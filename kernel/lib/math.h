@@ -13,4 +13,5 @@ T max(T a, T b) { return a > b ? a : b; }
 
 }
 
-using namespace klib;
+using klib::max;
+using klib::min;

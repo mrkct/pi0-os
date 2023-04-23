@@ -11,6 +11,11 @@ static inline constexpr uintptr_t bcm2835_bus_address_to_physical(uintptr_t addr
     return addr - 0x7e000000 + 0x20000000;
 }
 
+static inline constexpr uintptr_t videocore_address_to_physical(uintptr_t addr)
+{
+    return addr + 0x20000000;
+}
+
 template<typename T>
 static inline T ioread32(uintptr_t reg)
 {
@@ -41,15 +46,9 @@ static inline void wait_cycles(uint32_t cycles)
                  : [cycles] "+r"(cycles));
 }
 
-static inline void delay(int32_t count)
+static inline void memory_barrier()
 {
-    asm volatile(
-        "__delay_%=:\n"
-        "   subs %[count], %[count], #1;\n"
-        "   bne __delay_%=\n"
-        : "=r"(count)
-        : [count] "0"(count)
-        : "cc");
+    // TODO: Need more research on this
 }
 
 }
