@@ -30,6 +30,13 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(get_clock_rate(ClockId::ARM, clock_rate));
     kprintf("arm clock rate: %dHz\n", clock_rate);
 
+    Framebuffer fb;
+    MUST(allocate_framebuffer(fb));
+
+    for (int i = 0; i < fb.height; ++i)
+        for (int j = 0; j < fb.width; ++j)
+            fb.address[i * fb.width + j] = i * j;
+
     while (1)
         ;
 }

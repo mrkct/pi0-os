@@ -11,22 +11,26 @@ namespace kernel {
 
 static Error four_bytes_message(Channel channel, uint32_t tag_id, uint32_t& data)
 {
-    __attribute__((aligned(16))) MailboxMessage<1> message = MailboxMessage<1> {
-        .total_size = sizeof(message),
-        .request_response_code = 0,
-        .tag = {
-            .tag_id = tag_id,
-            .buffer_size = 4,
-            .request_response_codes_and_data_size = 0,
-            .data = { 0 } },
-        .end_tag = 0
-    };
+    struct __attribute__((aligned(16))) {
+        MailboxMessageHeader header;
+        struct {
+            uint32_t tag_id;
+            uint32_t buffer_size;
+            uint32_t request_response_codes_and_data_size;
+            uint32_t data;
+        } tags;
+        MailboxMessageTail tail;
+    } message;
 
-    auto r = mailbox_send_and_receive(channel, message);
-    if (r.is_success())
-        data = message.tag.data[0];
+    message.tags.tag_id = tag_id;
+    message.tags.buffer_size = sizeof(message.tags.data);
+    message.tags.request_response_codes_and_data_size = 0;
+    message.tags.data = 0;
 
-    return r;
+    TRY(mailbox_send_and_receive(channel, message));
+    data = message.tags.data;
+
+    return Success;
 }
 
 char const* get_display_name_from_board_revision_id(uint32_t revision)
@@ -101,22 +105,144 @@ Error get_firmware_revision(uint32_t& revision)
 
 Error get_clock_rate(ClockId clock, uint32_t& rate)
 {
-    __attribute__((aligned(16))) MailboxMessage<2> message = MailboxMessage<2> {
-        .total_size = sizeof(message),
-        .request_response_code = 0,
-        .tag = {
-            .tag_id = 0x00030002,
-            .buffer_size = 8,
-            .request_response_codes_and_data_size = 0,
-            .data = { static_cast<uint32_t>(clock), 0 } },
-        .end_tag = 0
+    struct __attribute__((aligned(16))) {
+        MailboxMessageHeader header;
+        struct {
+            uint32_t tag_id;
+            uint32_t buffer_size;
+            uint32_t request_response_codes_and_data_size;
+            uint32_t data[2];
+        } tags;
+        MailboxMessageTail tail;
+    } message;
+
+    message.tags.tag_id = 0x00030002;
+    message.tags.buffer_size = 8;
+    message.tags.request_response_codes_and_data_size = 0;
+    message.tags.data[0] = static_cast<uint32_t>(clock);
+    message.tags.data[1] = 0;
+
+    TRY(mailbox_send_and_receive(Channel::PropertyTagsARMToVc, message));
+    rate = message.tags.data[1];
+
+    return Success;
+}
+
+Error allocate_framebuffer(struct Framebuffer& fb)
+{
+    constexpr uint32_t width = 1280;
+    constexpr uint32_t height = 720;
+    constexpr uint32_t depth = 32;
+
+#define TAG_HEADER        \
+    uint32_t tag_id;      \
+    uint32_t buffer_size; \
+    uint32_t request_response_codes_and_data_size;
+
+    struct __attribute__((aligned(16))) {
+        MailboxMessageHeader header;
+        struct {
+            struct {
+                TAG_HEADER;
+                uint32_t width;
+                uint32_t height;
+            } set_physical_width_height_tag;
+            struct {
+                TAG_HEADER;
+                uint32_t width;
+                uint32_t height;
+            } set_virtual_width_height_tag;
+            struct {
+                TAG_HEADER;
+                uint32_t depth;
+            } set_depth_tag;
+            struct {
+                TAG_HEADER;
+                uint32_t pixel_order;
+            } set_pixel_order_tag;
+            struct {
+                TAG_HEADER;
+                uint32_t pitch;
+            } get_pitch_tag;
+            struct {
+                TAG_HEADER;
+                uint32_t x;
+                uint32_t y;
+            } set_virtual_offset_tag;
+            struct {
+                TAG_HEADER;
+                uint32_t alignment_or_address;
+                uint32_t size;
+            } allocate_buffer_tag;
+        } tags;
+        MailboxMessageTail tail;
+    } message;
+
+    {
+        message.tags.set_physical_width_height_tag.tag_id = 0x00048003;
+        message.tags.set_physical_width_height_tag.buffer_size = 8;
+        message.tags.set_physical_width_height_tag.request_response_codes_and_data_size = 0;
+        message.tags.set_physical_width_height_tag.width = width;
+        message.tags.set_physical_width_height_tag.height = height;
+    }
+    {
+        message.tags.set_virtual_width_height_tag.tag_id = 0x00048004;
+        message.tags.set_virtual_width_height_tag.buffer_size = 8;
+        message.tags.set_virtual_width_height_tag.request_response_codes_and_data_size = 0;
+        message.tags.set_virtual_width_height_tag.width = width;
+        message.tags.set_virtual_width_height_tag.height = height;
+    }
+    {
+        message.tags.set_depth_tag.tag_id = 0x00048005;
+        message.tags.set_depth_tag.buffer_size = 4;
+        message.tags.set_depth_tag.request_response_codes_and_data_size = 0;
+        message.tags.set_depth_tag.depth = depth;
+    }
+    {
+        message.tags.set_pixel_order_tag.tag_id = 0x00048006;
+        message.tags.set_pixel_order_tag.buffer_size = 4;
+        message.tags.set_pixel_order_tag.request_response_codes_and_data_size = 0;
+        message.tags.set_pixel_order_tag.pixel_order = 1; // RGB
+    }
+    {
+        message.tags.get_pitch_tag.tag_id = 0x00040008;
+        message.tags.get_pitch_tag.buffer_size = 4;
+        message.tags.get_pitch_tag.request_response_codes_and_data_size = 0;
+    }
+    {
+        message.tags.set_virtual_offset_tag.tag_id = 0x00048009;
+        message.tags.set_virtual_offset_tag.buffer_size = 8;
+        message.tags.set_virtual_offset_tag.request_response_codes_and_data_size = 0;
+        message.tags.set_virtual_offset_tag.x = 0;
+        message.tags.set_virtual_offset_tag.y = 0;
+    }
+    {
+        message.tags.allocate_buffer_tag.tag_id = 0x00040001;
+        message.tags.allocate_buffer_tag.buffer_size = 8;
+        message.tags.allocate_buffer_tag.request_response_codes_and_data_size = 0;
+        message.tags.allocate_buffer_tag.alignment_or_address = 16;
+    }
+
+    TRY(mailbox_send_and_receive(Channel::PropertyTagsARMToVc, message));
+
+    if (message.tags.set_physical_width_height_tag.width != width || message.tags.set_physical_width_height_tag.height != height || message.tags.set_virtual_width_height_tag.width != width || message.tags.set_virtual_width_height_tag.height != height || message.tags.set_depth_tag.depth != depth || message.tags.set_pixel_order_tag.pixel_order != 1 || message.tags.get_pitch_tag.pitch == 0 || message.tags.allocate_buffer_tag.alignment_or_address == 0)
+        return Error {
+            .generic_error_code = GenericErrorCode::BadResponse,
+            .device_specific_error_code = message.header.request_response_code,
+            .user_message = "Videocore IV refused to setup the framebuffer with the requested parameters",
+            .extra_data = nullptr
+        };
+
+    fb = Framebuffer {
+        .width = width,
+        .height = height,
+        .pitch = message.tags.get_pitch_tag.pitch,
+        .depth = depth,
+        .address = reinterpret_cast<uint32_t*>(message.tags.allocate_buffer_tag.alignment_or_address),
+        .size = message.tags.allocate_buffer_tag.size
     };
 
-    auto r = mailbox_send_and_receive(Channel::PropertyTagsARMToVc, message);
-    if (r.is_success())
-        rate = message.tag.data[1];
-
-    return r;
+    return Success;
 }
 
 }

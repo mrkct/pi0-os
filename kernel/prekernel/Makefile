@@ -2,7 +2,7 @@ SOURCES_ROOT=../../
 
 CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
-CXXFLAGS=-MMD -MP -mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc -fno-exceptions
+CXXFLAGS=-MMD -MP -mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc -fno-exceptions -fno-rtti -std=c++2a
 CXXFLAGS+=-I$(SOURCES_ROOT)
 CXXFLAGS+=-Wall -Wextra -g
 

@@ -8,6 +8,14 @@ Error get_board_revision(uint32_t& revision);
 char const* get_display_name_from_board_revision_id(uint32_t revision);
 Error get_firmware_revision(uint32_t& revision);
 
+struct Framebuffer {
+    size_t width, height;
+    size_t pitch, depth;
+    uint32_t* address;
+    size_t size;
+};
+Error allocate_framebuffer(struct Framebuffer&);
+
 enum class ClockId : uint32_t {
     EMMC = 1,
     UART,

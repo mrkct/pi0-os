@@ -20,21 +20,30 @@ enum class Channel : uint32_t {
     PropertyTagsVcToARM
 };
 
-template<uint32_t TagDataSize>
-struct MailboxMessage {
+struct MailboxMessageHeader {
     uint32_t total_size;
     uint32_t request_response_code;
-    struct {
-        uint32_t tag_id;
-        uint32_t buffer_size;
-        uint32_t request_response_codes_and_data_size;
-        uint32_t data[TagDataSize];
-    } tag;
-    uint32_t end_tag;
-} __attribute__((aligned(16)));
+};
 
-template<uint32_t TagDataSize>
-Error mailbox_send_and_receive(Channel channel, MailboxMessage<TagDataSize> volatile& mailbox_message)
+struct MailboxMessageTail {
+    uint32_t end_tag;
+};
+
+template<typename T>
+concept MailboxMessage = requires(T message) {
+                             {
+                                 message.header
+                             };
+                             {
+                                 message.tags
+                             };
+                             {
+                                 message.tail
+                             };
+                         };
+
+template<MailboxMessage M>
+Error mailbox_send_and_receive(Channel channel, M volatile& message)
 {
     static constexpr uintptr_t MAILBOX_BASE = videocore_address_to_physical(0x0000B880);
 
@@ -46,12 +55,11 @@ Error mailbox_send_and_receive(Channel channel, MailboxMessage<TagDataSize> vola
     while (ioread32<uint32_t>(MBOX_STATUS) & FULL)
         ;
 
-    mailbox_message.total_size = sizeof(mailbox_message);
-    mailbox_message.request_response_code = 0;
-    mailbox_message.tag.buffer_size = TagDataSize;
-    mailbox_message.end_tag = 0;
+    message.header.total_size = sizeof(message);
+    message.header.request_response_code = 0;
+    message.tail.end_tag = 0;
 
-    iowrite32(MBOX_WRITE, static_cast<uint32_t>(channel) | (reinterpret_cast<uintptr_t>(&mailbox_message) & 0xFFFFFFF0));
+    iowrite32(MBOX_WRITE, static_cast<uint32_t>(channel) | (reinterpret_cast<uintptr_t>(&message) & 0xFFFFFFF0));
 
     constexpr uint32_t EMPTY = 1 << 30;
     uint32_t response;
@@ -62,10 +70,10 @@ Error mailbox_send_and_receive(Channel channel, MailboxMessage<TagDataSize> vola
         response = ioread32<uint32_t>(MBOX_READ);
     } while ((response & 0xf) != static_cast<uint32_t>(channel));
 
-    if (mailbox_message.request_response_code != 0x80000000)
+    if (message.header.request_response_code != 0x80000000)
         return Error {
             GenericErrorCode::BadResponse,
-            mailbox_message.request_response_code,
+            message.header.request_response_code,
             "Mailbox response code is not 0x80000000, no further information is available",
             nullptr
         };
