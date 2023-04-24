@@ -46,6 +46,8 @@ struct Error {
                 __result.extra_data == nullptr ? "no" : "yes");                           \
     } while (0)
 
+#define TODO() panic("TODO: %s:%d\n", __FILE__, __LINE__)
+
 static constexpr Error Success { GenericErrorCode::Success, 0, "Success", nullptr };
 static constexpr Error ResponseTimeout { GenericErrorCode::ResponseTimeout, 0, "Device did not response in time", nullptr };
 static constexpr Error BadParameters { GenericErrorCode::BadParameters, 0, "Bad parameters", nullptr };
