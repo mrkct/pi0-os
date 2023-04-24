@@ -13,6 +13,9 @@ static constexpr uintptr_t GPFSEL4 = GPIO_BASE + 0x10;
 static constexpr uintptr_t GPFSEL5 = GPIO_BASE + 0x14;
 static constexpr uintptr_t GPFSEL_REGS[] = { GPFSEL0, GPFSEL1, GPFSEL2, GPFSEL3, GPFSEL4, GPFSEL5 };
 
+static constexpr uintptr_t GPHEN0 = GPIO_BASE + 0x64;
+static constexpr uintptr_t GPHEN1 = GPIO_BASE + 0x68;
+
 static constexpr uintptr_t GPPUD = GPIO_BASE + 0x94;
 static constexpr uintptr_t GPPUDCLK0 = GPIO_BASE + 0x98;
 static constexpr uintptr_t GPPUDCLK1 = GPIO_BASE + 0x9c;
@@ -52,6 +55,20 @@ Error gpio_set_pin_pull_up_down_state(uint8_t pin, PullUpDownState state)
     iowrite32(GPPUD, 0);
     iowrite32(GPPUDCLK0, 0);
     iowrite32(GPPUDCLK1, 0);
+
+    return Success;
+}
+
+Error gpio_set_pin_high_detect_enable(uint8_t pin, bool enable)
+{
+    if (pin > 53)
+        return BadParameters;
+
+    auto reg = pin < 32 ? GPHEN0 : GPHEN1;
+    if (enable)
+        iowrite32(reg, ioread32<uint32_t>(reg) | (1 << (pin % 32)));
+    else
+        iowrite32(reg, ioread32<uint32_t>(reg) & ~(1 << (pin % 32)));
 
     return Success;
 }
