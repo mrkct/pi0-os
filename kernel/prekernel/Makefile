@@ -6,7 +6,7 @@ CXXFLAGS=-MMD -MP -mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc -fno-e
 CXXFLAGS+=-I$(SOURCES_ROOT)
 CXXFLAGS+=-Wall -Wextra -g
 
-QEMU_FLAGS:=
+QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial mon:stdio -kernel Prekernel -sd $(SOURCES_ROOT)/disks/test.sd
 
 LIBS_SOURCES=\
 	kernel/lib/libc/string.cpp \
@@ -15,6 +15,7 @@ LIBS_SOURCES=\
 SOURCES=\
 	$(LIBS_SOURCES) \
 	kernel/device/gpio.cpp \
+	kernel/device/sd.cpp \
 	kernel/device/uart.cpp \
 	kernel/device/videocore.cpp \
 	kernel/kprintf.cpp \
@@ -32,11 +33,11 @@ OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 all: Prekernel
 
 qemu: Prekernel
-	qemu-system-arm -d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial mon:stdio -kernel Prekernel -append 'hello world'
+	qemu-system-arm $(QEMU_FLAGS)
 
 qemu-gdb: Prekernel
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	qemu-system-arm  -M raspi0 -serial mon:stdio -kernel Prekernel -s -S
+	qemu-system-arm $(QEMU_FLAGS) -s -S
 
 kernel7.img: Prekernel
 	$(OBJCOPY) Prekernel -O binary kernel7.img

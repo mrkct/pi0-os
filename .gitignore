@@ -1,4 +1,5 @@
 Prekernel
+disks/*
 
 # Prerequisites
 *.d
