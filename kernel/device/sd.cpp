@@ -76,20 +76,6 @@ enum class AppCommand : uint32_t {
     SendSCR = 0x33220010,
 };
 
-template<typename Callback>
-Error retry_with_timeout(Callback callback)
-{
-    constexpr uint32_t TIMEOUT = 1000000;
-    for (uint32_t i = 0; i < TIMEOUT; ++i) {
-        if (callback())
-            return Success;
-
-        wait_cycles(500);
-    }
-
-    return ResponseTimeout;
-}
-
 enum class Version {
     V1,
     V2,

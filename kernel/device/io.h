@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <kernel/error.h>
 
 namespace kernel {
 
@@ -49,6 +50,20 @@ static inline void wait_cycles(uint32_t cycles)
 static inline void memory_barrier()
 {
     // TODO: Need more research on this
+}
+
+template<typename Callback>
+Error retry_with_timeout(Callback callback)
+{
+    constexpr uint32_t TIMEOUT = 1000000;
+    for (uint32_t i = 0; i < TIMEOUT; ++i) {
+        if (callback())
+            return Success;
+
+        wait_cycles(500);
+    }
+
+    return ResponseTimeout;
 }
 
 }
