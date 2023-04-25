@@ -1,3 +1,4 @@
+#include <kernel/device/sd.h>
 #include <kernel/device/uart.h>
 #include <kernel/device/videocore.h>
 #include <kernel/kprintf.h>
@@ -30,11 +31,28 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(get_clock_rate(ClockId::ARM, clock_rate));
     kprintf("arm clock rate: %dHz\n", clock_rate);
 
+    MUST(sdhc_init());
+    if (sdhc_contains_card()) {
+        SDCard card;
+        MUST(sdhc_initialize_inserted_card(card));
+        kprintf("sdhc card initialized\n");
+
+        uint8_t first_three_blocks[3 * 512];
+        MUST(sd_read_block(card, 0, 3, first_three_blocks));
+
+        for (size_t i = 0; i < 3; ++i) {
+            kprintf("\tblock %d: ", i);
+            for (size_t j = 0; j < 32; ++j)
+                kprintf("%c", first_three_blocks[i * 512 + j]);
+            kprintf("\n");
+        }
+    }
+
     Framebuffer fb;
     MUST(allocate_framebuffer(fb));
 
-    for (int i = 0; i < fb.height; ++i)
-        for (int j = 0; j < fb.width; ++j)
+    for (size_t i = 0; i < fb.height; ++i)
+        for (size_t j = 0; j < fb.width; ++j)
             fb.address[i * fb.width + j] = i * j;
 
     while (1)
