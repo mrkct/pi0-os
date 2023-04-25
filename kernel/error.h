@@ -11,7 +11,31 @@ enum class GenericErrorCode {
     BadParameters,
     BadResponse,
     NotInitialized,
+    NotConnected,
+    DeviceNotReady,
 };
+
+static constexpr char const* __generic_error_code_to_string(GenericErrorCode code)
+{
+    switch (code) {
+    case GenericErrorCode::Success:
+        return "Success";
+    case GenericErrorCode::ResponseTimeout:
+        return "ResponseTimeout";
+    case GenericErrorCode::BadParameters:
+        return "BadParameters";
+    case GenericErrorCode::BadResponse:
+        return "BadResponse";
+    case GenericErrorCode::NotInitialized:
+        return "NotInitialized";
+    case GenericErrorCode::NotConnected:
+        return "NotConnected";
+    case GenericErrorCode::DeviceNotReady:
+        return "DeviceNotReady";
+    default:
+        return "Unknown";
+    }
+}
 
 struct Error {
     GenericErrorCode generic_error_code;
@@ -34,13 +58,14 @@ struct Error {
         auto __result = (expr);                                                           \
         if (!__result.is_success())                                                       \
             panic(                                                                        \
-                "=========== KERNEL PANIC :^( ===========\n"                              \
                 "The following expression returned an error:\n" #expr "\n"                \
-                "| Error: %d\n"                                                           \
+                "Called from %s:%d\n"                                                     \
+                "| Error: %s\n"                                                           \
                 "| DeviceSpecificError: %lu (%lx)\n"                                      \
                 "| Message: \"%s\"\n"                                                     \
                 "| Extra data available: %s\n",                                           \
-                static_cast<int>(__result.generic_error_code),                            \
+                __FILE__, __LINE__,                                                       \
+                __generic_error_code_to_string(__result.generic_error_code),              \
                 __result.device_specific_error_code, __result.device_specific_error_code, \
                 __result.user_message,                                                    \
                 __result.extra_data == nullptr ? "no" : "yes");                           \
@@ -52,5 +77,7 @@ static constexpr Error Success { GenericErrorCode::Success, 0, "Success", nullpt
 static constexpr Error ResponseTimeout { GenericErrorCode::ResponseTimeout, 0, "Device did not response in time", nullptr };
 static constexpr Error BadParameters { GenericErrorCode::BadParameters, 0, "Bad parameters", nullptr };
 static constexpr Error DeviceNotInitialized { GenericErrorCode::NotInitialized, 0, "Device was not initialized before usage", nullptr };
+static constexpr Error DeviceNotConnected { GenericErrorCode::NotConnected, 0, "Device is not connected", nullptr };
+static constexpr Error DeviceNotReady { GenericErrorCode::DeviceNotReady, 0, "Device is not yet ready, retry the operation", nullptr };
 
 }
