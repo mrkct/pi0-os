@@ -1,6 +1,7 @@
 #include <kernel/device/sd.h>
 #include <kernel/device/uart.h>
 #include <kernel/device/videocore.h>
+#include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -54,6 +55,14 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     for (size_t i = 0; i < fb.height; ++i)
         for (size_t j = 0; j < fb.width; ++j)
             fb.address[i * fb.width + j] = i * j;
+
+    install_software_interrupt(123, [](InterruptFrame*) {
+        kprintf("BEEP!\n");
+    });
+
+    kprintf("Calling software interrupt...\n");
+    asm volatile("swi #123");
+    kprintf("Returned from software interrupt!\n");
 
     while (1)
         ;

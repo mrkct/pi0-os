@@ -2,12 +2,19 @@ ENTRY(_start)
  
 SECTIONS
 {
+    . = 0x0000;
+    .vector_table :
+    {
+        KEEP(*(.vector_table.table))
+    }
+
     . = 0x8000;
     __start = .;
     __text_start = .;
     .text :
     {
         KEEP(*(.text.boot))
+        KEEP(*(.text.vector_trampolines))
         *(.text)
     }
     . = ALIGN(4096);

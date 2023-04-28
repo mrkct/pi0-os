@@ -18,9 +18,11 @@ SOURCES=\
 	kernel/device/sd.cpp \
 	kernel/device/uart.cpp \
 	kernel/device/videocore.cpp \
+	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \
+	kernel/prekernel/vector_table.S
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))
