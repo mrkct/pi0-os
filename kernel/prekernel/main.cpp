@@ -1,4 +1,5 @@
 #include <kernel/device/sd.h>
+#include <kernel/device/systimer.h>
 #include <kernel/device/uart.h>
 #include <kernel/device/videocore.h>
 #include <kernel/interrupt.h>
@@ -56,13 +57,31 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         for (size_t j = 0; j < fb.width; ++j)
             fb.address[i * fb.width + j] = i * j;
 
-    install_software_interrupt_handler(123, [](auto*) {
+    interrupt_init();
+    interrupt_install_swi_handler(123, [](auto*) {
         kprintf("BEEP!\n");
     });
 
     kprintf("Calling software interrupt...\n");
     asm volatile("swi #123");
     kprintf("Returned from software interrupt!\n");
+
+    systimer_init();
+    interrupt_enable();
+
+    systimer_exec_after(3 * 1000000, []() {
+        kprintf("TIMER TRIGGERED!\n");
+    });
+
+    uint64_t start = systimer_get_ticks();
+    int count = 0;
+    while (true) {
+        while (systimer_get_ticks() - start < 1000000)
+            ;
+        kprintf("tick. %d\n", count);
+        start = systimer_get_ticks();
+        count++;
+    }
 
     while (1)
         ;

@@ -12,11 +12,16 @@ struct VectorFrame {
     uint32_t lr_mode, spsr_mode;
 };
 
-void init_interrupts();
+typedef void (*InterruptHandler)(VectorFrame*);
 
-void enable_interrupts();
-void disable_interrupts();
+void interrupt_init();
 
-void install_software_interrupt_handler(uint32_t swi_number, void (*handler)(struct VectorFrame*));
+static inline void interrupt_enable() { asm volatile("cpsie i"); }
+static inline void interrupt_disable() { asm volatile("cpsid i"); }
+
+void interrupt_install_swi_handler(uint32_t swi_number, InterruptHandler);
+void interrupt_install_basic_irq_handler(uint32_t irq_number, InterruptHandler);
+void interrupt_install_irq1_handler(uint32_t irq_number, InterruptHandler);
+void interrupt_install_irq2_handler(uint32_t irq_number, InterruptHandler);
 
 }

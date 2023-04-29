@@ -16,6 +16,7 @@ SOURCES=\
 	$(LIBS_SOURCES) \
 	kernel/device/gpio.cpp \
 	kernel/device/sd.cpp \
+	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \
 	kernel/device/videocore.cpp \
 	kernel/interrupt.cpp \

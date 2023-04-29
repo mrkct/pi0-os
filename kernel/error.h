@@ -13,6 +13,7 @@ enum class GenericErrorCode {
     NotInitialized,
     NotConnected,
     DeviceNotReady,
+    DeviceIsBusy
 };
 
 static constexpr char const* __generic_error_code_to_string(GenericErrorCode code)
@@ -32,6 +33,8 @@ static constexpr char const* __generic_error_code_to_string(GenericErrorCode cod
         return "NotConnected";
     case GenericErrorCode::DeviceNotReady:
         return "DeviceNotReady";
+    case GenericErrorCode::DeviceIsBusy:
+        return "DeviceIsBusy";
     default:
         return "Unknown";
     }
@@ -79,5 +82,6 @@ static constexpr Error BadParameters { GenericErrorCode::BadParameters, 0, "Bad 
 static constexpr Error DeviceNotInitialized { GenericErrorCode::NotInitialized, 0, "Device was not initialized before usage", nullptr };
 static constexpr Error DeviceNotConnected { GenericErrorCode::NotConnected, 0, "Device is not connected", nullptr };
 static constexpr Error DeviceNotReady { GenericErrorCode::DeviceNotReady, 0, "Device is not yet ready, retry the operation", nullptr };
+static constexpr Error DeviceIsBusy { GenericErrorCode::DeviceIsBusy, 0, "Device is busy, retry the operation", nullptr };
 
 }
