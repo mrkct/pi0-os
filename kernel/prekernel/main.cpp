@@ -56,7 +56,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         for (size_t j = 0; j < fb.width; ++j)
             fb.address[i * fb.width + j] = i * j;
 
-    install_software_interrupt(123, [](InterruptFrame*) {
+    install_software_interrupt_handler(123, [](auto*) {
         kprintf("BEEP!\n");
     });
 

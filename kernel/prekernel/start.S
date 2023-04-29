@@ -4,7 +4,6 @@ __early_stack_start:
     .space 0x8000
 __early_stack_end:
 
-
 .section ".text.boot"
 .globl _start
 _start:
