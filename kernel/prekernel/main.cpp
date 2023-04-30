@@ -1,11 +1,15 @@
 #include <kernel/device/sd.h>
 #include <kernel/device/systimer.h>
 #include <kernel/device/uart.h>
+#include <kernel/device/videoconsole.h>
 #include <kernel/device/videocore.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
+#include <kernel/memory/pagealloc.h>
 #include <stddef.h>
 #include <stdint.h>
+
+static kernel::VideoConsole vc;
 
 extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 {
@@ -53,9 +57,8 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     Framebuffer fb;
     MUST(allocate_framebuffer(fb));
 
-    for (size_t i = 0; i < fb.height; ++i)
-        for (size_t j = 0; j < fb.width; ++j)
-            fb.address[i * fb.width + j] = i * j;
+    videoconsole_init(vc, fb, 24, 32);
+    kprintf_video_init(vc);
 
     interrupt_init();
     interrupt_install_swi_handler(123, [](auto*) {
@@ -65,6 +68,8 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     kprintf("Calling software interrupt...\n");
     asm volatile("swi #123");
     kprintf("Returned from software interrupt!\n");
+
+    page_allocator_init();
 
     systimer_init();
     interrupt_enable();

@@ -1,8 +1,16 @@
 #include <kernel/device/uart.h>
+#include <kernel/device/videoconsole.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
 
 namespace kernel {
+
+static VideoConsole* g_video_console;
+
+void kprintf_video_init(VideoConsole& video_console)
+{
+    g_video_console = &video_console;
+}
 
 static bool represent_integer(char* buffer, size_t* written, size_t buffer_size, uint64_t num, int base, int pad_to)
 {
@@ -157,8 +165,11 @@ size_t kprintf(char const* format, ...)
     va_end(args);
 
     auto uart = uart_device();
-    for (size_t i = 0; i < written; i++)
+    for (size_t i = 0; i < written; i++) {
         uart.write(&uart.data, (unsigned char)buffer[i]);
+        if (g_video_console != nullptr)
+            videoconsole_putc(*g_video_console, buffer[i]);
+    }
 
     return written;
 }

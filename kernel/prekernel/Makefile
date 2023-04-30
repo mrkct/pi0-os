@@ -20,6 +20,7 @@ SOURCES=\
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \
+	kernel/device/videoconsole.cpp \
 	kernel/device/videocore.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \

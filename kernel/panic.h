@@ -1,6 +1,10 @@
 #pragma once
 
-#include <kernel/kprintf.h>
+#include <stddef.h>
+
+namespace kernel {
+size_t kprintf(char const* format, ...);
+}
 
 #define panic(...)                                                     \
     do {                                                               \
