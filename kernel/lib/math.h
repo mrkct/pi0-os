@@ -11,6 +11,9 @@ T min(T a, T b) { return a < b ? a : b; }
 template<typename T>
 T max(T a, T b) { return a > b ? a : b; }
 
+template<typename T>
+T round_up(T a, T b) { return (a + b - 1) / b * b; }
+
 }
 
 using klib::max;
