@@ -10,7 +10,9 @@ QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial mon:stdio -ker
 
 LIBS_SOURCES=\
 	kernel/lib/libc/string.cpp \
-	kernel/lib/memory.cpp
+	kernel/lib/memory.cpp \
+	kernel/lib/psf/default_font.cpp \
+	kernel/lib/psf/psf.cpp
 
 SOURCES=\
 	$(LIBS_SOURCES) \
