@@ -48,7 +48,7 @@ SECTIONS
     __bss_size = __bss_end - __bss_start;
 
     . = ALIGN(4096);
-    
+    __heap_start = .;
 
 
     __end = .;

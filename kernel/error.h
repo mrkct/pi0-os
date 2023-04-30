@@ -13,7 +13,8 @@ enum class GenericErrorCode {
     NotInitialized,
     NotConnected,
     DeviceNotReady,
-    DeviceIsBusy
+    DeviceIsBusy,
+    OutOfMemory,
 };
 
 static constexpr char const* __generic_error_code_to_string(GenericErrorCode code)
@@ -35,6 +36,8 @@ static constexpr char const* __generic_error_code_to_string(GenericErrorCode cod
         return "DeviceNotReady";
     case GenericErrorCode::DeviceIsBusy:
         return "DeviceIsBusy";
+    case GenericErrorCode::OutOfMemory:
+        return "OutOfMemory";
     default:
         return "Unknown";
     }
@@ -83,5 +86,6 @@ static constexpr Error DeviceNotInitialized { GenericErrorCode::NotInitialized, 
 static constexpr Error DeviceNotConnected { GenericErrorCode::NotConnected, 0, "Device is not connected", nullptr };
 static constexpr Error DeviceNotReady { GenericErrorCode::DeviceNotReady, 0, "Device is not yet ready, retry the operation", nullptr };
 static constexpr Error DeviceIsBusy { GenericErrorCode::DeviceIsBusy, 0, "Device is busy, retry the operation", nullptr };
+static constexpr Error OutOfMemory { GenericErrorCode::OutOfMemory, 0, "Out of memory", nullptr };
 
 }

@@ -21,6 +21,7 @@ SOURCES=\
 	kernel/device/videocore.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
+	kernel/memory/pagealloc.cpp \
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \
 	kernel/prekernel/vector_table.S
