@@ -33,6 +33,8 @@ SECTIONS
     {
         *(.data)
         KEEP(*(.data.boot))
+        . = ALIGN(16384);
+        KEEP(*(.data.boot.early_translation_table))
     }
     . = ALIGN(4096);
     __data_end = .;
