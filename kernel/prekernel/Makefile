@@ -6,7 +6,7 @@ CXXFLAGS=-MMD -MP -mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc -fno-e
 CXXFLAGS+=-I$(SOURCES_ROOT)
 CXXFLAGS+=-Wall -Wextra -g
 
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial mon:stdio -kernel Prekernel -sd $(SOURCES_ROOT)/disks/test.sd
+QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial stdio -kernel Prekernel -sd $(SOURCES_ROOT)/disks/test.sd
 
 LIBS_SOURCES=\
 	kernel/lib/libc/string.cpp \
