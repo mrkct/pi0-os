@@ -17,10 +17,24 @@ static inline constexpr uintptr_t videocore_address_to_physical(uintptr_t addr)
     return addr + 0x20000000;
 }
 
+static inline void memory_barrier()
+{
+    asm volatile(
+        "mcr p15, 0, r3, c7, c5, 0  \n" // Invalidate instruction cache
+        "mcr p15, 0, r3, c7, c5, 6  \n" // Invalidate BTB
+        "mcr p15, 0, r3, c7, c10, 4 \n" // Drain write buffer
+        "mcr p15, 0, r3, c7, c5, 4  \n" // Prefetch flush
+        :
+        :
+        : "r3");
+}
+
 template<typename T>
 static inline T ioread32(uintptr_t reg)
 {
     static_assert(sizeof(T) == 4, "ioread32 can only read 32-bit values but the template parameter is not 32-bit wide");
+
+    memory_barrier();
     union {
         uint32_t u32;
         T t;
@@ -37,6 +51,7 @@ static inline void iowrite32(uintptr_t reg, T data)
         uint32_t u32;
         T t;
     } u;
+    memory_barrier();
     u.t = data;
     *reinterpret_cast<uint32_t volatile*>(reg) = u.u32;
 }
@@ -45,11 +60,6 @@ static inline void wait_cycles(uint32_t cycles)
 {
     asm volatile("1: subs %[cycles], %[cycles], #1; bne 1b"
                  : [cycles] "+r"(cycles));
-}
-
-static inline void memory_barrier()
-{
-    // TODO: Need more research on this
 }
 
 template<typename Callback>
