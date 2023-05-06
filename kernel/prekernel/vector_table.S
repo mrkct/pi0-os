@@ -1,5 +1,4 @@
-// Define section "vector_table.boot" in assembly
-.section ".vector_table.table", "a"
+.section ".vector_table.table", "aw"
 vector_table:
     ldr pc, =reset_trampoline
     ldr pc, =undefined_instruction_trampoline
@@ -10,9 +9,7 @@ vector_table:
     ldr pc, =irq_trampoline
     ldr pc, =fast_irq_trampoline
 
-.section ".text.vector_trampolines", "ax"
-.align 2
-
+.section ".vector_table.trampolines", "ax"
 .extern irq_and_exception_handler
 .macro TRAMPOLINE name, vector_offset
 \name :

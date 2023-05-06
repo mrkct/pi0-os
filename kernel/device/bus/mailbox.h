@@ -3,6 +3,7 @@
 #include <kernel/device/io.h>
 #include <kernel/error.h>
 #include <kernel/kprintf.h>
+#include <kernel/memory/mmu.h>
 #include <stddef.h>
 
 namespace kernel {
@@ -59,7 +60,7 @@ Error mailbox_send_and_receive(Channel channel, M volatile& message)
     message.header.request_response_code = 0;
     message.tail.end_tag = 0;
 
-    iowrite32(MBOX_WRITE, static_cast<uint32_t>(channel) | (reinterpret_cast<uintptr_t>(&message) & 0xFFFFFFF0));
+    iowrite32(MBOX_WRITE, static_cast<uint32_t>(channel) | (virt2phys(reinterpret_cast<uintptr_t>(&message)) & 0xFFFFFFF0));
 
     constexpr uint32_t EMPTY = 1 << 30;
     uint32_t response;
