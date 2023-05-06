@@ -1,6 +1,7 @@
 #pragma once
 
 #include <kernel/error.h>
+#include <kernel/memory/areas.h>
 #include <stdint.h>
 
 namespace kernel {
@@ -33,6 +34,8 @@ template<typename T>
 static inline T ioread32(uintptr_t reg)
 {
     static_assert(sizeof(T) == 4, "ioread32 can only read 32-bit values but the template parameter is not 32-bit wide");
+    if (!areas::peripherals.contains(reg))
+        panic("ioread32: address %p is not in the peripherals area", reg);
 
     memory_barrier();
     union {
@@ -47,6 +50,9 @@ template<typename T>
 static inline void iowrite32(uintptr_t reg, T data)
 {
     static_assert(sizeof(T) == 4, "iowrite32 can only write 32-bit values but the template parameter is not 32-bit wide");
+    if (!areas::peripherals.contains(reg))
+        panic("iowrite32: address %p is not in the peripherals area", reg);
+
     union {
         uint32_t u32;
         T t;
