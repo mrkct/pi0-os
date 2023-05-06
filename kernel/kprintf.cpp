@@ -90,10 +90,11 @@ size_t ksnprintf(char* buffer, size_t buffer_size, char const* format, va_list a
         }
 
         case 'l': {
+            // FIXME: "long" is actually 4 bytes on arm6, yet here we treat it as 8 bytes
             char next = format[++i]; // FIXME: Bound checking
 
             if (next == 'd') {
-                long num = va_arg(args, long);
+                long num = va_arg(args, int64_t);
                 if (num < 0) {
                     APPEND('-');
                     num = -num;
@@ -101,10 +102,10 @@ size_t ksnprintf(char* buffer, size_t buffer_size, char const* format, va_list a
                 if (!represent_integer(buffer, &written, buffer_size, (uint64_t)num, 10, 0))
                     goto append_terminator_and_return;
             } else if (next == 'u') {
-                if (!represent_integer(buffer, &written, buffer_size, va_arg(args, unsigned long), 10, 0))
+                if (!represent_integer(buffer, &written, buffer_size, va_arg(args, uint64_t), 10, 0))
                     goto append_terminator_and_return;
             } else if (next == 'x') {
-                if (!represent_integer(buffer, &written, buffer_size, va_arg(args, unsigned long), 16, 8))
+                if (!represent_integer(buffer, &written, buffer_size, va_arg(args, uint64_t), 16, 8))
                     goto append_terminator_and_return;
             } else {
                 APPEND('%');
