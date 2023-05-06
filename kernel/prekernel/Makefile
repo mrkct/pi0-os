@@ -32,6 +32,7 @@ SOURCES=\
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))
+DEPENDS:=$(DEPENDS) linker.ld 
 DEPENDS:= $(addprefix $(SOURCES_ROOT), $(DEPENDS))
 OBJS:=$(addsuffix .o, $(SOURCES))
 OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
