@@ -30,7 +30,7 @@ Error uart_read(void*, uint8_t&);
 Error uart_write(void*, uint8_t);
 
 struct UartData {
-    bool initialized { true };
+    bool initialized { false };
 };
 static UartData g_uart0;
 
