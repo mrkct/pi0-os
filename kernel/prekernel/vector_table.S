@@ -1,4 +1,4 @@
-.section ".vector_table.table", "aw"
+.section ".vector_table.table", "a"
 vector_table:
     ldr pc, =reset_trampoline
     ldr pc, =undefined_instruction_trampoline
