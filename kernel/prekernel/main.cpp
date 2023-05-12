@@ -57,7 +57,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     Framebuffer fb;
     MUST(allocate_framebuffer(fb));
 
-    videoconsole_init(vc, fb, 24, 32);
+    MUST(videoconsole_init(vc, fb, 24, 32));
     kprintf_video_init(vc);
 
     interrupt_init();
