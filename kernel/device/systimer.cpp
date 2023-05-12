@@ -31,7 +31,7 @@ void systimer_init()
     static constexpr uint32_t CS_M1 = 1 << 1;
     static constexpr uint32_t CS_M3 = 1 << 3;
 
-    iowrite32<uint32_t>(CS_M1 | CS_M3, SYSTIMER_CS);
+    iowrite32<uint32_t>(SYSTIMER_CS, CS_M1 | CS_M3);
 
     interrupt_install_irq1_handler(1, [](auto*) {
         if (g_channel1_callback != nullptr)
