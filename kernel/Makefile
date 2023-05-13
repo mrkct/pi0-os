@@ -2,10 +2,13 @@ SOURCES_ROOT=../
 
 CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
-CXXFLAGS=-MMD -MP -mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc -fno-exceptions -fno-rtti -std=c++2a
-CXXFLAGS+=-I$(SOURCES_ROOT)
+
+CXXFLAGS=-mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc
+CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT)
+CXXFLAGS+=-fno-exceptions -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
+QEMU:=qemu-system-arm
 QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial stdio -kernel Kernel -sd $(SOURCES_ROOT)/disks/test.sd
 
 LIBS_SOURCES=\
@@ -42,11 +45,11 @@ OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 all: Kernel
 
 qemu: Kernel
-	qemu-system-arm $(QEMU_FLAGS)
+	$(QEMU) $(QEMU_FLAGS)
 
 qemu-gdb: Kernel
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	qemu-system-arm $(QEMU_FLAGS) -s -S
+	$(QEMU) $(QEMU_FLAGS) -s -S
 
 kernel7.img: Kernel
 	$(OBJCOPY) Kernel -O binary kernel7.img
