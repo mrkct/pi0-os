@@ -3,7 +3,7 @@
 #include <kernel/device/io.h>
 #include <kernel/error.h>
 #include <kernel/kprintf.h>
-#include <kernel/memory/mmu.h>
+#include <kernel/memory/virtualmem.h>
 #include <stddef.h>
 
 namespace kernel {

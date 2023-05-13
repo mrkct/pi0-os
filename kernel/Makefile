@@ -27,7 +27,7 @@ SOURCES=\
 	kernel/device/videocore.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
-	kernel/memory/mmu.cpp \
+	kernel/memory/virtualmem.cpp \
 	kernel/memory/pagealloc.cpp \
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \

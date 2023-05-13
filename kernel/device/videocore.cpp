@@ -233,13 +233,19 @@ Error allocate_framebuffer(struct Framebuffer& fb)
             .extra_data = nullptr
         };
 
+    auto phys_addr = static_cast<uintptr_t>(message.tags.allocate_buffer_tag.alignment_or_address);
+    auto size = message.tags.allocate_buffer_tag.size;
+    uint32_t* virt_addr;
+    TRY(mmu_map_framebuffer(virt_addr, phys_addr, size));
+
     fb = Framebuffer {
         .width = width,
         .height = height,
         .pitch = message.tags.get_pitch_tag.pitch,
         .depth = depth,
-        .address = reinterpret_cast<uint32_t*>(message.tags.allocate_buffer_tag.alignment_or_address),
-        .size = message.tags.allocate_buffer_tag.size
+        .physical_address = phys_addr,
+        .address = virt_addr,
+        .size = size
     };
 
     return Success;

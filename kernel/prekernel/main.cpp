@@ -6,6 +6,7 @@
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
 #include <kernel/memory/pagealloc.h>
+#include <kernel/memory/virtualmem.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -15,12 +16,18 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 {
     using namespace kernel;
 
+    mmu_prepare_kernel_address_space();
+
     auto uart = uart_device();
 
     uart.init(uart.data);
 
     kprintf("Hello, kernel world!\n");
     kprintf("int test. negative value: %d, positive value: %d\n", -1, 1);
+    kprintf("unsigned int test. value: %u\n", 1u);
+    kprintf("long test. negative value: %ld, positive value: %ld\n", -1l, 1l);
+    kprintf("unsigned long test. value: %lu\n", 1ul);
+    kprintf("sizeof(unsigned long) = %d   sizeof(int) = %d\n", sizeof(unsigned long), sizeof(unsigned int));
     kprintf("hex test. value: %x\n", 0xabcd1234);
     kprintf("pointer: %p\n", (void*)0x5678);
     kprintf("string: %s\n", "Hello, world!");

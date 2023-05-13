@@ -18,43 +18,59 @@ SECTIONS
     {
         KEEP(*(.prekernel.text))
     }
-    .prekernel.data ALIGN(4K):
-    {
-        *(.prekernel.data)
-    }
-    .prekernel.data.early_translation_table ALIGN(16K):
-    {
-        *(.prekernel.data.early_translation_table)
-    }
     __prekernel_end = .;
 
     . = 0xe0000000 + 1M;
     __kernel_start = .;
-    __text_start = .;
+    
     .text ALIGN(4K) : AT(ADDR(.text) - 0xe0000000)
     {
+        . = ALIGN(4);
+        __text_start = .;
+
         *(.text)
+
+        __text_end = .;
+        . = ALIGN(4);
     }
-    __text_end = .;
-    __rodata_start = .;
+    
+    
     .rodata ALIGN(4K) : AT(ADDR(.rodata) - 0xe0000000)
     {
+        . = ALIGN(4);
+        __rodata_start = .;
+
         *(.rodata)
+        *(.rodata*)
+
+        . = ALIGN(4);
+        __rodata_end = .;
     }
-    __rodata_end = .;
-    __data_start = .;
+    
     .data ALIGN(4K) : AT(ADDR(.data) - 0xe0000000)
     {
+        . = ALIGN(4);
+        __data_start = .;
+
         *(.data)
+
+        . = ALIGN(4);
+        __data_end = .;
     }
-    __data_end = .;
-    __bss_start = .;
+    
     .bss ALIGN(4K) : AT(ADDR(.bss) - 0xe0000000)
     {
+        . = ALIGN(4);
+        __bss_start = .;
+
         bss = .;
         *(.bss)
+        *(.bss*)
+        *(COMMON)
+
+        . = ALIGN(4);
+        __bss_end = .;
     }
-    __bss_end = .;
     __bss_size = __bss_end - __bss_start;
     
     . = ALIGN(4096);

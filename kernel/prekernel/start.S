@@ -1,22 +1,16 @@
-.section ".prekernel.data.early_translation_table"
-.global early_translation_table
-early_translation_table:
-    .space 16 * 1024
-early_translation_table_end:
-
 .section ".prekernel.text", "ax"
 .globl _start
 _start:
     // 1. The RPi firmware passes some useful info in r0, r1, r2
     //    so let's setup the stack to save them
-    ldr sp, =(__kernel_stack_end - 0xe0000000)
+    ldr sp, =(_kernel_stack_end - 0xe0000000)
     push {r0, r1, r2}
 
     // 2. Let's setup the MMU so we can start using the higher half kernel    
     
     // 2.1 First, let's zero out the translation table
-    ldr r0, =early_translation_table
-    ldr r1, =early_translation_table_end
+    ldr r0, =(_kernel_translation_table - 0xe0000000)
+    ldr r1, =(_kernel_translation_table_end - 0xe0000000)
     mov r2, #0
 1:
     str r2, [r0]
@@ -33,7 +27,7 @@ _start:
     //            [0xe0000000, 0xe2000000]
     //        to the first 32MBs of physical RAM 
 
-    ldr r0, =early_translation_table
+    ldr r0, =(_kernel_translation_table - 0xe0000000)
     movs r1, #0xe0000000                    // Start address of higher half kernel
     lsr r1, r1, #20                         // Get the index in the translation table
     lsl r1, r1, #2                          // Multiply by 4 to get the index in the translation table
@@ -52,11 +46,12 @@ _start:
     cmp r3, #32
     blo 1b
 
-    // 2.2.2 Let's also identity map the peripherals so we can get some
+    // 2.2.2 Let's also map the peripherals so we can get some
     //       UART output for debugging.
-    //       The peripherals memory area starts at 0x20000000 and its 16MBs
-    ldr r0, =early_translation_table
-    movs r1, #0x20000000                    // Start address of peripherals memory area
+    //       The peripherals memory area starts at 0x20000000 and its 16MBs,
+    //       so we'll map it to the 16MBs after the higher half kernel
+    ldr r0, =(_kernel_translation_table - 0xe0000000)
+    movs r1, #0xe2000000                    // Start address of peripherals memory area
     lsr r1, r1, #20                         // Get the index in the translation table
     lsl r1, r1, #2                          // Multiply by 4 to get the index in the translation table
     add r1, r0, r1                          // Add the base address of the translation table
@@ -80,7 +75,7 @@ _start:
     movs r0, #0xffffffff                    // All domains set to "Manager"(no permission checking)
     mcr p15, 0, r0, c3, c0, 0               // Write "Domain Access Control Register"
 
-    ldr r0, =early_translation_table
+    ldr r0, =(_kernel_translation_table - 0xe0000000)
     mcr p15, 0, r0, c2, c0, 0               // Write "Translation Table Base Register 0"
     mcr p15, 0, r0, c2, c0, 1               // Write "Translation Table Base Register 1"
 
@@ -127,9 +122,16 @@ halt:
     wfe
     b halt
 
-.section ".data.boot", "aw"
-.global __kernel_stack_start
-__kernel_stack_start:
+.section ".data", "aw"
+.global _kernel_stack_start
+_kernel_stack_start:
     .space 0x8000
-.global __kernel_stack_end
-__kernel_stack_end:
+.global _kernel_stack_end
+_kernel_stack_end:
+
+.global _kernel_translation_table
+.balign 16384
+_kernel_translation_table:
+    .space 16 * 1024
+_kernel_translation_table_end:
+.size _kernel_translation_table, _kernel_translation_table_end - _kernel_translation_table

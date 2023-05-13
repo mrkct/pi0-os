@@ -6,16 +6,14 @@
 
 namespace kernel {
 
-static constexpr uintptr_t MMIO_BASE = 0x3F000000;
-
 static inline constexpr uintptr_t bcm2835_bus_address_to_physical(uintptr_t addr)
 {
-    return addr - 0x7e000000 + 0x20000000;
+    return areas::peripherals.start + (addr - 0x7e000000);
 }
 
 static inline constexpr uintptr_t videocore_address_to_physical(uintptr_t addr)
 {
-    return addr + 0x20000000;
+    return areas::peripherals.start + addr;
 }
 
 static inline void memory_barrier()
