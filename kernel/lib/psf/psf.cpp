@@ -7,12 +7,12 @@ using kernel::GenericErrorCode;
 
 namespace klib {
 
-extern "C" uint8_t __resource_psf_font[];
-extern "C" size_t __resource_psf_font_size;
+extern "C" const uint8_t _resource_psf_font[];
+extern "C" const size_t _resource_psf_font_size;
 
 kernel::Error psf_load_default(PSFFont& font)
 {
-    return psf_load(font, (uint8_t const*)__resource_psf_font, __resource_psf_font_size);
+    return psf_load(font, _resource_psf_font, _resource_psf_font_size);
 }
 
 kernel::Error psf_load(PSFFont& font, uint8_t const* data, size_t size)

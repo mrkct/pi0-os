@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-extern "C" constexpr uint8_t const __resource_psf_font[] = {
+extern "C" constexpr uint8_t const _resource_psf_font[] = {
     0x72,
     0xb5,
     0x4a,
@@ -3181,4 +3181,4 @@ extern "C" constexpr uint8_t const __resource_psf_font[] = {
     0xff,
 };
 
-extern "C" constexpr size_t __resource_psf_font_size = sizeof(__resource_psf_font);
+extern "C" constexpr size_t _resource_psf_font_size = sizeof(_resource_psf_font);
