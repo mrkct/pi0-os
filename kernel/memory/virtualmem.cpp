@@ -2,10 +2,14 @@
 #include <kernel/lib/memory.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/armv6mmu.h>
-#include <kernel/memory/pagealloc.h>
+#include <kernel/memory/sectionalloc.h>
 #include <kernel/memory/virtualmem.h>
 
 namespace kernel {
+
+static __attribute__((aligned(1024))) SmallPageEntry g_temp_mappings_lvl2_table[1024] = {};
+
+extern "C" FirstLevelEntry _kernel_translation_table[];
 
 uintptr_t virt2phys(uintptr_t virt)
 {
@@ -15,20 +19,18 @@ uintptr_t virt2phys(uintptr_t virt)
         // 0x20000000 is the base address of the BCM2835 peripherals
         return virt - areas::peripherals.start + 0x20000000;
     }
-    panic("virt2phys: address %p is not in the higher half or peripherals area, cannot convert it (yet)", virt);
+
+    switch (_kernel_translation_table[lvl1_index(virt)].section.identifier) {
+    case 0:
+        return 0;
+    case SECTION_ENTRY_ID:
+        return _kernel_translation_table[lvl1_index(virt)].section.base_address() | (virt & 0x000fffff);
+    case COARSE_PAGE_TABLE_ENTRY_ID:
+        panic("virt2phys: coarse page table entries are not supported yet :^(");
+    default:
+        panic("virt2phys: unknown page table entry type, wtf?");
+    }
 }
-
-static void invalidate_tlb()
-{
-    // "Invalidate entire unified TLB or both instruction and data TLBs"
-    asm volatile("mcr p15, 0, %0, c8, c7, 0" ::"r"(0));
-}
-
-static constexpr size_t lvl1_index(uintptr_t virt) { return virt >> 20; }
-
-static __attribute__((aligned(1024))) SmallPageEntry g_temp_mappings_lvl2_table[1024] = {};
-
-extern "C" FirstLevelEntry _kernel_translation_table[];
 
 void mmu_prepare_kernel_address_space()
 {
@@ -91,6 +93,73 @@ Error mmu_map_framebuffer(uint32_t*& virt_addr, uintptr_t addr, size_t size)
     virt_addr = reinterpret_cast<uint32_t*>(areas::framebuffer.start);
     invalidate_tlb();
 
+    return Success;
+}
+
+Error mmu_map_section(uintptr_t phys, uintptr_t virt, VirtualSectionType)
+{
+    if (virt % SECTION_SIZE != 0)
+        return Error {
+            .generic_error_code = GenericErrorCode::BadParameters,
+            .device_specific_error_code = 0,
+            .user_message = "Virtual address is not aligned to 1MB",
+            .extra_data = nullptr
+        };
+
+    if (phys % SECTION_SIZE != 0)
+        return Error {
+            .generic_error_code = GenericErrorCode::BadParameters,
+            .device_specific_error_code = 0,
+            .user_message = "Physical address is not aligned to 1MB",
+            .extra_data = nullptr
+        };
+
+    auto idx = lvl1_index(virt);
+    if (_kernel_translation_table[idx].raw != 0)
+        return Error {
+            .generic_error_code = GenericErrorCode::BadParameters,
+            .device_specific_error_code = 0,
+            .user_message = "Virtual address is already mapped",
+            .extra_data = nullptr
+        };
+
+    _kernel_translation_table[idx].section = SectionEntry {
+        .identifier = SECTION_ENTRY_ID,
+        .bufferable_writes = 0,
+        .cachable = 0,
+        .sbz = 0,
+        .domain = 0,
+        .impl_defined = 0,
+        .access_permission = 0b011,
+        .tex = 0b001,
+        .sbz2 = 0,
+        .base_addr = (phys >> 20) & 0xfff,
+    };
+
+    invalidate_tlb();
+
+    return Success;
+}
+
+Error mmu_unmap_section(uintptr_t virt)
+{
+    if (virt % SECTION_SIZE != 0)
+        return Error {
+            .generic_error_code = GenericErrorCode::BadParameters,
+            .device_specific_error_code = 0,
+            .user_message = "Virtual address is not aligned to 1MB",
+            .extra_data = nullptr
+        };
+
+    if (_kernel_translation_table[lvl1_index(virt)].section.identifier != SECTION_ENTRY_ID)
+        return Error {
+            .generic_error_code = GenericErrorCode::BadParameters,
+            .device_specific_error_code = 0,
+            .user_message = "Virtual address is not mapped",
+            .extra_data = nullptr
+        };
+
+    _kernel_translation_table[lvl1_index(virt)].raw = 0;
     return Success;
 }
 

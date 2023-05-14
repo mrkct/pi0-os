@@ -5,7 +5,8 @@
 #include <kernel/device/videocore.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
-#include <kernel/memory/pagealloc.h>
+#include <kernel/memory/kheap.h>
+#include <kernel/memory/sectionalloc.h>
 #include <kernel/memory/virtualmem.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -76,7 +77,14 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     asm volatile("swi #123");
     kprintf("Returned from software interrupt!\n");
 
-    page_allocator_init();
+    section_allocator_init();
+    MUST(kheap_init());
+
+    char* test;
+    MUST(kmalloc(1024, test));
+    for (int i = 0; i < 1024; ++i)
+        test[i] = 'a';
+    MUST(kfree(test));
 
     systimer_init();
     interrupt_enable();

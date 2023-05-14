@@ -27,8 +27,9 @@ SOURCES=\
 	kernel/device/videocore.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
+	kernel/memory/kheap.cpp \
+	kernel/memory/sectionalloc.cpp \
 	kernel/memory/virtualmem.cpp \
-	kernel/memory/pagealloc.cpp \
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \
 	kernel/prekernel/vector_table.S

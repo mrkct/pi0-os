@@ -5,6 +5,14 @@
 
 namespace kernel {
 
+static constexpr size_t lvl1_index(uintptr_t virt) { return virt >> 20; }
+
+static void invalidate_tlb()
+{
+    // "Invalidate entire unified TLB or both instruction and data TLBs"
+    asm volatile("mcr p15, 0, %0, c8, c7, 0" ::"r"(0));
+}
+
 static constexpr uint32_t COARSE_PAGE_TABLE_ENTRY_ID = 0b01;
 struct CoarsePageTableEntry {
     uint32_t identifier : 2;
@@ -27,6 +35,8 @@ struct SectionEntry {
     uint32_t tex : 3;
     uint32_t sbz2 : 5;
     uint32_t base_addr : 12;
+
+    uintptr_t base_address() const { return base_addr << 20; }
 };
 static_assert(sizeof(SectionEntry) == 4, "SectionEntry is not 32 bits");
 
