@@ -27,6 +27,7 @@ SOURCES=\
 	kernel/device/videocore.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
+	kernel/locking/spinlock.cpp \
 	kernel/memory/kheap.cpp \
 	kernel/memory/sectionalloc.cpp \
 	kernel/memory/virtualmem.cpp \
