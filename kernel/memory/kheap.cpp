@@ -78,7 +78,7 @@ Error _kmalloc(size_t size, uintptr_t& address)
     return Success;
 }
 
-Error _kfree(uintptr_t address)
+Error _kfree(uintptr_t)
 {
     return Success;
 }
