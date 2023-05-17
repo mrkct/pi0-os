@@ -15,7 +15,8 @@ LIBS_SOURCES=\
 	kernel/lib/libc/string.cpp \
 	kernel/lib/memory.cpp \
 	kernel/lib/psf/default_font.cpp \
-	kernel/lib/psf/psf.cpp
+	kernel/lib/psf/psf.cpp \
+	kernel/lib/string.cpp \
 
 SOURCES=\
 	$(LIBS_SOURCES) \
