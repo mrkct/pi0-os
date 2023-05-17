@@ -8,6 +8,8 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/sectionalloc.h>
 #include <kernel/memory/virtualmem.h>
+#include <kernel/task/scheduler.h>
+#include <kernel/task/task.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -89,20 +91,30 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     systimer_init();
     interrupt_enable();
 
-    systimer_exec_after(3 * 1000000, []() {
-        kprintf("TIMER TRIGGERED!\n");
-    });
+    scheduler_init();
+    Task *A, *B;
+    MUST(task_create_kernel_thread(A, "A", []() {
+        int count = 0;
+        while (1) {
+            kprintf("[A]: %d\n", count++);
+            uint64_t start = systimer_get_ticks();
+            while (systimer_get_ticks() - start < 500000)
+                ;
+            scheduler_step();
+        }
+    }));
+    MUST(task_create_kernel_thread(B, "B", []() {
+        int count = 0;
+        while (1) {
+            kprintf("[B]: %d\n", count++);
+            uint64_t start = systimer_get_ticks();
+            while (systimer_get_ticks() - start < 500000)
+                ;
+            scheduler_step();
+        }
+    }));
 
-    uint64_t start = systimer_get_ticks();
-    int count = 0;
-    while (true) {
-        while (systimer_get_ticks() - start < 1000000)
-            ;
-        kprintf("tick. %d\n", count);
-        start = systimer_get_ticks();
-        count++;
+    while (1) {
+        scheduler_step();
     }
-
-    while (1)
-        ;
 }
