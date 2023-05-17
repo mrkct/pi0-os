@@ -34,15 +34,19 @@ void systimer_init()
     iowrite32<uint32_t>(SYSTIMER_CS, CS_M1 | CS_M3);
 
     interrupt_install_irq1_handler(1, [](auto*) {
-        if (g_channel1_callback != nullptr)
-            g_channel1_callback();
-        // iowrite32(SYSTIMER_C1, 0);
+        if (g_channel1_callback != nullptr) {
+            auto callback = g_channel1_callback;
+            g_channel1_callback = nullptr;
+            callback();
+        }
         iowrite32<uint32_t>(SYSTIMER_CS, CS_M1);
     });
     interrupt_install_irq1_handler(3, [](auto*) {
-        if (g_channel3_callback != nullptr)
-            g_channel3_callback();
-        // iowrite32(SYSTIMER_C3, 0);
+        if (g_channel3_callback != nullptr) {
+            auto callback = g_channel3_callback;
+            g_channel3_callback = nullptr;
+            callback();
+        }
         iowrite32<uint32_t>(SYSTIMER_CS, CS_M3);
     });
 }
