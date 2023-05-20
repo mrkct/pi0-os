@@ -89,6 +89,12 @@ size_t ksnprintf(char* buffer, size_t buffer_size, char const* format, va_list a
             break;
         }
 
+        case 'u': {
+            if (!represent_integer(buffer, &written, buffer_size, va_arg(args, unsigned), 10, 0))
+                goto append_terminator_and_return;
+            break;
+        }
+
         case 'l': {
             // FIXME: "long" is actually 4 bytes on arm6, yet here we treat it as 8 bytes
             char next = format[++i]; // FIXME: Bound checking
