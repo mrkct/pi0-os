@@ -9,7 +9,10 @@ CXXFLAGS+=-fno-exceptions -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
 QEMU:=qemu-system-arm
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial stdio -kernel Kernel -sd $(SOURCES_ROOT)/disks/test.sd
+QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial stdio -kernel Kernel
+ifdef SD_IMAGE
+QEMU_FLAGS+=-sd $(SD_IMAGE)
+endif
 
 LIBS_SOURCES=\
 	kernel/lib/libc/string.cpp \
