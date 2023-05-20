@@ -15,7 +15,9 @@ enum class GenericErrorCode {
     DeviceNotReady,
     DeviceIsBusy,
     OutOfMemory,
-    CantRepeat
+    CantRepeat,
+    NotSupported,
+    InvalidFormat
 };
 
 static constexpr char const* __generic_error_code_to_string(GenericErrorCode code)
@@ -41,6 +43,10 @@ static constexpr char const* __generic_error_code_to_string(GenericErrorCode cod
         return "OutOfMemory";
     case GenericErrorCode::CantRepeat:
         return "CantRepeat";
+    case GenericErrorCode::NotSupported:
+        return "NotSupported";
+    case GenericErrorCode::InvalidFormat:
+        return "InvalidFormat";
     default:
         return "Unknown";
     }
@@ -91,5 +97,6 @@ static constexpr Error DeviceNotReady { GenericErrorCode::DeviceNotReady, 0, "De
 static constexpr Error DeviceIsBusy { GenericErrorCode::DeviceIsBusy, 0, "Device is busy, retry the operation", nullptr };
 static constexpr Error OutOfMemory { GenericErrorCode::OutOfMemory, 0, "Out of memory", nullptr };
 static constexpr Error CantRepeat { GenericErrorCode::CantRepeat, 0, "Can't repeat the operation", nullptr };
+static constexpr Error NotSupported { GenericErrorCode::NotSupported, 0, "Not supported", nullptr };
 
 }
