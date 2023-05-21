@@ -16,4 +16,23 @@ char* strncpy_safe(char* dest, char const* src, size_t n)
     return dest;
 }
 
+int strcmp(char const* s1, char const* s2)
+{
+    while (*s1 && *s2 && *s1 == *s2) {
+        s1++;
+        s2++;
+    }
+
+    return *s1 - *s2;
+}
+
+size_t strlen(char const* s)
+{
+    size_t len = 0;
+    while (*s++)
+        len++;
+
+    return len;
+}
+
 }
