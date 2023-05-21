@@ -296,4 +296,24 @@ Error sd_read_block(SDCard& card, uint32_t block_idx, uint32_t block_count, uint
     return Success;
 }
 
+Error sd_storage_interface(SDCard& card, Storage& storage, uint32_t block_offset)
+{
+    if (!card.is_initialized)
+        return DeviceNotInitialized;
+
+    storage.block_idx_offset = block_offset;
+    storage.data = &card;
+    storage.get_block_count = [](auto&, auto& block_count) {
+        // FIXME: Actually implement this
+        block_count = 2 * 1024 * 1024 / 512;
+        return Success;
+    };
+    storage.read_block = [](Storage& storage, uint64_t block_idx, uint8_t* data) {
+        return sd_read_block(*reinterpret_cast<SDCard*>(storage.data), block_idx, 1, data);
+    };
+    storage.write_block = [](Storage&, uint64_t, uint8_t const*) { return DeviceIsBusy; };
+
+    return Success;
+}
+
 }
