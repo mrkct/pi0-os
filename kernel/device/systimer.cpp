@@ -66,17 +66,19 @@ uint64_t systimer_get_ticks()
 Error systimer_exec_after(uint64_t ticks, void (*callback)())
 {
     auto current = systimer_get_ticks();
-    auto target = current + ticks;
+    uint32_t target = current + ticks;
+    if (target < current)
+        panic("systimer_exec_after: target overflowed");
 
     if (g_channel1_callback == nullptr) {
         g_channel1_callback = callback;
-        iowrite32(SYSTIMER_C1, (uint32_t)target);
+        iowrite32(SYSTIMER_C1, target);
         return Success;
     }
 
     if (g_channel3_callback == nullptr) {
         g_channel3_callback = callback;
-        iowrite32(SYSTIMER_C3, (uint32_t)target);
+        iowrite32(SYSTIMER_C3, target);
         return Success;
     }
 
