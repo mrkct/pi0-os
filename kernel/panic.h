@@ -14,3 +14,9 @@ size_t kprintf(char const* format, ...);
         while (1)                                                      \
             ;                                                          \
     } while (0)
+
+#define kassert(expr)                               \
+    do {                                            \
+        if (!(expr))                                \
+            panic("ASSERTION FAILED: " #expr "\n"); \
+    } while (0)
