@@ -17,7 +17,11 @@ enum class GenericErrorCode {
     OutOfMemory,
     CantRepeat,
     NotSupported,
-    InvalidFormat
+    InvalidFormat,
+    EndOfData,
+    NotFound,
+    NotAFile,
+    NotADirectory,
 };
 
 static constexpr char const* __generic_error_code_to_string(GenericErrorCode code)
@@ -47,6 +51,12 @@ static constexpr char const* __generic_error_code_to_string(GenericErrorCode cod
         return "NotSupported";
     case GenericErrorCode::InvalidFormat:
         return "InvalidFormat";
+    case GenericErrorCode::EndOfData:
+        return "EndOfData";
+    case GenericErrorCode::NotFound:
+        return "NotFound";
+    case GenericErrorCode::NotAFile:
+        return "NotAFile";
     default:
         return "Unknown";
     }
@@ -98,5 +108,9 @@ static constexpr Error DeviceIsBusy { GenericErrorCode::DeviceIsBusy, 0, "Device
 static constexpr Error OutOfMemory { GenericErrorCode::OutOfMemory, 0, "Out of memory", nullptr };
 static constexpr Error CantRepeat { GenericErrorCode::CantRepeat, 0, "Can't repeat the operation", nullptr };
 static constexpr Error NotSupported { GenericErrorCode::NotSupported, 0, "Not supported", nullptr };
+static constexpr Error EndOfData { GenericErrorCode::EndOfData, 0, "End of data", nullptr };
+static constexpr Error NotFound { GenericErrorCode::NotFound, 0, "Not found", nullptr };
+static constexpr Error NotAFile { GenericErrorCode::NotAFile, 0, "Not a file", nullptr };
+static constexpr Error NotADirectory { GenericErrorCode::NotADirectory, 0, "Not a directory", nullptr };
 
 }
