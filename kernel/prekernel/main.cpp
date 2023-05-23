@@ -3,6 +3,7 @@
 #include <kernel/device/uart.h>
 #include <kernel/device/videoconsole.h>
 #include <kernel/device/videocore.h>
+#include <kernel/filesystem/fat32/fat32.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
 #include <kernel/memory/kheap.h>
@@ -14,6 +15,32 @@
 #include <stdint.h>
 
 static kernel::VideoConsole vc;
+
+static void fs_tree(kernel::Filesystem& fs)
+{
+    using namespace kernel;
+
+    static void (*helper)(Filesystem&, Directory&, size_t) = [](auto& fs, auto& dir, auto tab_size) {
+        using namespace kernel;
+
+        DirectoryEntry entry;
+        while (fs.directory_next_entry(dir, entry).is_success()) {
+            for (size_t i = 0; i < tab_size; i++)
+                kernel::kprintf(" ");
+
+            kernel::kprintf("%s\n", entry.name);
+            if (entry.type == DirectoryEntry::Type::Directory && entry.name[0] != '.') {
+                Directory sub_dir;
+                MUST(fs.open_directory_entry(entry, sub_dir));
+                helper(fs, sub_dir, tab_size + 2);
+            }
+        }
+    };
+
+    Directory root_dir;
+    MUST(fs.root_directory(fs, root_dir));
+    helper(fs, root_dir, 0);
+}
 
 extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 {
@@ -47,23 +74,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(get_clock_rate(ClockId::ARM, clock_rate));
     kprintf("arm clock rate: %dHz\n", clock_rate);
 
-    MUST(sdhc_init());
-    if (sdhc_contains_card()) {
-        SDCard card;
-        MUST(sdhc_initialize_inserted_card(card));
-        kprintf("sdhc card initialized\n");
-
-        uint8_t first_three_blocks[3 * 512];
-        MUST(sd_read_block(card, 0, 3, first_three_blocks));
-
-        for (size_t i = 0; i < 3; ++i) {
-            kprintf("\tblock %d: ", i);
-            for (size_t j = 0; j < 32; ++j)
-                kprintf("%c", first_three_blocks[i * 512 + j]);
-            kprintf("\n");
-        }
-    }
-
     Framebuffer fb;
     MUST(allocate_framebuffer(fb));
 
@@ -87,6 +97,19 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     for (int i = 0; i < 1024; ++i)
         test[i] = 'a';
     MUST(kfree(test));
+
+    MUST(sdhc_init());
+    if (sdhc_contains_card()) {
+        SDCard card;
+        Storage card_storage;
+        MUST(sdhc_initialize_inserted_card(card));
+        MUST(sd_storage_interface(card, card_storage));
+        kprintf("sdhc card initialized\n");
+
+        Filesystem fs;
+        MUST(fat32_create(fs, card_storage));
+        MUST(fs.init(fs));
+    }
 
     systimer_init();
     interrupt_enable();

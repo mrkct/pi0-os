@@ -29,6 +29,7 @@ SOURCES=\
 	kernel/device/uart.cpp \
 	kernel/device/videoconsole.cpp \
 	kernel/device/videocore.cpp \
+	kernel/filesystem/fat32/fat32.cpp \
 	kernel/filesystem/filesystem.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
