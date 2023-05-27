@@ -1,6 +1,7 @@
 #include <kernel/kprintf.h>
 #include <kernel/lib/memory.h>
 #include <kernel/lib/psf/psf.h>
+#include <kernel/panic.h>
 
 using kernel::Error;
 using kernel::GenericErrorCode;
@@ -42,6 +43,10 @@ kernel::Error psf_load(PSFFont& font, uint8_t const* data, size_t size)
 
 kernel::Error psf_draw_char(PSFFont& font, kernel::Framebuffer& fb, char c, uint32_t color, size_t x, size_t y)
 {
+    kassert(c >= 0);
+    kassert(c < font.header.num_glyphs);
+    kassert(' ' <= c && c <= '~');
+
     uint8_t const* start_of_glyph = &font.data[sizeof(font.header) + font.header.bytes_per_glyph * c];
 
     size_t glyph_width = x + 8 < fb.width ? 8 : fb.width - x;

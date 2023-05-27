@@ -58,7 +58,8 @@ Error videoconsole_init(VideoConsole& console, Framebuffer fb, size_t offset_x, 
     console.offset_x = offset_x;
     console.offset_y = offset_y;
 
-    klib::kmemset(console.data, 0, sizeof(console.data));
+    for (size_t i = 0; i < klib::array_size(console.data); i++)
+        console.data[i] = ' ';
     TRY(klib::psf_load_default(console.font));
     draw_background(console);
 
