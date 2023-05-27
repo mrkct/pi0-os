@@ -35,7 +35,7 @@ vector_table:
     cpsid if, #0x1f                     // Change processor mode to System with disabled IRQs, FIQs and interrupts
     mov r0, sp                          // Store the current stack pointer(same one used by the user) in r0
     mov r1, lr                          // Store the current lr(same one used by the user) in r1
-    cpsie if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
+    cpsid if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
     push {r0}                           // Store the current stack pointer on Supervisor mode's stack
     push {r1}                           // Store the current lr on Supervisor mode's stack
 
@@ -64,7 +64,7 @@ vector_table:
     cpsid if, #0x1f                     // Change processor mode to System with disabled IRQs, FIQs and interrupts
     mov sp, r0                          // Restore the user's stack pointer
     mov lr, r1                          // Restore the user's lr
-    cpsie if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
+    cpsid if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
 
     pop     {r0-r12}
     rfeia   sp!                         // Restores the previously stored sprs and lr from the stack and
