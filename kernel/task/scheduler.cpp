@@ -35,7 +35,6 @@ Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)
     klib::strncpy_safe(task->name, name, sizeof(task->name));
     task->state.task_sp = reinterpret_cast<uint32_t>(sp);
     task->state.lr = reinterpret_cast<uint32_t>(entry);
-    kprintf("task_create_kernel_thread: %s (%p)\n", task->name, task->state.task_sp);
 
     task->state.spsr = 0x1f; // System mode. FIXME: Disable Fast IRQ also?
 
@@ -49,7 +48,6 @@ static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
 static void idle_task()
 {
     while (1) {
-        kprintf("[IDLE]\n");
         yield();
     }
 }
@@ -65,7 +63,6 @@ void scheduler_init()
     g_last_scheduled->state.lr = reinterpret_cast<uint32_t>(idle_task);
 
     interrupt_install_swi_handler(1, [](auto* suspended_state) {
-        kprintf("Yielding (from task: %s)\n", g_current_task->name);
         scheduler_step(suspended_state);
     });
 }
