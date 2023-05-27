@@ -1,13 +1,16 @@
 #pragma once
 
+#include <kernel/error.h>
 #include <kernel/interrupt.h>
 
 namespace kernel {
 
+typedef uint32_t PID;
+
 struct Task {
     SuspendedTaskState state;
     char name[32];
-    uint32_t pid;
+    PID pid;
     Task* next_to_run;
 };
 

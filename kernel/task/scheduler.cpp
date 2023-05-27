@@ -11,7 +11,7 @@ static void scheduler_step(SuspendedTaskState*);
 
 static Task* g_current_task = nullptr;
 static Task* g_last_scheduled = nullptr;
-static uint32_t g_next_pid = 1;
+static PID g_next_pid = 1;
 
 void yield()
 {
