@@ -7,15 +7,12 @@ namespace kernel {
 
 typedef uint32_t Spinlock;
 
-#define DECLARE_SPINLOCK(name) kernel::Spinlock name = 0
+static constexpr Spinlock SPINLOCK_START = 0;
 
-consteval Spinlock spinlock_create()
-{
-    return 0;
-}
+void take(Spinlock&);
 
-void spinlock_take(Spinlock&);
+bool is_taken(Spinlock& lock);
 
-void spinlock_release(Spinlock&);
+void release(Spinlock&);
 
 }

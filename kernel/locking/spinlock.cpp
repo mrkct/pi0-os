@@ -1,4 +1,5 @@
 #include <kernel/locking/spinlock.h>
+#include <kernel/task/scheduler.h>
 
 namespace kernel {
 
@@ -15,15 +16,20 @@ static bool try_acquire(Spinlock& lock)
     return old_value == 0;
 }
 
-void spinlock_take(Spinlock& lock)
+void take(Spinlock& lock)
 {
     while (!try_acquire(lock))
-        ;
+        yield();
 }
 
-void spinlock_release(Spinlock& lock)
+void release(Spinlock& lock)
 {
     lock = 0;
+}
+
+bool is_taken(Spinlock& lock)
+{
+    return lock != 0;
 }
 
 }
