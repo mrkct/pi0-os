@@ -26,22 +26,47 @@ vector_table:
 .endif
     srsdb sp!, #0x13                    // Stores the current mode's spsr and lr on Supervisor mode's stack
     cpsid if, #0x13                     // Change processor mode to Supervisor with disabled IRQs and FIQs
-    push {r0-r12, lr}
+    push {r0-r12}
     
-    // Stack alignment
-    and r1, sp, #4
-    sub sp, sp, r1
-    push {r1}
+    // We want to also save and restore the user's stack pointer and leaf registers because they might be changed
+    // by the IRQ handler if a context switch is needed.
+    // There's no way to access it directly so we temporarily change the processor mode to System
+    // (which shares the same stack as the user) and store the stack pointer in r0.
+    cpsid if, #0x1f                     // Change processor mode to System with disabled IRQs, FIQs and interrupts
+    mov r0, sp                          // Store the current stack pointer(same one used by the user) in r0
+    mov r1, lr                          // Store the current lr(same one used by the user) in r1
+    cpsie if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
+    push {r0}                           // Store the current stack pointer on Supervisor mode's stack
+    push {r1}                           // Store the current lr on Supervisor mode's stack
+
+    // Stack alignment: The stack pointer must be 8-byte aligned before calling the handler.
+    // We need to save whatever alignment correction we do here so we can undo it after the handler returns.
+    and r0, sp, #4
+    sub sp, sp, r0
+    push {r0}
+
+    // 2nd argument of the handler: The address at where the SavedTaskState starts
+    mov r1, sp
+    add r1, r1, r0                      // Stack alignment correction
+    add r1, r1, #4                      // Because we pushed the alignment correction on the stack
 
     mov r0, \vector_offset
-    mov r1, sp
+
     bl irq_and_exception_handler
     
     // Restore stack alignment
     pop     {r1}
     add     sp, sp, r1
 
-    pop     {r0-r12, lr}
+    // Restore the user's stack pointer
+    pop {r1}
+    pop {r0}
+    cpsid if, #0x1f                     // Change processor mode to System with disabled IRQs, FIQs and interrupts
+    mov sp, r0                          // Restore the user's stack pointer
+    mov lr, r1                          // Restore the user's lr
+    cpsie if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
+
+    pop     {r0-r12}
     rfeia   sp!                         // Restores the previously stored sprs and lr from the stack and
                                         // changes processor mode back to the one stored in the spsr
 .endm

@@ -5,14 +5,20 @@
 
 namespace kernel {
 
-struct VectorFrame {
-    uint32_t stack_alignment_padding;
-    uint32_t lr;
+struct SuspendedTaskState {
+    uint32_t task_lr;
+    uint32_t task_sp;
     uint32_t r[13];
-    uint32_t lr_mode, spsr_mode;
+    uint32_t lr;
+    uint32_t spsr;
 };
 
-typedef void (*InterruptHandler)(VectorFrame*);
+struct VectorFrame {
+    uint32_t stack_alignment_padding;
+    SuspendedTaskState* suspended_state;
+};
+
+typedef void (*InterruptHandler)(SuspendedTaskState*);
 
 void interrupt_init();
 

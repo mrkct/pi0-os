@@ -1,32 +1,89 @@
 #include <kernel/interrupt.h>
 #include <kernel/lib/string.h>
 #include <kernel/memory/kheap.h>
+#include <kernel/sizes.h>
+#include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
 
 namespace kernel {
 
+static void scheduler_step(SuspendedTaskState*);
+
 static Task* g_current_task = nullptr;
 static Task* g_last_scheduled = nullptr;
+static uint32_t g_next_pid = 1;
+
+void yield()
+{
+    asm volatile("swi #1\n");
+}
+
+Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)())
+{
+    static constexpr size_t KERNEL_STACK_SIZE = 4 * _1KB;
+
+    Task* task;
+    TRY(kmalloc(sizeof(Task), task));
+    out_task = task;
+
+    uint32_t* sp;
+    TRY(kmalloc(KERNEL_STACK_SIZE, sp));
+    sp = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(sp) + KERNEL_STACK_SIZE - 4);
+
+    task->next_to_run = nullptr;
+    task->pid = g_next_pid++;
+    klib::strncpy_safe(task->name, name, sizeof(task->name));
+    task->state.task_sp = reinterpret_cast<uint32_t>(sp);
+    task->state.lr = reinterpret_cast<uint32_t>(entry);
+    kprintf("task_create_kernel_thread: %s (%p)\n", task->name, task->state.task_sp);
+
+    task->state.spsr = 0x1f; // System mode. FIXME: Disable Fast IRQ also?
+
+    scheduler_add(task);
+
+    return Success;
+}
+
+static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
+
+static void idle_task()
+{
+    while (1) {
+        kprintf("[IDLE]\n");
+        yield();
+    }
+}
 
 void scheduler_init()
 {
     MUST(kmalloc(sizeof(Task), g_current_task));
     g_current_task->next_to_run = nullptr;
     g_current_task->pid = 0;
-    g_current_task->sp = 0;
-    klib::strncpy_safe(g_current_task->name, "kernel", sizeof(g_current_task->name));
+    klib::strncpy_safe(g_current_task->name, "idle", sizeof(g_current_task->name));
     g_last_scheduled = g_current_task;
+    g_last_scheduled->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
+    g_last_scheduled->state.lr = reinterpret_cast<uint32_t>(idle_task);
+
+    interrupt_install_swi_handler(1, [](auto* suspended_state) {
+        kprintf("Yielding (from task: %s)\n", g_current_task->name);
+        scheduler_step(suspended_state);
+    });
+}
+
+Task* scheduler_current_task()
+{
+    return g_current_task;
 }
 
 static void scheduler_print()
 {
     kprintf("Tasks:\n");
-    kprintf("[C] %s (%p)\n", g_current_task->name, g_current_task->sp);
+    kprintf("[C] %s (%p)\n", g_current_task->name, g_current_task->state.task_sp);
     for (auto* task = g_current_task->next_to_run; task != nullptr; task = task->next_to_run)
-        kprintf("    %s (%p)\n", task->name, task->sp);
+        kprintf("    %s (%p)\n", task->name, task->state.task_sp);
     kprintf("+--------------------------------------+\n");
-    kprintf("| g_last_scheduled: %s (%p) \t\t|\n", g_last_scheduled->name, g_last_scheduled->sp);
-    kprintf("| g_current_task:   %s (%p) \t\t|\n", g_current_task->name, g_current_task->sp);
+    kprintf("| g_last_scheduled: %s (%p) \t\t|\n", g_last_scheduled->name, g_last_scheduled->state.task_sp);
+    kprintf("| g_current_task:   %s (%p) \t\t|\n", g_current_task->name, g_current_task->state.task_sp);
     kprintf("+--------------------------------------+\n");
 }
 
@@ -37,7 +94,7 @@ void scheduler_add(Task* task)
     g_last_scheduled = task;
 }
 
-void scheduler_step()
+void scheduler_step(SuspendedTaskState* suspended_state)
 {
     // scheduler_print();
     auto* current = g_current_task;
@@ -48,11 +105,32 @@ void scheduler_step()
         return;
     }
 
+    g_current_task->state = *suspended_state;
+    *suspended_state = next->state;
+
     g_current_task = next;
     scheduler_add(current);
+}
 
-    // kprintf("Switching from %s (%p) to %s (%p)\n", current->name, current->sp, next->name, next->sp);
-    context_switch_kernel_threads(current, next);
+[[noreturn]] void scheduler_begin()
+{
+    // FIXME: Enable interrupts?
+
+    asm volatile(
+        "mov r0, %[system_stack] \n"
+        "mov r1, %[entry_point] \n"
+        "cpsid if, #0x1f \n"
+        "mov sp, r0 \n"
+        "mov lr, #0 \n"
+        "mov pc, r1 \n"
+        :
+        : [system_stack] "r"(g_current_task->state.task_sp),
+        [entry_point] "r"(g_current_task->state.lr)
+        : "r0", "r1", "memory");
+
+    // Silence compiler warning
+    while (1)
+        ;
 }
 
 }

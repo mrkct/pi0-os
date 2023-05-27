@@ -11,16 +11,16 @@ static InterruptHandler g_basic_irq_handlers[32] = { nullptr };
 static InterruptHandler g_irq1_handlers[32] = { nullptr };
 static InterruptHandler g_irq2_handlers[32] = { nullptr };
 
-static void software_interrupt_handler(VectorFrame* frame)
+static void software_interrupt_handler(SuspendedTaskState* suspended_state)
 {
-    auto swi_number = *reinterpret_cast<uint32_t*>(frame->lr_mode - 4) & 0xff;
+    auto swi_number = *reinterpret_cast<uint32_t*>(suspended_state->lr - 4) & 0xff;
 
     if (g_swi_handlers[swi_number] == nullptr) {
         kprintf("Unknown software interrupt: %d\n", swi_number);
         return;
     }
 
-    g_swi_handlers[swi_number](frame);
+    g_swi_handlers[swi_number](suspended_state);
 }
 
 static constexpr uintptr_t IRQ_CONTROLLER_BASE = bcm2835_bus_address_to_physical(0x7E00B000);
@@ -36,7 +36,7 @@ static constexpr uintptr_t DISABLE_IRQS_1 = IRQ_CONTROLLER_BASE + 0x21c;
 static constexpr uintptr_t DISABLE_IRQS_2 = IRQ_CONTROLLER_BASE + 0x220;
 static constexpr uintptr_t DISABLE_BASIC_IRQS = IRQ_CONTROLLER_BASE + 0x224;
 
-static void irq_handler(VectorFrame* frame)
+static void irq_handler(SuspendedTaskState* suspended_state)
 {
     uint32_t basic, pending1, pending2;
     basic = ioread32<uint32_t>(IRQ_BASIC_PENDING);
@@ -58,7 +58,7 @@ static void irq_handler(VectorFrame* frame)
             if (g_basic_irq_handlers[i] == nullptr)
                 panic("Unhandled IRQ %d\n", i);
 
-            g_basic_irq_handlers[i](frame);
+            g_basic_irq_handlers[i](suspended_state);
         }
     }
 
@@ -70,7 +70,7 @@ static void irq_handler(VectorFrame* frame)
                 if (g_irq1_handlers[i] == nullptr)
                     panic("Unhandled IRQ1 %d\n", i);
 
-                g_irq1_handlers[i](frame);
+                g_irq1_handlers[i](suspended_state);
             }
         }
     }
@@ -83,7 +83,7 @@ static void irq_handler(VectorFrame* frame)
                 if (g_irq2_handlers[i] == nullptr)
                     panic("Unhandled IRQ2 %d\n", i);
 
-                g_irq2_handlers[i](frame);
+                g_irq2_handlers[i](suspended_state);
             }
         }
     }
@@ -150,7 +150,7 @@ void interrupt_install_irq2_handler(uint32_t irq_number, InterruptHandler handle
 }
 
 // This gets called by the assembly code in vector_table.S
-extern "C" void irq_and_exception_handler(uint32_t vector_offset, VectorFrame* frame)
+extern "C" void irq_and_exception_handler(uint32_t vector_offset, SuspendedTaskState* suspended_state)
 {
     char const* vector_name[] = {
         "RESET",
@@ -168,11 +168,11 @@ extern "C" void irq_and_exception_handler(uint32_t vector_offset, VectorFrame* f
         panic("UNEXPECTED VECTOR OFFSET: %x\n", vector_offset);
 
     if (vector_index == 2) {
-        software_interrupt_handler(frame);
+        software_interrupt_handler(suspended_state);
     } else if (vector_index == 6) {
-        irq_handler(frame);
+        irq_handler(suspended_state);
     } else {
-        panic("%s caused by instruction at %p\n", vector_name[vector_index], frame->lr_mode);
+        panic("%s caused by instruction at %p\n", vector_name[vector_index], suspended_state->lr);
     }
 }
 

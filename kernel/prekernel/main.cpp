@@ -10,7 +10,6 @@
 #include <kernel/memory/sectionalloc.h>
 #include <kernel/memory/virtualmem.h>
 #include <kernel/task/scheduler.h>
-#include <kernel/task/task.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -123,7 +122,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
             uint64_t start = systimer_get_ticks();
             while (systimer_get_ticks() - start < 500000)
                 ;
-            scheduler_step();
+            yield();
         }
     }));
     MUST(task_create_kernel_thread(B, "B", []() {
@@ -133,11 +132,11 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
             uint64_t start = systimer_get_ticks();
             while (systimer_get_ticks() - start < 500000)
                 ;
-            scheduler_step();
+            yield();
         }
     }));
 
-    while (1) {
-        scheduler_step();
-    }
+    scheduler_begin();
+
+    panic("Should not reach here");
 }
