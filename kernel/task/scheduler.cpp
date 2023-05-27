@@ -1,3 +1,4 @@
+#include <kernel/device/systimer.h>
 #include <kernel/interrupt.h>
 #include <kernel/lib/string.h>
 #include <kernel/memory/kheap.h>
@@ -8,6 +9,8 @@
 namespace kernel {
 
 static void scheduler_step(SuspendedTaskState*);
+
+static constexpr uint32_t TIME_SLICE = 10000; // 10ms
 
 static Task* g_current_task = nullptr;
 static Task* g_last_scheduled = nullptr;
@@ -52,6 +55,15 @@ static void idle_task()
     }
 }
 
+static void _do_context_switch(SuspendedTaskState* suspended_state)
+{
+    // This is because if a process yielded right before it's time slice was up,
+    // the timer would fire unfairly early for the next process. This way, we
+    // always get a full time slice.
+    systimer_repeating_callback(TIME_SLICE, _do_context_switch);
+    scheduler_step(suspended_state);
+}
+
 void scheduler_init()
 {
     MUST(kmalloc(sizeof(Task), g_current_task));
@@ -62,9 +74,7 @@ void scheduler_init()
     g_last_scheduled->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
     g_last_scheduled->state.lr = reinterpret_cast<uint32_t>(idle_task);
 
-    interrupt_install_swi_handler(1, [](auto* suspended_state) {
-        scheduler_step(suspended_state);
-    });
+    interrupt_install_swi_handler(1, _do_context_switch);
 }
 
 Task* scheduler_current_task()
@@ -111,7 +121,7 @@ void scheduler_step(SuspendedTaskState* suspended_state)
 
 [[noreturn]] void scheduler_begin()
 {
-    // FIXME: Enable interrupts?
+    systimer_repeating_callback(TIME_SLICE, _do_context_switch);
 
     asm volatile(
         "mov r0, %[system_stack] \n"
@@ -119,6 +129,7 @@ void scheduler_step(SuspendedTaskState* suspended_state)
         "cpsid if, #0x1f \n"
         "mov sp, r0 \n"
         "mov lr, #0 \n"
+        "cpsie if, #0x1f \n"
         "mov pc, r1 \n"
         :
         : [system_stack] "r"(g_current_task->state.task_sp),

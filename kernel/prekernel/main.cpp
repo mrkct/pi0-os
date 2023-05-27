@@ -119,20 +119,12 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         int count = 0;
         while (1) {
             kprintf("[A]: %d\n", count++);
-            uint64_t start = systimer_get_ticks();
-            while (systimer_get_ticks() - start < 500000)
-                ;
-            yield();
         }
     }));
     MUST(task_create_kernel_thread(B, "B", []() {
         int count = 0;
         while (1) {
             kprintf("[B]: %d\n", count++);
-            uint64_t start = systimer_get_ticks();
-            while (systimer_get_ticks() - start < 500000)
-                ;
-            yield();
         }
     }));
 
