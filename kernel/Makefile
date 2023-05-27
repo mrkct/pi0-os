@@ -33,6 +33,7 @@ SOURCES=\
 	kernel/filesystem/filesystem.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
+	kernel/locking/reentrant.cpp \
 	kernel/locking/spinlock.cpp \
 	kernel/memory/kheap.cpp \
 	kernel/memory/sectionalloc.cpp \
