@@ -12,8 +12,18 @@ static constexpr uintptr_t SYSTIMER_CHI = SYSTIMER_BASE + 0x08;
 static constexpr uintptr_t SYSTIMER_C1 = SYSTIMER_BASE + 0x10;
 static constexpr uintptr_t SYSTIMER_C3 = SYSTIMER_BASE + 0x18;
 
-static void (*g_channel1_callback)() = nullptr;
-static void (*g_channel3_callback)() = nullptr;
+static SystimerCallback g_repeating_callback = nullptr;
+static uint32_t g_repeating_callback_interval = 0;
+static SystimerCallback g_channel3_callback = nullptr;
+
+static uint32_t ticks_plus_interval(uint32_t interval)
+{
+    uint32_t ticks = (uint32_t)(systimer_get_ticks() & 0xffffffff);
+    if (ticks + interval < ticks)
+        panic("systimer: ticks overflow");
+
+    return ticks + interval;
+}
 
 void systimer_init()
 {
@@ -33,19 +43,22 @@ void systimer_init()
 
     iowrite32<uint32_t>(SYSTIMER_CS, CS_M1 | CS_M3);
 
-    interrupt_install_irq1_handler(1, [](auto*) {
-        if (g_channel1_callback != nullptr) {
-            auto callback = g_channel1_callback;
-            g_channel1_callback = nullptr;
-            callback();
-        }
+    interrupt_install_irq1_handler(1, [](auto* suspended_task_state) {
+        if (g_repeating_callback != nullptr)
+            g_repeating_callback(suspended_task_state);
+
         iowrite32<uint32_t>(SYSTIMER_CS, CS_M1);
+
+        if (g_repeating_callback != nullptr) {
+            auto ticks = systimer_get_ticks();
+            iowrite32<uint32_t>(SYSTIMER_C1, (uint32_t)ticks + g_repeating_callback_interval);
+        }
     });
-    interrupt_install_irq1_handler(3, [](auto*) {
+    interrupt_install_irq1_handler(3, [](auto* suspended_task_state) {
         if (g_channel3_callback != nullptr) {
             auto callback = g_channel3_callback;
             g_channel3_callback = nullptr;
-            callback();
+            callback(suspended_task_state);
         }
         iowrite32<uint32_t>(SYSTIMER_CS, CS_M3);
     });
@@ -63,22 +76,25 @@ uint64_t systimer_get_ticks()
     } while (true);
 }
 
-Error systimer_exec_after(uint64_t ticks, void (*callback)())
+Error systimer_repeating_callback(uint32_t interval, void (*callback)(SuspendedTaskState*))
 {
-    auto current = systimer_get_ticks();
-    uint32_t target = current + ticks;
-    if (target < current)
-        panic("systimer_exec_after: target overflowed");
+    if (g_repeating_callback != nullptr)
+        return DeviceIsBusy;
 
-    if (g_channel1_callback == nullptr) {
-        g_channel1_callback = callback;
-        iowrite32(SYSTIMER_C1, target);
-        return Success;
-    }
+    if (interval == 0)
+        return BadParameters;
 
+    g_repeating_callback = callback;
+    g_repeating_callback_interval = interval;
+    iowrite32<uint32_t>(SYSTIMER_C1, ticks_plus_interval(interval));
+    return Success;
+}
+
+Error systimer_exec_after(uint64_t ticks, void (*callback)(SuspendedTaskState*))
+{
     if (g_channel3_callback == nullptr) {
         g_channel3_callback = callback;
-        iowrite32(SYSTIMER_C3, target);
+        iowrite32(SYSTIMER_C3, ticks_plus_interval(ticks));
         return Success;
     }
 
