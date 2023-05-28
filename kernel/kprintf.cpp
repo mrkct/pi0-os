@@ -2,9 +2,11 @@
 #include <kernel/device/videoconsole.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
+#include <kernel/locking/reentrant.h>
 
 namespace kernel {
 
+static ReentrantSpinlock g_kprintf_lock = REENTRANT_SPINLOCK_START;
 static VideoConsole* g_video_console;
 
 void kprintf_video_init(VideoConsole& video_console)
@@ -171,12 +173,14 @@ size_t kprintf(char const* format, ...)
     size_t written = ksnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
+    take(g_kprintf_lock);
     auto uart = uart_device();
     for (size_t i = 0; i < written; i++) {
         uart.write(&uart.data, (unsigned char)buffer[i]);
         if (g_video_console != nullptr)
             videoconsole_putc(*g_video_console, buffer[i]);
     }
+    release(g_kprintf_lock);
 
     return written;
 }
