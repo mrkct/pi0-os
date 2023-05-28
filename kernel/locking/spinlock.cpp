@@ -18,13 +18,16 @@ static bool try_acquire(Spinlock& lock)
 
 void take(Spinlock& lock)
 {
-    while (!try_acquire(lock))
-        yield();
+    while (!try_acquire(lock)) {
+        asm volatile("wfe");
+    }
+    interrupt_disable();
 }
 
 void release(Spinlock& lock)
 {
     lock = 0;
+    interrupt_enable();
 }
 
 bool is_taken(Spinlock& lock)
