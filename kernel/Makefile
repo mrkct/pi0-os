@@ -36,6 +36,7 @@ SOURCES=\
 	kernel/locking/reentrant.cpp \
 	kernel/locking/spinlock.cpp \
 	kernel/memory/kheap.cpp \
+	kernel/memory/physicalalloc.cpp \
 	kernel/memory/sectionalloc.cpp \
 	kernel/memory/virtualmem.cpp \
 	kernel/prekernel/main.cpp \
