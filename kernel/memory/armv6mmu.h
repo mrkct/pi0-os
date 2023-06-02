@@ -60,4 +60,10 @@ union FirstLevelEntry {
 };
 static_assert(sizeof(FirstLevelEntry) == 4, "FirstLevelEntry is not 32 bits");
 
+union SecondLevelEntry {
+    uint32_t raw;
+    SmallPageEntry small_page;
+};
+static_assert(sizeof(SecondLevelEntry) == 4, "SecondLevelEntry is not 32 bits");
+
 }
