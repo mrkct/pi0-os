@@ -82,7 +82,7 @@ Task* scheduler_current_task()
     return g_current_task;
 }
 
-static void scheduler_print()
+static __attribute__((unused)) void scheduler_print()
 {
     kprintf("Tasks:\n");
     kprintf("[C] %s (%p)\n", g_current_task->name, g_current_task->state.task_sp);

@@ -15,7 +15,7 @@
 
 static kernel::VideoConsole vc;
 
-static void fs_tree(kernel::Filesystem& fs)
+static void __attribute__((unused)) fs_tree(kernel::Filesystem& fs)
 {
     using namespace kernel;
 
