@@ -15,6 +15,8 @@ size_t kprintf(char const* format, ...);
             ;                                                          \
     } while (0)
 
+#define kassert_not_reached() panic("ASSERTION FAILED: not reached\n")
+
 #define kassert(expr)                               \
     do {                                            \
         if (!(expr))                                \
