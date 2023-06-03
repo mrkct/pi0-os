@@ -31,7 +31,17 @@ struct CoarsePageTableEntry {
     uint32_t impl_defined : 1;
     uint32_t base_addr : 22;
 
-    uintptr_t base_address() const { return base_addr << 10; }
+    uintptr_t base_address() const { return (base_addr << 10) & ~0x3ff; }
+
+    static CoarsePageTableEntry make_entry(uintptr_t address) {
+        return {
+            .identifier = COARSE_PAGE_TABLE_ENTRY_ID,
+            .sbz = 0,
+            .domain = 0,
+            .impl_defined = 0,
+            .base_addr = ((uint32_t) address >> 10) & 0x3fffff,
+        };
+    }
 };
 static_assert(sizeof(CoarsePageTableEntry) == 4, "CoarsePageTableEntry is not 32 bits");
 
@@ -64,6 +74,19 @@ struct SmallPageEntry {
     uint32_t address : 20;
 
     uintptr_t base_address() const { return address << 12; }
+
+    static SmallPageEntry make_entry(uintptr_t address) {
+        return {
+            .identifier = SMALL_PAGE_ENTRY_ID,
+            .bufferable_writes = 0,
+            .cachable = 0,
+            .ap0 = 0b00,
+            .ap1 = 0b00,
+            .ap2 = 0b00,
+            .ap3 = 0b00,
+            .address = ((uint32_t) address >> 12) & 0xfffff,
+        };
+    }
 };
 static_assert(sizeof(SmallPageEntry) == 4, "SmallPageEntry is not 32 bits");
 
