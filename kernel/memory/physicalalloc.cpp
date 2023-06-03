@@ -56,7 +56,7 @@ static PageOrder smaller_order(PageOrder order)
 
     kassert_not_reached();
 }
-static struct PhysicalPage* addr2page(uintptr_t addr) { return &g_pages.data[addr / _1KB]; }
+struct PhysicalPage* addr2page(uintptr_t addr) { return &g_pages.data[addr / _1KB]; }
 uintptr_t page2addr(struct PhysicalPage* page) { return (page - g_pages.data) * _1KB; }
 static size_t page2array_index(struct PhysicalPage* page) { return page - g_pages.data; }
 

@@ -33,6 +33,8 @@ static inline size_t order2page_size(PageOrder order)
 
 uintptr_t page2addr(struct PhysicalPage* page);
 
+struct PhysicalPage *addr2page(uintptr_t addr);
+
 Error physical_page_allocator_init(size_t total_physical_memory_size);
 
 Error physical_page_allocator_set_memory_range_as_reserved(uintptr_t start, uintptr_t end);
