@@ -2,15 +2,25 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <kernel/sizes.h>
 
 namespace kernel {
 
 static constexpr size_t lvl1_index(uintptr_t virt) { return virt >> 20; }
+static constexpr size_t lvl2_index(uintptr_t virt) { return (virt >> 12) & 0xff; }
 
-static void invalidate_tlb()
+static constexpr size_t LVL1_TABLE_SIZE = 16 * _1KB;
+static constexpr size_t LVL2_TABLE_SIZE = _1KB;
+
+static inline void invalidate_tlb()
 {
     // "Invalidate entire unified TLB or both instruction and data TLBs"
     asm volatile("mcr p15, 0, %0, c8, c7, 0" ::"r"(0));
+}
+
+static inline void invalidate_tlb_entry(uintptr_t virt_addr)
+{
+    asm volatile("mcr p15, 0, %0, c8, c7, 1" ::"r"(virt_addr));
 }
 
 static constexpr uint32_t COARSE_PAGE_TABLE_ENTRY_ID = 0b01;
@@ -20,6 +30,8 @@ struct CoarsePageTableEntry {
     uint32_t domain : 4;
     uint32_t impl_defined : 1;
     uint32_t base_addr : 22;
+
+    uintptr_t base_address() const { return base_addr << 10; }
 };
 static_assert(sizeof(CoarsePageTableEntry) == 4, "CoarsePageTableEntry is not 32 bits");
 
@@ -50,6 +62,8 @@ struct SmallPageEntry {
     uint32_t ap2 : 2;
     uint32_t ap3 : 2;
     uint32_t address : 20;
+
+    uintptr_t base_address() const { return address << 12; }
 };
 static_assert(sizeof(SmallPageEntry) == 4, "SmallPageEntry is not 32 bits");
 
