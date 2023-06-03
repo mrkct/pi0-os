@@ -1,8 +1,7 @@
+#include <kernel/lib/libc/string.h>
 #include <kernel/lib/math.h>
 #include <kernel/memory/vm.h>
 #include <kernel/sizes.h>
-#include <kernel/lib/libc/string.h>
-
 
 namespace kernel {
 
@@ -83,7 +82,7 @@ uintptr_t virt2phys(uintptr_t virt)
         return virt - areas::peripherals.start + 0x20000000;
     }
 
-    auto &lvl1_entry = _kernel_translation_table[lvl1_index(virt)];
+    auto& lvl1_entry = _kernel_translation_table[lvl1_index(virt)];
     switch (lvl1_entry.section.identifier) {
     case 0:
         return 0;
@@ -91,7 +90,7 @@ uintptr_t virt2phys(uintptr_t virt)
         return lvl1_entry.section.base_address() | (virt & 0x000fffff);
     case COARSE_PAGE_TABLE_ENTRY_ID: {
         TemporarilyMappedRange lvl2_table { lvl1_entry.coarse.base_address(), LVL2_TABLE_SIZE };
-        auto &lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[lvl2_index(virt)];
+        auto& lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[lvl2_index(virt)];
         return lvl2_entry.small_page.base_address() | (virt & 0x00000fff);
     }
     default:
@@ -103,8 +102,7 @@ Error vm_init_kernel_address_space()
 {
     // Note that we already mapped the kernel and peripherals in the start.S file
     _kernel_translation_table[lvl1_index(areas::temp_mappings.start)].coarse = CoarsePageTableEntry::make_entry(
-        virt2phys(reinterpret_cast<uintptr_t>(&g_temp_mappings_lvl2_table))
-    );
+        virt2phys(reinterpret_cast<uintptr_t>(&g_temp_mappings_lvl2_table)));
 
     // This value depends on the address at which the kernel is mapped
     // eg: 0xe0000000 has the first 3 bits set to 1, therefore N=3
@@ -122,23 +120,21 @@ Error vm_create_address_space(struct AddressSpace& as)
     TRY(physical_page_alloc(PageOrder::_16KB, as_ttbr1_page));
     as.ttbr1_page = as_ttbr1_page;
 
-    TemporarilyMappedRange tmp_mapped{ page2addr(as_ttbr1_page), LVL1_TABLE_SIZE };
+    TemporarilyMappedRange tmp_mapped { page2addr(as_ttbr1_page), LVL1_TABLE_SIZE };
     memset(tmp_mapped.as_ptr<void*>(), 0, LVL1_TABLE_SIZE);
 
     return Success;
 }
 
-static Error vm_map_kernel_page(uintptr_t phys_addr, uintptr_t virt_addr)
+static Error vm_map_page(FirstLevelEntry* root_table, uintptr_t phys_addr, uintptr_t virt_addr)
 {
-    kassert(areas::higher_half.contains(virt_addr));
-
-    auto &lvl1_entry = _kernel_translation_table[lvl1_index(virt_addr)];
+    auto& lvl1_entry = root_table[lvl1_index(virt_addr)];
     if (lvl1_entry.section.identifier == SECTION_ENTRY_ID)
-        panic("vm_map_kernel: Address %p is already mapped to a section", virt_addr);
-    
+        panic("vm_map_page: Address %p is already mapped to a section", virt_addr);
+
     bool lvl2_table_was_just_allocated = false;
     if (lvl1_entry.raw == 0) {
-        struct PhysicalPage *lvl2_table_page;
+        struct PhysicalPage* lvl2_table_page;
         MUST(physical_page_alloc(PageOrder::_1KB, lvl2_table_page));
 
         lvl1_entry.coarse = CoarsePageTableEntry::make_entry(page2addr(lvl2_table_page));
@@ -149,10 +145,10 @@ static Error vm_map_kernel_page(uintptr_t phys_addr, uintptr_t virt_addr)
 
     if (lvl2_table_was_just_allocated)
         memset(lvl2_table.as_ptr<void*>(), 0, LVL2_TABLE_SIZE);
-    
-    auto &lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[lvl2_index(virt_addr)];
+
+    auto& lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[lvl2_index(virt_addr)];
     if (lvl2_entry.raw != 0)
-        panic("vm_map_kernel: mapping already exists at %p (currenly mapped to %p)", virt_addr, lvl2_entry.small_page.base_address());
+        panic("vm_map_page: mapping already exists at %p (currenly mapped to %p)", virt_addr, lvl2_entry.small_page.base_address());
 
     lvl2_entry.small_page = SmallPageEntry::make_entry(phys_addr);
 
@@ -163,30 +159,10 @@ static Error vm_map_kernel_page(uintptr_t phys_addr, uintptr_t virt_addr)
 static Error vm_map_page(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t virt_addr)
 {
     if (areas::higher_half.contains(virt_addr))
-        return vm_map_kernel_page(phys_addr, virt_addr);
+        return vm_map_page(_kernel_translation_table, phys_addr, virt_addr);
 
     TemporarilyMappedRange lvl1_table { page2addr(as.ttbr1_page), LVL1_TABLE_SIZE };
-
-    bool lvl2_table_was_just_allocated = false;
-    auto& lvl1_entry = lvl1_table.as_ptr<FirstLevelEntry*>()[lvl1_index(virt_addr)];
-    if (lvl1_entry.raw == 0) {
-        struct PhysicalPage *lvl2_table_page;
-        TRY(physical_page_alloc(PageOrder::_1KB, lvl2_table_page));
-        lvl1_entry.coarse = CoarsePageTableEntry::make_entry(page2addr(lvl2_table_page));
-        lvl2_table_was_just_allocated = true;
-    }
-
-    TemporarilyMappedRange lvl2_table { lvl1_entry.coarse.base_address(), LVL2_TABLE_SIZE };
-    
-    if (lvl2_table_was_just_allocated)
-        memset(lvl2_table.as_ptr<void*>(), 0, LVL2_TABLE_SIZE);
-    
-    auto& lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[lvl2_index(virt_addr)];
-    if (lvl2_entry.raw != 0)
-        panic("vm_map: mapping already exists at %p (currenly mapped to %p)", virt_addr, lvl2_entry.small_page.base_address());
-
-    lvl2_entry.small_page = SmallPageEntry::make_entry(phys_addr);
-    invalidate_tlb_entry(virt_addr);
+    TRY(vm_map_page(lvl1_table.as_ptr<FirstLevelEntry*>(), phys_addr, virt_addr));
 
     return Success;
 }
@@ -208,55 +184,56 @@ Error vm_map_mmio(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t virt_a
     return Success;
 }
 
-static Error vm_unmap_kernel_page(uintptr_t virt_addr, uintptr_t& previously_mapped_physical_address)
+static Error vm_unmap_page(FirstLevelEntry* root_table, uintptr_t virt_addr, uintptr_t& previously_mapped_physical_address)
 {
-    kassert(areas::higher_half.contains(virt_addr));
-
     if (areas::temp_mappings.contains(virt_addr))
         panic("vm_unmap_kernel: Address %p is in the temporary mappings area, you can't unmap that!", virt_addr);
 
-    auto &lvl1_entry = _kernel_translation_table[lvl1_index(virt_addr)];
+    auto& lvl1_entry = root_table[lvl1_index(virt_addr)];
     if (lvl1_entry.section.identifier == SECTION_ENTRY_ID)
         panic("vm_unmap_kernel: Address %p is mapped to a section, you can't unmap that!", virt_addr);
-    
+
     if (lvl1_entry.raw == 0) {
         previously_mapped_physical_address = 0;
         return Success;
     }
-    
+
     TemporarilyMappedRange lvl2_table { lvl1_entry.coarse.base_address(), LVL2_TABLE_SIZE };
     auto& lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[lvl2_index(virt_addr)];
     if (lvl2_entry.raw == 0) {
         previously_mapped_physical_address = 0;
         return Success;
     }
-    
+
     previously_mapped_physical_address = lvl2_entry.small_page.base_address() << 12;
     lvl2_entry.raw = 0;
     invalidate_tlb_entry(virt_addr);
+
+    // If the whole level 2 table is empty, we can free it
+    bool whole_lvl2_table_is_empty = true;
+    for (size_t i = 0; i < LVL2_ENTRIES; i++) {
+        auto& entry = lvl2_table.as_ptr<SecondLevelEntry*>()[i];
+        if (entry.raw != 0) {
+            whole_lvl2_table_is_empty = false;
+            break;
+        }
+    }
+    if (whole_lvl2_table_is_empty) {
+        struct PhysicalPage* p = addr2page(lvl1_entry.coarse.base_address());
+        MUST(physical_page_free(p, PageOrder::_16KB));
+        lvl1_entry.raw = 0;
+    }
 
     return Success;
 }
 
-static Error vm_unmap_page(struct AddressSpace& as, uintptr_t virt_addr, uintptr_t& previously_mapped_physical_address)
+static Error vm_unmap_page(struct AddressSpace& as, uintptr_t virt_addr, uintptr_t& previously_mapped_page)
 {
     if (areas::higher_half.contains(virt_addr))
-        return vm_unmap_kernel_page(virt_addr, previously_mapped_physical_address);
+        return vm_unmap_page(_kernel_translation_table, virt_addr, previously_mapped_page);
 
     TemporarilyMappedRange lvl1_table { page2addr(as.ttbr1_page), LVL1_TABLE_SIZE };
-
-    auto& lvl1_entry = lvl1_table.as_ptr<FirstLevelEntry*>()[lvl1_index(virt_addr)];
-    if (lvl1_entry.raw == 0)
-        return Success;
-
-    TemporarilyMappedRange lvl2_table { lvl1_entry.coarse.base_address(), LVL2_TABLE_SIZE };
-    auto& lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[lvl2_index(virt_addr)];
-    if (lvl2_entry.raw == 0)
-        return Success;
-
-    previously_mapped_physical_address = lvl2_entry.small_page.base_address() << 12;
-    lvl2_entry.raw = 0;
-    invalidate_tlb_entry(virt_addr);
+    TRY(vm_unmap_page(lvl1_table.as_ptr<FirstLevelEntry*>(), virt_addr, previously_mapped_page));
 
     return Success;
 }
@@ -264,6 +241,7 @@ static Error vm_unmap_page(struct AddressSpace& as, uintptr_t virt_addr, uintptr
 Error vm_unmap(struct AddressSpace& as, uintptr_t virt_addr, struct PhysicalPage*& previously_mapped_page)
 {
     uintptr_t previously_mapped_physical_address;
+
     TRY(vm_unmap_page(as, virt_addr, previously_mapped_physical_address));
     previously_mapped_page = addr2page(previously_mapped_physical_address);
     previously_mapped_page->ref_count--;

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <kernel/error.h>
-#include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/armv6mmu.h>
+#include <kernel/memory/physicalalloc.h>
 
 namespace kernel {
 
