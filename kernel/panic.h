@@ -10,7 +10,7 @@ size_t kprintf(char const* format, ...);
     do {                                                               \
         kernel::kprintf("=========== KERNEL PANIC :^( ===========\n"); \
         kernel::kprintf(__VA_ARGS__);                                  \
-        kernel::kprintf("========================================\n"); \
+        kernel::kprintf("\n========================================\n"); \
         while (1)                                                      \
             ;                                                          \
     } while (0)
