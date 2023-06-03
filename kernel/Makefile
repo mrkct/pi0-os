@@ -37,8 +37,7 @@ SOURCES=\
 	kernel/locking/spinlock.cpp \
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
-	kernel/memory/sectionalloc.cpp \
-	kernel/memory/virtualmem.cpp \
+	kernel/memory/vm.cpp \
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \
 	kernel/prekernel/vector_table.S \

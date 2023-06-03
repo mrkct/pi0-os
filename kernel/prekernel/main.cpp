@@ -7,8 +7,8 @@
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
 #include <kernel/memory/kheap.h>
-#include <kernel/memory/sectionalloc.h>
-#include <kernel/memory/virtualmem.h>
+#include <kernel/memory/physicalalloc.h>
+#include <kernel/memory/vm.h>
 #include <kernel/task/scheduler.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -45,8 +45,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 {
     using namespace kernel;
 
-    mmu_prepare_kernel_address_space();
-
     auto uart = uart_device();
 
     uart.init(uart.data);
@@ -73,6 +71,13 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(get_clock_rate(ClockId::ARM, clock_rate));
     kprintf("arm clock rate: %dHz\n", clock_rate);
 
+    kprintf("Initializing physical page allocator...");
+    MUST(physical_page_allocator_init(450 * 1024 * 1024));
+    kprintf("done\n");
+    kprintf("Initializing virtual memory manager...");
+    MUST(vm_init_kernel_address_space());
+    kprintf("done\n");
+
     Framebuffer fb;
     MUST(allocate_framebuffer(fb));
 
@@ -88,7 +93,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     asm volatile("swi #123");
     kprintf("Returned from software interrupt!\n");
 
-    section_allocator_init();
     MUST(kheap_init());
 
     char* test;
