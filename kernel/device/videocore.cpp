@@ -235,7 +235,7 @@ Error allocate_framebuffer(struct Framebuffer& fb)
 
     auto phys_addr = static_cast<uintptr_t>(message.tags.allocate_buffer_tag.alignment_or_address);
     auto size = message.tags.allocate_buffer_tag.size;
-    
+
     auto* virt_addr = reinterpret_cast<uint32_t*>(areas::framebuffer.start);
     TRY(vm_map_mmio(vm_current_address_space(), phys_addr, reinterpret_cast<uintptr_t>(virt_addr), size));
 

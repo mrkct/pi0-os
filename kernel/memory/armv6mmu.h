@@ -1,8 +1,8 @@
 #pragma once
 
+#include <kernel/sizes.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <kernel/sizes.h>
 
 namespace kernel {
 
@@ -33,13 +33,14 @@ struct CoarsePageTableEntry {
 
     uintptr_t base_address() const { return (base_addr << 10) & ~0x3ff; }
 
-    static CoarsePageTableEntry make_entry(uintptr_t address) {
+    static CoarsePageTableEntry make_entry(uintptr_t address)
+    {
         return {
             .identifier = COARSE_PAGE_TABLE_ENTRY_ID,
             .sbz = 0,
             .domain = 0,
             .impl_defined = 0,
-            .base_addr = ((uint32_t) address >> 10) & 0x3fffff,
+            .base_addr = ((uint32_t)address >> 10) & 0x3fffff,
         };
     }
 };
@@ -75,7 +76,8 @@ struct SmallPageEntry {
 
     uintptr_t base_address() const { return address << 12; }
 
-    static SmallPageEntry make_entry(uintptr_t address) {
+    static SmallPageEntry make_entry(uintptr_t address)
+    {
         return {
             .identifier = SMALL_PAGE_ENTRY_ID,
             .bufferable_writes = 0,
@@ -84,7 +86,7 @@ struct SmallPageEntry {
             .ap1 = 0b00,
             .ap2 = 0b00,
             .ap3 = 0b00,
-            .address = ((uint32_t) address >> 12) & 0xfffff,
+            .address = ((uint32_t)address >> 12) & 0xfffff,
         };
     }
 };

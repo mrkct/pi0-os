@@ -21,7 +21,7 @@ static Error brk(uintptr_t new_brk)
         auto chunks_to_add = (must_be_mapped_up_to - g_last_mapped_chunk) / CHUNK_SIZE;
 
         for (size_t i = 0; i < chunks_to_add; i++) {
-            struct PhysicalPage *page;
+            struct PhysicalPage* page;
 
             TRY(physical_page_alloc(PageOrder::_4KB, page));
             TRY(vm_map(vm_current_address_space(), page, g_last_mapped_chunk + (i + 1) * CHUNK_SIZE));
@@ -32,7 +32,7 @@ static Error brk(uintptr_t new_brk)
         auto chunks_to_remove = (g_last_mapped_chunk - must_be_mapped_up_to) / CHUNK_SIZE;
 
         for (size_t i = 0; i < chunks_to_remove; i++) {
-            struct PhysicalPage *to_free;
+            struct PhysicalPage* to_free;
 
             MUST(vm_unmap(vm_current_address_space(), g_last_mapped_chunk, to_free));
             MUST(physical_page_free(to_free, PageOrder::_4KB));
@@ -60,7 +60,7 @@ static Error sbrk(size_t size, uintptr_t& address)
 
 Error kheap_init()
 {
-    struct PhysicalPage *first_page;
+    struct PhysicalPage* first_page;
 
     TRY(physical_page_alloc(PageOrder::_4KB, first_page));
     TRY(vm_map(vm_current_address_space(), first_page, g_last_mapped_chunk));
