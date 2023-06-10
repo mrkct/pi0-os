@@ -5,9 +5,12 @@
 
 namespace kernel {
 
-typedef uint32_t Spinlock;
+typedef struct {
+    uint32_t is_taken;
+    bool need_reenable_interrupts;
+} Spinlock;
 
-static constexpr Spinlock SPINLOCK_START = 0;
+static constexpr Spinlock SPINLOCK_START = { 0, false };
 
 void take(Spinlock&);
 
