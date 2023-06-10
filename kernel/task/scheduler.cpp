@@ -123,34 +123,10 @@ void scheduler_add(Task* task)
 
 void scheduler_step(SuspendedTaskState* suspended_state)
 {
-
-    // kprintf("[%s]: user_stack: %p     alignment: %u\n",
-    //     g_current_task->name, suspended_state->task_sp, *alignment);
-    // auto *p = g_current_task->next_to_run;
-    // while (p) {
-    //     kprintf(" -> [%s]: u.stack: %p ", p->name, p->state.task_sp);
-    //     p = p->next_to_run;
-    // }
-    // kprintf("\n");
-
     if (!g_interrupt_triggered_context_switch)
         return;
-
-    kassert(g_current_task != nullptr);
-    uint32_t* alignment = (uint32_t*)suspended_state;
-    alignment--;
-
-    if (g_current_task->name[0] != 'i') {
-        kprintf("[%s]: user_stack: %p   %p\n", g_current_task->name, suspended_state->task_sp, g_current_task);
-        kassert(areas::user_stack.contains((uintptr_t)suspended_state->task_sp));
-        for (uint32_t* sp = (uint32_t*)suspended_state->task_sp; reinterpret_cast<uintptr_t>(sp) != areas::user_stack.end; sp++) {
-            kprintf("    %p: %x\n", sp, *sp);
-        }
-    }
-
     g_interrupt_triggered_context_switch = false;
-    // kprintf_no_lock("[Kprintf lock status: %s]\n", g_kprintf_lock.internal_spinlock.is_taken ? "taken" : "free");
-    // scheduler_print();
+
     auto* current = g_current_task;
     auto* next = g_current_task->next_to_run;
 
