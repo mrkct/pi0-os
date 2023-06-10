@@ -1,5 +1,6 @@
 #pragma once
 
+#include <kernel/sizes.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -23,6 +24,7 @@ extern "C" uint8_t _kernel_stack_start[];
 extern "C" uint8_t _kernel_stack_end[];
 static const Area kernel_stack = { reinterpret_cast<uintptr_t>(_kernel_stack_start), reinterpret_cast<uintptr_t>(_kernel_stack_end) };
 
+static constexpr Area user_stack = { 0xdfffe000 - (16 * _4KB), 0xdfffe000 };
 static constexpr Area kernel = { 0xe0000000, 0xe2000000 };
 static constexpr Area peripherals = { 0xe2000000, 0xe3000000 };
 static constexpr Area framebuffer = { 0xe3000000, 0xe4000000 };

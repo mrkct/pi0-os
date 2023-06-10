@@ -5,12 +5,24 @@
 
 namespace kernel {
 
-static constexpr size_t LVL1_ENTRIES = 16 * _16KB / sizeof(FirstLevelEntry);
+static constexpr size_t LVL1_ENTRIES = _16KB / sizeof(FirstLevelEntry);
 static constexpr size_t LVL2_ENTRIES = _1KB / sizeof(SecondLevelEntry);
 
 extern "C" FirstLevelEntry _kernel_translation_table[];
 static __attribute__((aligned(_1KB))) SecondLevelEntry g_temp_mappings_lvl2_table[LVL2_ENTRIES];
 
+static AddressSpace g_current_address_space;
+
+struct AddressSpace& vm_current_address_space()
+{
+    return g_current_address_space;
+}
+
+void vm_switch_address_space(struct AddressSpace& as)
+{
+    asm volatile("mcr p15, 0, %0, c2, c0, 0" ::"r"(page2addr(as.ttbr0_page)));
+    g_current_address_space = as;
+}
 class TemporarilyMappedRange {
 public:
     TemporarilyMappedRange(uintptr_t phys_addr, size_t size)
@@ -27,12 +39,12 @@ public:
 
         for (size_t i = 0; i < consecutive_entries_required; i++) {
             auto& entry = g_temp_mappings_lvl2_table[idx + i];
-            entry.small_page = SmallPageEntry::make_entry(phys_addr + i * 4 * _1KB);
-            invalidate_tlb_entry(areas::temp_mappings.start + (idx + i) * 4 * _1KB);
+            entry.small_page = SmallPageEntry::make_entry(phys_addr + i * _4KB);
+            invalidate_tlb_entry(areas::temp_mappings.start + (idx + i) * _4KB);
         }
         m_stored_range_start = idx;
         m_stored_range_end = idx + consecutive_entries_required - 1;
-        m_virtual_addr = reinterpret_cast<void*>(areas::temp_mappings.start + idx * 4 * _1KB + offset_since_page_start);
+        m_virtual_addr = reinterpret_cast<void*>(areas::temp_mappings.start + idx * _4KB + offset_since_page_start);
     }
 
     template<typename T>
@@ -43,7 +55,7 @@ public:
         for (size_t i = m_stored_range_start; i <= m_stored_range_end; i++) {
             auto& entry = g_temp_mappings_lvl2_table[i];
             entry.raw = 0;
-            invalidate_tlb_entry(areas::temp_mappings.start + i * 4 * _1KB);
+            invalidate_tlb_entry(areas::temp_mappings.start + i * _4KB);
         }
     }
 
@@ -100,14 +112,11 @@ uintptr_t virt2phys(uintptr_t virt)
 
 Error vm_init_kernel_address_space()
 {
+    g_current_address_space.ttbr0_page = addr2page(virt2phys(reinterpret_cast<uintptr_t>(_kernel_translation_table)));
+
     // Note that we already mapped the kernel and peripherals in the start.S file
     _kernel_translation_table[lvl1_index(areas::temp_mappings.start)].coarse = CoarsePageTableEntry::make_entry(
         virt2phys(reinterpret_cast<uintptr_t>(&g_temp_mappings_lvl2_table)));
-
-    // This value depends on the address at which the kernel is mapped
-    // eg: 0xe0000000 has the first 3 bits set to 1, therefore N=3
-    auto const N = 3;
-    asm volatile("mcr p15, 0, %0, c2, c0, 2" ::"r"(N)); // Write N to TTBCR, the remaining bits are zero
 
     invalidate_tlb();
 
@@ -116,12 +125,24 @@ Error vm_init_kernel_address_space()
 
 Error vm_create_address_space(struct AddressSpace& as)
 {
-    struct PhysicalPage* as_ttbr1_page;
-    TRY(physical_page_alloc(PageOrder::_16KB, as_ttbr1_page));
-    as.ttbr1_page = as_ttbr1_page;
+    struct PhysicalPage* as_ttbr0_page;
+    TRY(physical_page_alloc(PageOrder::_16KB, as_ttbr0_page));
+    as.ttbr0_page = as_ttbr0_page;
 
-    TemporarilyMappedRange tmp_mapped { page2addr(as_ttbr1_page), LVL1_TABLE_SIZE };
-    memset(tmp_mapped.as_ptr<void*>(), 0, LVL1_TABLE_SIZE);
+    TemporarilyMappedRange tmp_mapped { page2addr(as_ttbr0_page), LVL1_TABLE_SIZE };
+    FirstLevelEntry* lvl1_table = tmp_mapped.as_ptr<FirstLevelEntry*>();
+    memset(lvl1_table, 0, LVL1_TABLE_SIZE);
+
+    constexpr uintptr_t KERNEL_START = areas::higher_half.start;
+    for (size_t i = lvl1_index(KERNEL_START); i < LVL1_ENTRIES; i++)
+        lvl1_table[i].raw = _kernel_translation_table[i].raw;
+
+    // Map the first 1MB of virtual memory to the first 1MB of physical memory
+    // This is necessary because the CPU jumps to the vector table, which is located there and
+    // it must be always be accessible or we risk a fault loop (the CPU will try to jump to the
+    // vector table, but it will fault because it's not mapped, so it will try to jump to the
+    // vector table and so on)
+    lvl1_table[0].section = SectionEntry::make_entry(0x00000000);
 
     return Success;
 }
@@ -138,6 +159,16 @@ static Error vm_map_page(FirstLevelEntry* root_table, uintptr_t phys_addr, uintp
         MUST(physical_page_alloc(PageOrder::_1KB, lvl2_table_page));
 
         lvl1_entry.coarse = CoarsePageTableEntry::make_entry(page2addr(lvl2_table_page));
+
+        // The kernel area must be mapped the same way in all address spaces.
+        // We can afford to have different address spaces not mapped the same way since
+        // we can fix them in the page fault handler anyway, but we must always have the
+        // kernel_translation_table be the final source of truth for the kernel area.
+        if (areas::higher_half.contains(virt_addr) && root_table != _kernel_translation_table) {
+            kassert(_kernel_translation_table[lvl1_index(virt_addr)].raw == 0);
+            _kernel_translation_table[lvl1_index(virt_addr)].coarse = lvl1_entry.coarse;
+        }
+
         lvl2_table_was_just_allocated = true;
     }
 
@@ -161,7 +192,7 @@ static Error vm_map_page(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t
     if (areas::higher_half.contains(virt_addr))
         return vm_map_page(_kernel_translation_table, phys_addr, virt_addr);
 
-    TemporarilyMappedRange lvl1_table { page2addr(as.ttbr1_page), LVL1_TABLE_SIZE };
+    TemporarilyMappedRange lvl1_table { page2addr(as.ttbr0_page), LVL1_TABLE_SIZE };
     TRY(vm_map_page(lvl1_table.as_ptr<FirstLevelEntry*>(), phys_addr, virt_addr));
 
     return Success;
@@ -209,19 +240,23 @@ static Error vm_unmap_page(FirstLevelEntry* root_table, uintptr_t virt_addr, uin
     lvl2_entry.raw = 0;
     invalidate_tlb_entry(virt_addr);
 
-    // If the whole level 2 table is empty, we can free it
-    bool whole_lvl2_table_is_empty = true;
-    for (size_t i = 0; i < LVL2_ENTRIES; i++) {
-        auto& entry = lvl2_table.as_ptr<SecondLevelEntry*>()[i];
-        if (entry.raw != 0) {
-            whole_lvl2_table_is_empty = false;
-            break;
+    // If the whole level 2 table is empty, and it's not a kernel area address, we can free it
+    // Note we don't want to unmap lvl1 tables in the kernel address space because
+    // it might cause hard-to-solve inconsistencies with the other address spaces
+    if (!areas::higher_half.contains(virt_addr)) {
+        bool whole_lvl2_table_is_empty = true;
+        for (size_t i = 0; i < LVL2_ENTRIES; i++) {
+            auto& entry = lvl2_table.as_ptr<SecondLevelEntry*>()[i];
+            if (entry.raw != 0) {
+                whole_lvl2_table_is_empty = false;
+                break;
+            }
         }
-    }
-    if (whole_lvl2_table_is_empty) {
-        struct PhysicalPage* p = addr2page(lvl1_entry.coarse.base_address());
-        MUST(physical_page_free(p, PageOrder::_16KB));
-        lvl1_entry.raw = 0;
+        if (whole_lvl2_table_is_empty) {
+            struct PhysicalPage* p = addr2page(lvl1_entry.coarse.base_address());
+            MUST(physical_page_free(p, PageOrder::_16KB));
+            lvl1_entry.raw = 0;
+        }
     }
 
     return Success;
@@ -232,7 +267,7 @@ static Error vm_unmap_page(struct AddressSpace& as, uintptr_t virt_addr, uintptr
     if (areas::higher_half.contains(virt_addr))
         return vm_unmap_page(_kernel_translation_table, virt_addr, previously_mapped_page);
 
-    TemporarilyMappedRange lvl1_table { page2addr(as.ttbr1_page), LVL1_TABLE_SIZE };
+    TemporarilyMappedRange lvl1_table { page2addr(as.ttbr0_page), LVL1_TABLE_SIZE };
     TRY(vm_unmap_page(lvl1_table.as_ptr<FirstLevelEntry*>(), virt_addr, previously_mapped_page));
 
     return Success;
@@ -249,18 +284,33 @@ Error vm_unmap(struct AddressSpace& as, uintptr_t virt_addr, struct PhysicalPage
     return Success;
 }
 
-static AddressSpace g_current_address_space;
-
-struct AddressSpace& vm_current_address_space()
+PageFaultHandlerResult vm_page_fault_handler(uintptr_t phys_ttbr0_addr, uintptr_t virt_fault_addr, uintptr_t status)
 {
-    return g_current_address_space;
-}
+    if (areas::higher_half.contains(virt_fault_addr)) {
+        // If the fault is in the kernel area, but the main kernel address space has
+        // a valid entry, then it's just that the address space was created before the
+        // that new mapping was added, so we can just fix it and return
 
-void vm_switch_address_space(struct AddressSpace& as)
-{
-    asm volatile("mcr p15, 0, %0, c2, c0, 0" ::"r"(page2addr(as.ttbr1_page) | 0b11));
-    invalidate_tlb();
-    g_current_address_space = as;
+        if (_kernel_translation_table[lvl1_index(virt_fault_addr)].raw != 0) {
+            TemporarilyMappedRange ttbr0 { phys_ttbr0_addr, LVL1_TABLE_SIZE };
+            auto& ttbr0_lvl1_entry = ttbr0.as_ptr<FirstLevelEntry*>()[lvl1_index(virt_fault_addr)];
+            ttbr0_lvl1_entry = _kernel_translation_table[lvl1_index(virt_fault_addr)];
+            invalidate_tlb_entry(virt_fault_addr);
+
+            return PageFaultHandlerResult::Fixed;
+        } else {
+            // The fault is in the kernel area, but there's not a valid entry in the kernel address space
+            // This is a kernel bug, so we panic
+            panic(
+                "vm_page_fault_handler: fault in kernel area, but no valid entry in kernel address space\n"
+                "    phys_ttbr0_addr: %p\n"
+                "    virt_fault_addr: %p\n"
+                "    status: %p\n",
+                phys_ttbr0_addr, virt_fault_addr, status);
+        }
+    }
+
+    return PageFaultHandlerResult::Fatal;
 }
 
 }

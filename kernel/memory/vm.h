@@ -8,7 +8,7 @@
 namespace kernel {
 
 struct AddressSpace {
-    struct PhysicalPage* ttbr1_page;
+    struct PhysicalPage* ttbr0_page;
 };
 
 struct AddressSpace& vm_current_address_space();
@@ -26,5 +26,11 @@ Error vm_map_mmio(struct AddressSpace&, uintptr_t phys_addr, uintptr_t virt_addr
 Error vm_unmap(struct AddressSpace&, uintptr_t, struct PhysicalPage*&);
 
 void vm_switch_address_space(struct AddressSpace&);
+
+enum class PageFaultHandlerResult {
+    Fixed,
+    Fatal
+};
+PageFaultHandlerResult vm_page_fault_handler(uintptr_t phys_ttbr0_addr, uintptr_t fault_addr, uintptr_t status);
 
 }

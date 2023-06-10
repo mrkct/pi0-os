@@ -60,6 +60,22 @@ struct SectionEntry {
     uint32_t base_addr : 12;
 
     uintptr_t base_address() const { return base_addr << 20; }
+
+    static SectionEntry make_entry(uintptr_t addr)
+    {
+        return {
+            .identifier = SECTION_ENTRY_ID,
+            .bufferable_writes = 0,
+            .cachable = 0,
+            .sbz = 0,
+            .domain = 0,
+            .impl_defined = 0,
+            .access_permission = 0b00,
+            .tex = 0b000,
+            .sbz2 = 0,
+            .base_addr = ((uint32_t)addr >> 20) & 0xfff,
+        };
+    }
 };
 static_assert(sizeof(SectionEntry) == 4, "SectionEntry is not 32 bits");
 
