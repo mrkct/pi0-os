@@ -3,6 +3,7 @@
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/memory.h>
+#include <kernel/task/scheduler.h>
 
 namespace kernel {
 
@@ -38,6 +39,7 @@ static constexpr uintptr_t DISABLE_BASIC_IRQS = IRQ_CONTROLLER_BASE + 0x224;
 
 static void irq_handler(SuspendedTaskState* suspended_state)
 {
+    kassert_no_print(!interrupt_are_enabled());
     uint32_t basic, pending1, pending2;
     basic = ioread32<uint32_t>(IRQ_BASIC_PENDING);
     pending1 = ioread32<uint32_t>(IRQ_PENDING_1);
@@ -189,6 +191,8 @@ extern "C" void irq_and_exception_handler(uint32_t vector_offset, SuspendedTaskS
             suspended_state->task_lr,
             suspended_state->spsr);
     }
+
+    scheduler_step(suspended_state);
 }
 
 }

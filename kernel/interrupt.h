@@ -22,6 +22,13 @@ typedef void (*InterruptHandler)(SuspendedTaskState*);
 
 void interrupt_init();
 
+static inline bool interrupt_are_enabled()
+{
+    uint32_t cpsr;
+    asm volatile("mrs %0, cpsr"
+                 : "=r"(cpsr));
+    return !(cpsr & (1 << 7));
+}
 static inline void interrupt_enable() { asm volatile("cpsie i"); }
 static inline void interrupt_disable() { asm volatile("cpsid i"); }
 
