@@ -172,7 +172,22 @@ extern "C" void irq_and_exception_handler(uint32_t vector_offset, SuspendedTaskS
     } else if (vector_index == 6) {
         irq_handler(suspended_state);
     } else {
-        panic("%s caused by instruction at %p\n", vector_name[vector_index], suspended_state->lr);
+        panic(
+            "%s caused by instruction at %p by task %s\n"
+            "\t r0: %x\t r1: %x\t r2: %x\t r3: %x\n"
+            "\t r4: %x\t r5: %x\t r6: %x\t r7: %x\n"
+            "\t r8: %x\t r9: %x\t r10: %x\t r11: %x\n"
+            "\t sp: %p\n"
+            "\t user lr: %p\n"
+            "\t spsr: %x",
+            vector_name[vector_index], suspended_state->lr,
+            scheduler_current_task() ? scheduler_current_task()->name : "kernel",
+            suspended_state->r[0], suspended_state->r[1], suspended_state->r[2], suspended_state->r[3],
+            suspended_state->r[4], suspended_state->r[5], suspended_state->r[6], suspended_state->r[7],
+            suspended_state->r[8], suspended_state->r[9], suspended_state->r[10], suspended_state->r[11],
+            suspended_state->task_sp,
+            suspended_state->task_lr,
+            suspended_state->spsr);
     }
 }
 
