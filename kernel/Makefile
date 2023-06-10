@@ -10,6 +10,9 @@ CXXFLAGS+=-Wall -Wextra -g
 
 QEMU:=qemu-system-arm
 QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial stdio -kernel Kernel
+QEMU_REPLAY_FILENAME:=replay.bin
+QEMU_RECORD_FLAGS:=-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME)
+QEMU_REPLAY_FLAGS:=-icount shift=auto,rr=replay,rrfile=$(QEMU_REPLAY_FILENAME)
 ifdef SD_IMAGE
 QEMU_FLAGS+=-sd $(SD_IMAGE)
 endif
@@ -57,9 +60,16 @@ all: Kernel
 qemu: Kernel
 	$(QEMU) $(QEMU_FLAGS)
 
+qemu-record: Kernel
+	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS)
+
 qemu-gdb: Kernel
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) -s -S
+	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS) -s -S
+
+qemu-gdb-replay: Kernel
+	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
+	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
 
 kernel7.img: Kernel
 	$(OBJCOPY) Kernel -O binary kernel7.img
