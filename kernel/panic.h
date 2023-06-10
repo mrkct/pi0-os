@@ -8,11 +8,19 @@ size_t kprintf(char const* format, ...);
 
 #define panic(...)                                                       \
     do {                                                                 \
+        asm volatile("cpsid i");                                         \
         kernel::kprintf("=========== KERNEL PANIC :^( ===========\n");   \
         kernel::kprintf(__VA_ARGS__);                                    \
         kernel::kprintf("\n========================================\n"); \
         while (1)                                                        \
             ;                                                            \
+    } while (0)
+
+#define panic_no_print(...)      \
+    do {                         \
+        asm volatile("cpsid i"); \
+        while (1)                \
+            ;                    \
     } while (0)
 
 #define kassert_not_reached() panic("ASSERTION FAILED: not reached\n")
@@ -21,4 +29,10 @@ size_t kprintf(char const* format, ...);
     do {                                            \
         if (!(expr))                                \
             panic("ASSERTION FAILED: " #expr "\n"); \
+    } while (0)
+
+#define kassert_no_print(expr)                               \
+    do {                                                     \
+        if (!(expr))                                         \
+            panic_no_print("ASSERTION FAILED: " #expr "\n"); \
     } while (0)
