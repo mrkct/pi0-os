@@ -11,6 +11,20 @@ static size_t next_path_separator(char const* path, size_t offset)
     return i;
 }
 
+static Filesystem* g_root_fs;
+
+void fs_set_root(Filesystem* fs)
+{
+    kassert(fs != nullptr);
+    kassert(g_root_fs == nullptr);
+    g_root_fs = fs;
+}
+
+Filesystem* fs_get_root()
+{
+    return g_root_fs;
+}
+
 Error fs_open(Filesystem& fs, char const* path, File& file)
 {
     if (path[0] != '/')

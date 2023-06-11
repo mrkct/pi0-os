@@ -47,6 +47,10 @@ struct DirectoryEntry {
     uint8_t impl_data[32];
 };
 
+void fs_set_root(Filesystem* fs);
+
+Filesystem* fs_get_root();
+
 Error fs_open(Filesystem&, char const* path, File& file);
 
 Error fs_read(File& file, uint8_t* buffer, size_t offset, size_t size, size_t& bytes_read);
