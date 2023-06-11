@@ -1,4 +1,5 @@
 #include <api/syscalls.h>
+#include <kernel/datetime.h>
 #include <kernel/error.h>
 #include <kernel/interrupt.h>
 #include <kernel/lib/string.h>
@@ -39,13 +40,22 @@ static Error sys$exit(int error_code)
     return Success;
 }
 
-Error sys$get_process_info(uintptr_t user_buf)
+static Error sys$get_process_info(uintptr_t user_buf)
 {
     api::ProcessInfo info;
     info.pid = scheduler_current_task()->pid;
     klib::strncpy_safe(info.name, scheduler_current_task()->name, sizeof(info.name));
 
     TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buf, &info, sizeof(info)));
+
+    return Success;
+}
+
+static Error sys$get_datetime(uintptr_t user_buf)
+{
+    api::DateTime datetime;
+    TRY(datetime_read(datetime));
+    TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buf, &datetime, sizeof(datetime)));
 
     return Success;
 }
@@ -84,7 +94,8 @@ void dispatch_syscall(uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t&)
         break;
     case SyscallIdentifiers::ReadDirectory:
         break;
-    case SyscallIdentifiers::GetTimeOfDay:
+    case SyscallIdentifiers::GetDateTime:
+        err = sys$get_datetime(static_cast<uintptr_t>(r1));
         break;
     case SyscallIdentifiers::Sleep:
         break;

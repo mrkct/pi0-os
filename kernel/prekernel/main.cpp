@@ -1,4 +1,5 @@
 #include <api/syscalls.h>
+#include <kernel/datetime.h>
 #include <kernel/device/sd.h>
 #include <kernel/device/systimer.h>
 #include <kernel/device/uart.h>
@@ -51,6 +52,23 @@ static void task_A()
     api::syscall(api::SyscallIdentifiers::GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0);
 
     size_t len = kernel::ksprintf(buf, sizeof(buf), "I am %s and my PID is %d\n", info.name, info.pid);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+
+    api::DateTime datetime;
+    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0);
+
+    len = kernel::ksprintf(buf, sizeof(buf), "The date is %d-%d-%d %d:%d:%d\n",
+        datetime.year, datetime.month, datetime.day, datetime.hour, datetime.minute, datetime.second);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+
+    len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+
+    for (int volatile waste = 0; waste < 100000000; waste++)
+        ;
+
+    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0);
+    len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
     api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
 
     api::syscall(api::SyscallIdentifiers::Exit, 0, 0, 0);
@@ -131,6 +149,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         fs_set_root(&fs);
     }
 
+    datetime_init();
     syscall_init();
     systimer_init();
     interrupt_enable();

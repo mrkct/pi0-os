@@ -113,6 +113,7 @@ static constexpr Error DeviceIsBusy { GenericErrorCode::DeviceIsBusy, 0, "Device
 static constexpr Error OutOfMemory { GenericErrorCode::OutOfMemory, 0, "Out of memory", nullptr };
 static constexpr Error CantRepeat { GenericErrorCode::CantRepeat, 0, "Can't repeat the operation", nullptr };
 static constexpr Error NotSupported { GenericErrorCode::NotSupported, 0, "Not supported", nullptr };
+static constexpr Error InvalidFormat { GenericErrorCode::InvalidFormat, 0, "Invalid format", nullptr };
 static constexpr Error EndOfData { GenericErrorCode::EndOfData, 0, "End of data", nullptr };
 static constexpr Error NotFound { GenericErrorCode::NotFound, 0, "Not found", nullptr };
 static constexpr Error NotAFile { GenericErrorCode::NotAFile, 0, "Not a file", nullptr };

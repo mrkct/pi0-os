@@ -26,6 +26,7 @@ LIBS_SOURCES=\
 
 SOURCES=\
 	$(LIBS_SOURCES) \
+	kernel/datetime.cpp \
 	kernel/device/gpio.cpp \
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \

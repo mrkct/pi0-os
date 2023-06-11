@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 namespace api {
 
@@ -23,7 +23,7 @@ enum class SyscallIdentifiers : uint32_t {
     OpenDirectory = 21,
     ReadDirectory = 22,
 
-    GetTimeOfDay = 30,
+    GetDateTime = 30,
     Sleep = 31,
 
     Poll = 40,
@@ -57,6 +57,14 @@ struct ProcessInfo {
     char name[32];
 };
 
-
+struct DateTime {
+    int year;
+    int month;
+    int day;
+    int hour;
+    int minute;
+    int second;
+    uint64_t ticks_since_boot;
+};
 
 }
