@@ -165,6 +165,16 @@ append_terminator_and_return:
     return written;
 }
 
+size_t ksprintf(char* buffer, size_t buffer_size, char const* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    size_t written = ksnprintf(buffer, buffer_size, format, args);
+    va_end(args);
+
+    return written;
+}
+
 size_t kprintf(char const* format, ...)
 {
     va_list args;

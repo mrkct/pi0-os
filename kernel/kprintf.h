@@ -12,6 +12,8 @@ void kprintf_video_init(VideoConsole&);
 
 size_t ksnprintf(char* buffer, size_t buffer_size, char const* format, va_list args);
 
+size_t ksprintf(char* buffer, size_t buffer_size, char const* format, ...);
+
 size_t kprintf(char const* format, ...);
 
 }
