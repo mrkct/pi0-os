@@ -284,6 +284,30 @@ Error vm_unmap(struct AddressSpace& as, uintptr_t virt_addr, struct PhysicalPage
     return Success;
 }
 
+Error vm_copy_from_user(struct AddressSpace& as, void* dest, uintptr_t src, size_t len)
+{
+    if (g_current_address_space.ttbr0_page == as.ttbr0_page) {
+        memcpy(dest, reinterpret_cast<void*>(src), len);
+        return Success;
+    }
+
+    TODO();
+
+    return Success;
+}
+
+Error vm_copy_to_user(struct AddressSpace& as, uintptr_t dest, void* src, size_t len)
+{
+    if (g_current_address_space.ttbr0_page == as.ttbr0_page) {
+        memcpy(reinterpret_cast<void*>(dest), src, len);
+        return Success;
+    }
+
+    TODO();
+
+    return Success;
+}
+
 PageFaultHandlerResult vm_page_fault_handler(uintptr_t phys_ttbr0_addr, uintptr_t virt_fault_addr, uintptr_t status)
 {
     if (areas::higher_half.contains(virt_fault_addr)) {

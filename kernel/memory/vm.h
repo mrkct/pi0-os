@@ -25,6 +25,10 @@ Error vm_map_mmio(struct AddressSpace&, uintptr_t phys_addr, uintptr_t virt_addr
 
 Error vm_unmap(struct AddressSpace&, uintptr_t, struct PhysicalPage*&);
 
+Error vm_copy_from_user(struct AddressSpace&, void* dest, uintptr_t src, size_t len);
+
+Error vm_copy_to_user(struct AddressSpace& as, uintptr_t dest, void* src, size_t len);
+
 void vm_switch_address_space(struct AddressSpace&);
 
 enum class PageFaultHandlerResult {
