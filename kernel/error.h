@@ -22,6 +22,7 @@ enum class GenericErrorCode {
     NotFound,
     NotAFile,
     NotADirectory,
+    InvalidSystemCall,
 };
 
 static constexpr char const* __generic_error_code_to_string(GenericErrorCode code)
@@ -57,6 +58,10 @@ static constexpr char const* __generic_error_code_to_string(GenericErrorCode cod
         return "NotFound";
     case GenericErrorCode::NotAFile:
         return "NotAFile";
+    case GenericErrorCode::NotADirectory:
+        return "NotADirectory";
+    case GenericErrorCode::InvalidSystemCall:
+        return "InvalidSystemCall";
     default:
         return "Unknown";
     }
@@ -112,5 +117,6 @@ static constexpr Error EndOfData { GenericErrorCode::EndOfData, 0, "End of data"
 static constexpr Error NotFound { GenericErrorCode::NotFound, 0, "Not found", nullptr };
 static constexpr Error NotAFile { GenericErrorCode::NotAFile, 0, "Not a file", nullptr };
 static constexpr Error NotADirectory { GenericErrorCode::NotADirectory, 0, "Not a directory", nullptr };
+static constexpr Error InvalidSystemCall { GenericErrorCode::InvalidSystemCall, 0, "Invalid system call", nullptr };
 
 }

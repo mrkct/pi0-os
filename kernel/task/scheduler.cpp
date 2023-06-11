@@ -1,3 +1,4 @@
+#include <api/syscalls.h>
 #include <kernel/device/systimer.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
@@ -6,7 +7,6 @@
 #include <kernel/locking/reentrant.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/sizes.h>
-#include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
 
 namespace kernel {
@@ -18,27 +18,6 @@ static constexpr uint32_t TIME_SLICE = 10000; // 10ms;
 static Task* g_current_task = nullptr;
 static Task* g_last_scheduled = nullptr;
 static PID g_next_pid = 1;
-
-/*
-    When we're doing a context switch, we want to restart the scheduling
-    timer and pass control to the task that is next to run as soon as possible.
-    However, if we're in an interrupt handler, we can't do that because after
-    the interrupt handler returns, another interrupt(with a lower priority) might
-    be handled right after, consuming part of the time slice.
-
-    To solve this, any interrupt handler that wants to trigger a context switch
-    should set this variable to true. Then, when all the interrupt handlers are
-    done, we hardcoded a call to scheduler_step() at the end of the global
-    interrupt controller handler, which will actually do the context switch,
-    start the timer and pass control to the next task right after returning from
-    the function.
-*/
-static bool g_interrupt_triggered_context_switch = false;
-
-void yield()
-{
-    asm volatile("swi #1\n");
-}
 
 Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)())
 {
@@ -59,6 +38,8 @@ Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)
     // TODO: Ask the loader to map the executable into the address space and return the entry point
     task->state.lr = reinterpret_cast<uint32_t>(entry);
 
+    task->exit_code = 0;
+    task->task_state = TaskState::Running;
     task->next_to_run = nullptr;
     task->pid = g_next_pid++;
     klib::strncpy_safe(task->name, name, sizeof(task->name));
@@ -75,15 +56,15 @@ static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
 static void idle_task()
 {
     while (1) {
-        yield();
+        api::syscall(api::SyscallIdentifiers::Yield, 0, 0, 0);
     }
 }
-
-extern ReentrantSpinlock g_kprintf_lock;
 
 void scheduler_init()
 {
     MUST(kmalloc(sizeof(Task), g_current_task));
+    g_current_task->exit_code = 0;
+    g_current_task->task_state = TaskState::Running;
     g_current_task->next_to_run = nullptr;
     g_current_task->pid = 0;
     // FIXME: This assignment works only because AddressSpace only contains a pointer to ttbr0
@@ -93,8 +74,12 @@ void scheduler_init()
     g_last_scheduled = g_current_task;
     g_last_scheduled->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
     g_last_scheduled->state.lr = reinterpret_cast<uint32_t>(idle_task);
+}
 
-    interrupt_install_swi_handler(1, [](auto*) { g_interrupt_triggered_context_switch = true; });
+static void task_free(Task* task)
+{
+    // TODO: Free the address space
+    kfree(task);
 }
 
 Task* scheduler_current_task()
@@ -123,29 +108,30 @@ void scheduler_add(Task* task)
 
 void scheduler_step(SuspendedTaskState* suspended_state)
 {
-    if (!g_interrupt_triggered_context_switch)
-        return;
-    g_interrupt_triggered_context_switch = false;
-
     auto* current = g_current_task;
     auto* next = g_current_task->next_to_run;
 
-    if (next == nullptr) {
-        kprintf("No other tasks to run, carrying on\n");
+    if (next == nullptr)
         return;
-    }
 
     g_current_task->state = *suspended_state;
     *suspended_state = next->state;
 
     vm_switch_address_space(next->address_space);
     g_current_task = next;
-    scheduler_add(current);
+
+    if (current->task_state != TaskState::Zombie) {
+        scheduler_add(current);
+    } else {
+        task_free(current);
+    }
 }
 
 [[noreturn]] void scheduler_begin()
 {
-    systimer_repeating_callback(TIME_SLICE, [](auto*) { g_interrupt_triggered_context_switch = true; });
+    systimer_repeating_callback(TIME_SLICE, [](auto*) {
+        // No need to do anything, triggering any IRQ will cause the scheduler to run
+    });
 
     asm volatile(
         "mov r0, %[system_stack] \n"

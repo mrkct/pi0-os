@@ -1,3 +1,4 @@
+#include <api/syscalls.h>
 #include <kernel/device/sd.h>
 #include <kernel/device/systimer.h>
 #include <kernel/device/uart.h>
@@ -9,6 +10,7 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
+#include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -39,6 +41,20 @@ static void __attribute__((unused)) fs_tree(kernel::Filesystem& fs)
     Directory root_dir;
     MUST(fs.root_directory(fs, root_dir));
     helper(fs, root_dir, 0);
+}
+
+static void task_A()
+{
+    char buf[1024];
+
+    api::ProcessInfo info;
+    api::syscall(api::SyscallIdentifiers::GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0);
+
+    size_t len = kernel::ksprintf(buf, sizeof(buf), "I am %s and my PID is %d\n", info.name, info.pid);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+
+    api::syscall(api::SyscallIdentifiers::Exit, 0, 0, 0);
+    kassert_not_reached();
 }
 
 extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
@@ -114,23 +130,16 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         MUST(fs.init(fs));
     }
 
+    syscall_init();
     systimer_init();
     interrupt_enable();
-
     scheduler_init();
     Task *A, *B;
-    MUST(task_create_kernel_thread(A, "A", []() {
-        int count = 0;
-        while (1) {
-            kprintf("[A]: %d\n", count++);
-        }
-    }));
-    MUST(task_create_kernel_thread(B, "B", []() {
-        int count = 0;
-        while (1) {
-            kprintf("[B]: %d\n", count++);
-        }
-    }));
+    MUST(task_create_kernel_thread(A, "A", task_A));
+
+    // FIXME: There's a very hard to find bug where having this
+    // task run can cause A to crash. Will investigate later
+    // MUST(task_create_kernel_thread(B, "B", task_A));
 
     scheduler_begin();
 

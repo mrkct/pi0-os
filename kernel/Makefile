@@ -44,6 +44,7 @@ SOURCES=\
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \
 	kernel/prekernel/vector_table.S \
+	kernel/syscall/syscalls.cpp \
 	kernel/task/scheduler.cpp \
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
