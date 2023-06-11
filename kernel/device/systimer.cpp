@@ -44,14 +44,12 @@ void systimer_init()
     iowrite32<uint32_t>(SYSTIMER_CS, CS_M1 | CS_M3);
 
     interrupt_install_irq1_handler(1, [](auto* suspended_task_state) {
-        if (g_repeating_callback != nullptr)
+        if (g_repeating_callback != nullptr) {
             g_repeating_callback(suspended_task_state);
 
-        iowrite32<uint32_t>(SYSTIMER_CS, CS_M1);
-
-        if (g_repeating_callback != nullptr) {
             auto ticks = systimer_get_ticks();
             iowrite32<uint32_t>(SYSTIMER_C1, (uint32_t)ticks + g_repeating_callback_interval);
+            iowrite32<uint32_t>(SYSTIMER_CS, CS_M1);
         }
     });
     interrupt_install_irq1_handler(3, [](auto* suspended_task_state) {
