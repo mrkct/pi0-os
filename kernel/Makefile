@@ -11,10 +11,16 @@ CXXFLAGS+=-Wall -Wextra -g
 QEMU:=qemu-system-arm
 QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial stdio -kernel Kernel
 QEMU_REPLAY_FILENAME:=replay.bin
-QEMU_RECORD_FLAGS:=-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME)
-QEMU_REPLAY_FLAGS:=-icount shift=auto,rr=replay,rrfile=$(QEMU_REPLAY_FILENAME)
+QEMU_RECORD_FLAGS:=\
+	-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
+	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
+QEMU_REPLAY_FLAGS:=\
+	-icount shift=auto,rr=replay,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
+	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
 ifdef SD_IMAGE
-QEMU_FLAGS+=-sd $(SD_IMAGE)
+QEMU_SD_FLAGS+=-sd $(SD_IMAGE)
+else
+QEMU_SD_FLAGS:=
 endif
 
 LIBS_SOURCES=\
@@ -47,6 +53,7 @@ SOURCES=\
 	kernel/prekernel/vector_table.S \
 	kernel/syscall/syscalls.cpp \
 	kernel/task/scheduler.cpp \
+	kernel/timer.cpp \
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))
@@ -59,17 +66,20 @@ OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 
 all: Kernel
 
-qemu: Kernel
-	$(QEMU) $(QEMU_FLAGS)
+snapshot-drive.qcow2:
+	qemu-img create -f qcow2 snapshot-drive.qcow2 4G
 
-qemu-record: Kernel
+qemu: Kernel
+	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS)
+
+qemu-record: Kernel snapshot-drive.qcow2
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS)
 
 qemu-gdb: Kernel
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS) -s -S
+	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS) $(QEMU_RECORD_FLAGS) -s -S
 
-qemu-gdb-replay: Kernel
+qemu-gdb-replay: Kernel snapshot-drive.qcow2
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
 	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
 
