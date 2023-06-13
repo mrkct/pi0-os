@@ -1,6 +1,8 @@
 Kernel
 disks/*
 *.img
+replay.bin
+snapshot-drive.qcow2
 
 # Prerequisites
 *.d
