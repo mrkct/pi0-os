@@ -6,14 +6,19 @@
 
 namespace kernel {
 
+enum class SystimerChannel {
+    Channel1,
+    Channel3,
+};
+
 typedef void (*SystimerCallback)(SuspendedTaskState*);
 
 void systimer_init();
 
 uint64_t systimer_get_ticks();
 
-Error systimer_repeating_callback(uint32_t interval, SystimerCallback callback);
+Error systimer_install_handler(SystimerChannel, SystimerCallback);
 
-Error systimer_exec_after(uint64_t ticks, SystimerCallback callback);
+Error systimer_trigger(SystimerChannel, uint32_t ticks);
 
 }

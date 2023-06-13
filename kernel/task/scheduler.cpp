@@ -129,10 +129,6 @@ void scheduler_step(SuspendedTaskState* suspended_state)
 
 [[noreturn]] void scheduler_begin()
 {
-    systimer_repeating_callback(TIME_SLICE, [](auto*) {
-        // No need to do anything, triggering any IRQ will cause the scheduler to run
-    });
-
     asm volatile(
         "mov r0, %[system_stack] \n"
         "mov r1, %[entry_point] \n"

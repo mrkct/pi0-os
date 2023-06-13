@@ -13,6 +13,7 @@
 #include <kernel/memory/vm.h>
 #include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
+#include <kernel/timer.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -136,7 +137,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(kfree(test));
 
     MUST(sdhc_init());
-    if (sdhc_contains_card()) {
+    if (sdhc_contains_card() && false) {
         static SDCard card;
         static Storage card_storage;
         MUST(sdhc_initialize_inserted_card(card));
@@ -152,7 +153,8 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     datetime_init();
     syscall_init();
     systimer_init();
-    interrupt_enable();
+
+    timer_init();
     scheduler_init();
     Task *A, *B;
     MUST(task_create_kernel_thread(A, "A", task_A));
@@ -160,6 +162,32 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later
     // MUST(task_create_kernel_thread(B, "B", task_A));
+
+    timer_exec_after(
+        1000, [](void* id) {
+            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
+        },
+        (void*)0x1);
+    timer_exec_after(
+        2000, [](void* id) {
+            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
+        },
+        (void*)0x2);
+    timer_exec_after(
+        3000, [](void* id) {
+            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
+        },
+        (void*)0x3);
+    timer_exec_after(
+        4000, [](void* id) {
+            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
+        },
+        (void*)0x4);
+    timer_exec_after(
+        5000, [](void* id) {
+            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
+        },
+        (void*)0x5);
 
     scheduler_begin();
 
