@@ -3,7 +3,7 @@
 
 namespace kernel {
 
-constexpr uint32_t TICKS_BETWEEN_INTERRUPTS = 1000;
+constexpr uint32_t MS_BETWEEN_INTERRUPTS = 75;
 
 struct TimerEvent {
     int64_t time_to_exec;
@@ -18,13 +18,15 @@ static TimerEvent* g_active_timer_events = nullptr;
 
 static void systimer_callback()
 {
-    g_time_passed_since_boot_in_ms += TICKS_BETWEEN_INTERRUPTS;
+    g_time_passed_since_boot_in_ms += MS_BETWEEN_INTERRUPTS;
 
     TimerEvent* prev = nullptr;
     TimerEvent* event = g_active_timer_events;
 
+    // kprintf("------\n");
     while (event) {
-        event->time_to_exec -= TICKS_BETWEEN_INTERRUPTS;
+        event->time_to_exec -= MS_BETWEEN_INTERRUPTS;
+        // kprintf("Time to exec: %d\n", (int) event->time_to_exec);
 
         if (event->time_to_exec <= 0) {
             event->callback(event->data);
@@ -50,6 +52,7 @@ void timer_init()
         auto ticks_before = systimer_get_ticks();
         systimer_callback();
         auto ticks_after = systimer_get_ticks();
+        // kprintf("before: %d    after: %d\n", (int) ticks_before, (int) ticks_after);
 
         uint32_t ticks_passed;
         if (ticks_after < ticks_before) {
@@ -58,10 +61,9 @@ void timer_init()
             ticks_passed = ticks_after - ticks_before;
         }
 
-        auto ticks_to_trigger = ticks_passed < TICKS_BETWEEN_INTERRUPTS ? TICKS_BETWEEN_INTERRUPTS - ticks_passed : 1;
-        systimer_trigger(SystimerChannel::Channel1, ticks_to_trigger);
+        systimer_trigger(SystimerChannel::Channel1, systimer_ms_to_ticks(MS_BETWEEN_INTERRUPTS));
     }));
-    systimer_trigger(SystimerChannel::Channel1, TICKS_BETWEEN_INTERRUPTS);
+    systimer_trigger(SystimerChannel::Channel1, systimer_ms_to_ticks(MS_BETWEEN_INTERRUPTS));
 }
 
 uint64_t timer_time_passed_since_boot_in_ms()

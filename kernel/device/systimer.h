@@ -21,4 +21,6 @@ Error systimer_install_handler(SystimerChannel, SystimerCallback);
 
 Error systimer_trigger(SystimerChannel, uint32_t ticks);
 
+int64_t systimer_ms_to_ticks(uint32_t ms);
+
 }

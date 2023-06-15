@@ -15,6 +15,14 @@ static constexpr uintptr_t SYSTIMER_C3 = SYSTIMER_BASE + 0x18;
 static SystimerCallback g_channel1_callback = nullptr;
 static SystimerCallback g_channel3_callback = nullptr;
 
+static uint64_t g_ticks_per_millisecond = 0;
+
+int64_t systimer_ms_to_ticks(uint32_t ms)
+{
+    kassert(g_ticks_per_millisecond != 0);
+    return ms * g_ticks_per_millisecond;
+}
+
 void systimer_init()
 {
     /*
@@ -43,6 +51,9 @@ void systimer_init()
         if (g_channel3_callback != nullptr)
             g_channel3_callback(suspended_task_state);
     });
+
+    // FIXME: This is not correct. We should read the clock frequency from the clock tree
+    g_ticks_per_millisecond = 1000;
 }
 
 uint64_t systimer_get_ticks()
