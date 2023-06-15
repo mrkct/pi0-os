@@ -120,13 +120,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     kprintf_video_init(vc);
 
     interrupt_init();
-    interrupt_install_swi_handler(123, [](auto*) {
-        kprintf("BEEP!\n");
-    });
-
-    kprintf("Calling software interrupt...\n");
-    asm volatile("swi #123");
-    kprintf("Returned from software interrupt!\n");
 
     MUST(kheap_init());
 

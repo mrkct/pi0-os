@@ -1,5 +1,6 @@
 #pragma once
 
+#include <api/syscalls.h>
 #include <kernel/error.h>
 #include <kernel/interrupt.h>
 #include <kernel/memory/vm.h>
@@ -20,13 +21,12 @@ struct Task {
     AddressSpace address_space;
     SuspendedTaskState state;
     char name[32];
-    PID pid;
+    api::PID pid;
+    uint32_t time_slice;
     Task* next_to_run;
 };
 
 void scheduler_init();
-
-void scheduler_add(Task* task);
 
 [[noreturn]] void scheduler_begin();
 
@@ -35,5 +35,7 @@ Task* scheduler_current_task();
 Error task_create_kernel_thread(Task*&, char const* name, void (*entry)());
 
 void scheduler_step(SuspendedTaskState*);
+
+void change_task_state(Task*, TaskState);
 
 }

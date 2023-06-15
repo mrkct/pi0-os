@@ -11,13 +11,74 @@
 
 namespace kernel {
 
+struct Queue {
+    Task* head;
+    Task* tail;
+
+    constexpr Queue()
+        : head(nullptr)
+        , tail(nullptr)
+    {
+    }
+
+    void append(Task* task)
+    {
+        task->next_to_run = nullptr;
+        if (head == nullptr) {
+            head = task;
+            tail = task;
+        } else {
+            tail->next_to_run = task;
+            tail = task;
+        }
+    }
+
+    Task* pop()
+    {
+        if (head == nullptr)
+            return nullptr;
+
+        auto* task = head;
+        head = head->next_to_run;
+        if (head == nullptr)
+            tail = nullptr;
+        return task;
+    }
+
+    Task* remove(Task* task)
+    {
+        if (head == nullptr)
+            return nullptr;
+
+        if (head == task) {
+            head = head->next_to_run;
+            if (head == nullptr)
+                tail = nullptr;
+            return task;
+        }
+
+        auto* current = head;
+        while (current->next_to_run != nullptr) {
+            if (current->next_to_run == task) {
+                current->next_to_run = current->next_to_run->next_to_run;
+                if (current->next_to_run == nullptr)
+                    tail = current;
+                return task;
+            }
+            current = current->next_to_run;
+        }
+
+        return nullptr;
+    }
+};
+
+static void task_free(Task* task);
 void scheduler_step(SuspendedTaskState*);
 
-static constexpr uint32_t TIME_SLICE = 10000; // 10ms;
-
-static Task* g_current_task = nullptr;
-static Task* g_last_scheduled = nullptr;
-static PID g_next_pid = 1;
+constexpr size_t IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH = 1;
+static api::PID g_next_free_pid = 0;
+static Queue g_running_tasks_queue;
+static Queue g_suspended_tasks_queue;
 
 Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)())
 {
@@ -40,13 +101,16 @@ Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)
 
     task->exit_code = 0;
     task->task_state = TaskState::Running;
-    task->next_to_run = nullptr;
-    task->pid = g_next_pid++;
-    klib::strncpy_safe(task->name, name, sizeof(task->name));
+
     task->state.task_sp = static_cast<uint32_t>((areas::user_stack.end - 8) & 0xffffffff);
     task->state.spsr = 0x1f; // System mode. FIXME: Disable Fast IRQ also?
 
-    scheduler_add(task);
+    klib::strncpy_safe(task->name, name, sizeof(task->name));
+    task->pid = g_next_free_pid++;
+    task->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
+    task->next_to_run = nullptr;
+
+    g_running_tasks_queue.append(task);
 
     return Success;
 }
@@ -60,20 +124,66 @@ static void idle_task()
     }
 }
 
+void change_task_state(Task* task, TaskState new_state)
+{
+    if (task->task_state == new_state)
+        return;
+
+    auto previous_state = task->task_state;
+    task->task_state = new_state;
+    if (g_running_tasks_queue.head == task) {
+        // It's going to be moved to the correct queue by scheduler_step
+        return;
+    }
+
+    switch (previous_state) {
+    case TaskState::Running:
+        if (!g_running_tasks_queue.remove(task))
+            panic("Task %s was not found in the running queue\n", task->name);
+        break;
+    case TaskState::Suspended:
+        if (!g_suspended_tasks_queue.remove(task))
+            panic("Task %s was not found in the suspended queue\n", task->name);
+        break;
+    case TaskState::Zombie:
+        panic("Attempting to change task %s's state, but %s is a zombie\n", task->name, task->name);
+    default:
+        kassert_not_reached();
+    }
+
+    switch (new_state) {
+    case TaskState::Running:
+        g_running_tasks_queue.append(task);
+        break;
+    case TaskState::Suspended:
+        g_suspended_tasks_queue.append(task);
+        break;
+    case TaskState::Zombie:
+        task_free(task);
+        break;
+    }
+}
+
 void scheduler_init()
 {
-    MUST(kmalloc(sizeof(Task), g_current_task));
-    g_current_task->exit_code = 0;
-    g_current_task->task_state = TaskState::Running;
-    g_current_task->next_to_run = nullptr;
-    g_current_task->pid = 0;
-    // FIXME: This assignment works only because AddressSpace only contains a pointer to ttbr0
-    //        This is very risky and should be fixed.
-    g_current_task->address_space = vm_current_address_space();
-    klib::strncpy_safe(g_current_task->name, "idle", sizeof(g_current_task->name));
-    g_last_scheduled = g_current_task;
-    g_last_scheduled->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
-    g_last_scheduled->state.lr = reinterpret_cast<uint32_t>(idle_task);
+    Task* task;
+    MUST(kmalloc(sizeof(Task), task));
+    *task = Task {
+        .exit_code = 0,
+        .task_state = TaskState::Running,
+
+        // FIXME: This assignment works only because AddressSpace only contains a pointer to ttbr0
+        //        This is very risky and should be fixed.
+        .address_space = vm_current_address_space(),
+        .state = {},
+        .name = { 'i', 'd', 'l', 'e', '\0' },
+        .pid = g_next_free_pid++,
+        .time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH,
+        .next_to_run = nullptr,
+    };
+    task->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
+    task->state.lr = reinterpret_cast<uint32_t>(idle_task);
+    g_running_tasks_queue.append(task);
 }
 
 static void task_free(Task* task)
@@ -82,53 +192,51 @@ static void task_free(Task* task)
     kfree(task);
 }
 
-Task* scheduler_current_task()
-{
-    return g_current_task;
-}
-
-static __attribute__((unused)) void scheduler_print()
-{
-    kprintf("Tasks:\n");
-    kprintf("[C] %s (%p)\n", g_current_task->name, g_current_task->state.task_sp);
-    for (auto* task = g_current_task->next_to_run; task != nullptr; task = task->next_to_run)
-        kprintf("    %s (%p)\n", task->name, task->state.task_sp);
-    kprintf("+--------------------------------------+\n");
-    kprintf("| g_last_scheduled: %s (%p) \t\t|\n", g_last_scheduled->name, g_last_scheduled->state.task_sp);
-    kprintf("| g_current_task:   %s (%p) \t\t|\n", g_current_task->name, g_current_task->state.task_sp);
-    kprintf("+--------------------------------------+\n");
-}
-
-void scheduler_add(Task* task)
-{
-    task->next_to_run = nullptr;
-    g_last_scheduled->next_to_run = task;
-    g_last_scheduled = task;
-}
+Task* scheduler_current_task() { return g_running_tasks_queue.head; }
 
 void scheduler_step(SuspendedTaskState* suspended_state)
 {
-    auto* current = g_current_task;
-    auto* next = g_current_task->next_to_run;
+    auto* current = g_running_tasks_queue.head;
+    kassert(current != nullptr);
+    auto* next = current->next_to_run;
 
-    if (next == nullptr)
-        return;
+    if (current->task_state == TaskState::Running) {
+        current->time_slice--;
+        if (current->time_slice > 0)
+            return;
 
-    g_current_task->state = *suspended_state;
+        if (next == nullptr) {
+            current->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
+            return;
+        }
+    }
+
+    g_running_tasks_queue.pop();
+    current->state = *suspended_state;
     *suspended_state = next->state;
 
     vm_switch_address_space(next->address_space);
-    g_current_task = next;
+    next->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
 
-    if (current->task_state != TaskState::Zombie) {
-        scheduler_add(current);
-    } else {
+    switch (current->task_state) {
+    case TaskState::Running:
+        g_running_tasks_queue.append(current);
+        break;
+    case TaskState::Suspended:
+        g_suspended_tasks_queue.append(current);
+        break;
+    case TaskState::Zombie:
         task_free(current);
+        break;
     }
 }
 
 [[noreturn]] void scheduler_begin()
 {
+    auto* first_task = g_running_tasks_queue.head;
+    kassert(first_task != nullptr);
+    kassert(klib::strcmp(first_task->name, "idle") == 0);
+
     asm volatile(
         "mov r0, %[system_stack] \n"
         "mov r1, %[entry_point] \n"
@@ -138,8 +246,8 @@ void scheduler_step(SuspendedTaskState* suspended_state)
         "cpsie if, #0x1f \n"
         "mov pc, r1 \n"
         :
-        : [system_stack] "r"(g_current_task->state.task_sp),
-        [entry_point] "r"(g_current_task->state.lr)
+        : [system_stack] "r"(first_task->state.task_sp),
+        [entry_point] "r"(first_task->state.lr)
         : "r0", "r1", "memory");
 
     // Silence compiler warning
