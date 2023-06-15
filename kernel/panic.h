@@ -6,10 +6,13 @@ namespace kernel {
 size_t kprintf(char const* format, ...);
 }
 
+#define __STRINGIFY(x) #x
+
 #define panic(...)                                                       \
     do {                                                                 \
         asm volatile("cpsid i");                                         \
         kernel::kprintf("=========== KERNEL PANIC :^( ===========\n");   \
+        kernel::kprintf("At %s:%d\n", __FILE__, __LINE__);               \
         kernel::kprintf(__VA_ARGS__);                                    \
         kernel::kprintf("\n========================================\n"); \
         while (1)                                                        \
@@ -23,7 +26,7 @@ size_t kprintf(char const* format, ...);
             ;                    \
     } while (0)
 
-#define kassert_not_reached() panic("ASSERTION FAILED: not reached\n")
+#define kassert_not_reached() panic("ASSERTION FAILED: not reached")
 
 #define kassert(expr)                               \
     do {                                            \
