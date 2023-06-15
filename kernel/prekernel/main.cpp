@@ -65,8 +65,7 @@ static void task_A()
     len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
     api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
 
-    for (int volatile waste = 0; waste < 100000000; waste++)
-        ;
+    api::syscall(api::SyscallIdentifiers::Sleep, 10000, 0, 0);
 
     api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0);
     len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);

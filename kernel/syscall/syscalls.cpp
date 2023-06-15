@@ -7,6 +7,7 @@
 #include <kernel/memory/vm.h>
 #include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
+#include <kernel/timer.h>
 
 namespace kernel {
 
@@ -34,8 +35,9 @@ static Error sys$debug_log(uintptr_t user_buf, size_t len)
 
 static Error sys$exit(int error_code)
 {
-    scheduler_current_task()->exit_code = error_code;
-    scheduler_current_task()->task_state = TaskState::Zombie;
+    auto* current = scheduler_current_task();
+    current->exit_code = error_code;
+    change_task_state(current, TaskState::Zombie);
 
     return Success;
 }
@@ -56,6 +58,21 @@ static Error sys$get_datetime(uintptr_t user_buf)
     api::DateTime datetime;
     TRY(datetime_read(datetime));
     TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buf, &datetime, sizeof(datetime)));
+
+    return Success;
+}
+
+static Error sys$sleep(uint32_t ms)
+{
+    auto* task = scheduler_current_task();
+    kprintf("Suspending task %s\n", task->name);
+    change_task_state(task, TaskState::Suspended);
+    timer_exec_after(
+        ms, [](void* task) {
+            kprintf("Waking up task %s\n", static_cast<Task*>(task)->name);
+            change_task_state(static_cast<Task*>(task), TaskState::Running);
+        },
+        task);
 
     return Success;
 }
@@ -98,6 +115,7 @@ void dispatch_syscall(uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t&)
         err = sys$get_datetime(static_cast<uintptr_t>(r1));
         break;
     case SyscallIdentifiers::Sleep:
+        err = sys$sleep(r1);
         break;
     case SyscallIdentifiers::Poll:
         break;
