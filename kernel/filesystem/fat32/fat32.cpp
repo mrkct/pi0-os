@@ -180,6 +180,7 @@ restart:
     entry.dir = &dir;
     copy_entry_name(fat_entry.entry, entry.name);
     entry.type = fat_entry.entry.DIR_Attr == fat32::DirectoryEntry8_3::ATTR_DIRECTORY ? DirectoryEntry::Type::Directory : DirectoryEntry::Type::File;
+    entry.size = fat_entry.entry.DIR_FileSize;
     auto& fat_entry_data = *reinterpret_cast<Fat32DirectoryEntryData*>(entry.impl_data);
     fat_entry_data = Fat32DirectoryEntryData {
         .first_cluster = (static_cast<uint32_t>(fat_entry.entry.DIR_FstClusHI) << 16 | fat_entry.entry.DIR_FstClusLO) & 0x0fffffff,

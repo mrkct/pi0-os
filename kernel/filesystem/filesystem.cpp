@@ -25,10 +25,21 @@ Filesystem* fs_get_root()
     return g_root_fs;
 }
 
-Error fs_open(Filesystem& fs, char const* path, File& file)
+static Error fs_get_directory_entry(Filesystem& fs, char const* path, DirectoryEntry& dirent)
 {
     if (path[0] != '/')
         return BadParameters;
+
+    if (klib::strcmp(path, "/") == 0) {
+        dirent = DirectoryEntry {
+            .dir = nullptr,
+            .name = { '/', '\0' },
+            .type = DirectoryEntry::Type::Directory,
+            .size = 0,
+            .impl_data = {},
+        };
+        return Success;
+    }
 
     auto const& starts_with = [](char const* str, char const* prefix) {
         while (*prefix != '\0') {
@@ -80,12 +91,52 @@ Error fs_open(Filesystem& fs, char const* path, File& file)
         }
 
         if (klib::strcmp(entry.name, path + start_of_name) == 0) {
-            if (entry.type != DirectoryEntry::Type::File)
-                return NotAFile;
-
-            return fs.open_file_entry(entry, file);
+            dirent = entry;
+            return Success;
         }
     } while (true);
+}
+
+void file_inc_ref(File& file)
+{
+    kassert(file.fs != nullptr);
+    kassert(file.fs->storage != nullptr);
+    file.ref_count++;
+}
+
+void file_dec_ref(File& file)
+{
+    kassert(file.fs != nullptr);
+    kassert(file.fs->storage != nullptr);
+    kassert(file.ref_count > 0);
+    file.ref_count--;
+    if (file.ref_count == 0) {
+        // TODO: free file
+    }
+}
+
+Error fs_stat(Filesystem& fs, char const* path, api::Stat& stat)
+{
+    DirectoryEntry entry;
+    TRY(fs_get_directory_entry(fs, path, entry));
+    stat = api::Stat {
+        .is_directory = entry.type == DirectoryEntry::Type::Directory,
+        .size = entry.size
+    };
+
+    return Success;
+}
+
+Error fs_open(Filesystem& fs, char const* path, File& file)
+{
+    DirectoryEntry entry;
+    TRY(fs_get_directory_entry(fs, path, entry));
+
+    if (entry.type != DirectoryEntry::Type::File)
+        return NotAFile;
+
+    TRY(fs.open_file_entry(entry, file));
+    file_inc_ref(file);
 
     return NotFound;
 }
@@ -97,6 +148,7 @@ Error fs_read(File& file, uint8_t* buffer, size_t offset, size_t size, size_t& b
 
 Error fs_close(File& file)
 {
+    file_dec_ref(file);
     return Success;
 }
 

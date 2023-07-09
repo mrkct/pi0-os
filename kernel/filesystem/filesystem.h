@@ -1,11 +1,14 @@
 #pragma once
 
+#include <api/syscalls.h>
 #include <kernel/error.h>
 #include <kernel/filesystem/storage.h>
 #include <stddef.h>
 #include <stdint.h>
 
 namespace kernel {
+
+constexpr size_t FS_MAX_PATH_LENGTH = 512;
 
 struct File;
 struct Directory;
@@ -27,6 +30,7 @@ struct File {
     Filesystem* fs;
     char name[256];
     uint64_t size;
+    size_t ref_count;
 
     uint8_t impl_data[32];
 };
@@ -44,12 +48,15 @@ struct DirectoryEntry {
         File,
         Directory
     } type;
+    uint64_t size;
     uint8_t impl_data[32];
 };
 
 void fs_set_root(Filesystem* fs);
 
 Filesystem* fs_get_root();
+
+Error fs_stat(Filesystem&, char const* path, api::Stat&);
 
 Error fs_open(Filesystem&, char const* path, File& file);
 
@@ -60,6 +67,10 @@ Error fs_close(File& file);
 Error fs_open_directory(Filesystem&, char const* path, Directory& directory);
 
 Error fs_directory_next_entry(Directory&, DirectoryEntry& entry);
+
+void file_inc_ref(File& file);
+
+void file_dec_ref(File& file);
 
 template<typename Callback>
 Error fs_directory_for_each_entry(Directory& directory, Callback callback)
