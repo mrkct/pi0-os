@@ -49,18 +49,7 @@ static void systimer_callback()
 void timer_init()
 {
     MUST(systimer_install_handler(SystimerChannel::Channel1, [](auto*) {
-        auto ticks_before = systimer_get_ticks();
         systimer_callback();
-        auto ticks_after = systimer_get_ticks();
-        // kprintf("before: %d    after: %d\n", (int) ticks_before, (int) ticks_after);
-
-        uint32_t ticks_passed;
-        if (ticks_after < ticks_before) {
-            ticks_passed = ticks_after + (0xffffffff - ticks_before);
-        } else {
-            ticks_passed = ticks_after - ticks_before;
-        }
-
         systimer_trigger(SystimerChannel::Channel1, systimer_ms_to_ticks(MS_BETWEEN_INTERRUPTS));
     }));
     systimer_trigger(SystimerChannel::Channel1, systimer_ms_to_ticks(MS_BETWEEN_INTERRUPTS));
