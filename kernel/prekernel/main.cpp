@@ -50,28 +50,28 @@ static void task_A()
     char buf[1024];
 
     api::ProcessInfo info;
-    api::syscall(api::SyscallIdentifiers::GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0);
+    api::syscall(api::SyscallIdentifiers::GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0, 0, 0);
 
     size_t len = kernel::ksprintf(buf, sizeof(buf), "I am %s and my PID is %d\n", info.name, info.pid);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
 
     api::DateTime datetime;
-    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0);
+    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
 
     len = kernel::ksprintf(buf, sizeof(buf), "The date is %d-%d-%d %d:%d:%d\n",
         datetime.year, datetime.month, datetime.day, datetime.hour, datetime.minute, datetime.second);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
 
     len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
 
-    api::syscall(api::SyscallIdentifiers::Sleep, 10000, 0, 0);
+    api::syscall(api::SyscallIdentifiers::Sleep, 10000, 0, 0, 0, 0);
 
-    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0);
+    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
     len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0);
+    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
 
-    api::syscall(api::SyscallIdentifiers::Exit, 0, 0, 0);
+    api::syscall(api::SyscallIdentifiers::Exit, 0, 0, 0, 0, 0);
     kassert_not_reached();
 }
 

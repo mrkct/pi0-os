@@ -120,7 +120,10 @@ static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
 static void idle_task()
 {
     while (1) {
-        api::syscall(api::SyscallIdentifiers::Yield, 0, 0, 0);
+        api::syscall(api::SyscallIdentifiers::Yield, 0, 0, 0, 0, 0);
+    }
+}
+
     }
 }
 

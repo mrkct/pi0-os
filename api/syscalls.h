@@ -36,18 +36,20 @@ enum class SyscallIdentifiers : uint32_t {
     SetBrk = 61,
 };
 
-static inline int syscall(SyscallIdentifiers id, uint32_t arg0, uint32_t arg1, uint32_t arg2)
+static inline int syscall(SyscallIdentifiers id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
 {
     int result;
-    asm volatile("mov r0, %1\n"
-                 "mov r1, %2\n"
-                 "mov r2, %3\n"
-                 "mov r3, %4\n"
-                 "svc %5\n"
-                 "mov %0, r0\n"
+    asm volatile("mov r7, %1\n"
+                 "mov r0, %2\n"
+                 "mov r1, %3\n"
+                 "mov r2, %4\n"
+                 "mov r3, %5\n"
+                 "mov r4, %6\n"
+                 "svc %7\n"
+                 "mov %0, r7\n"
                  : "=r"(result)
-                 : "r"(static_cast<uint32_t>(id)), "r"(arg0), "r"(arg1), "r"(arg2), "i"(SYSCALL_VECTOR)
-                 : "r0", "r1", "r2", "r3", "memory");
+                 : "r"(static_cast<uint32_t>(id)), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "i"(SYSCALL_VECTOR)
+                 : "r0", "r1", "r2", "r3", "r4", "r7", "memory");
     return result;
 }
 
@@ -65,6 +67,11 @@ struct DateTime {
     int minute;
     int second;
     uint64_t ticks_since_boot;
+};
+
+struct Stat {
+    bool is_directory;
+    uint64_t size;
 };
 
 }

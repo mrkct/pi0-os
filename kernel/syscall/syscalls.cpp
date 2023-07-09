@@ -14,7 +14,13 @@ namespace kernel {
 void syscall_init()
 {
     interrupt_install_swi_handler(api::SYSCALL_VECTOR, [](auto* suspended_state) {
-        dispatch_syscall(suspended_state->r[0], suspended_state->r[1], suspended_state->r[2], suspended_state->r[3]);
+        dispatch_syscall(
+            suspended_state->r[7],
+            suspended_state->r[0],
+            suspended_state->r[1],
+            suspended_state->r[2],
+            suspended_state->r[3],
+            suspended_state->r[4]);
     });
 }
 
@@ -77,7 +83,8 @@ static Error sys$sleep(uint32_t ms)
     return Success;
 }
 
-void dispatch_syscall(uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t&)
+
+void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t& r3, uint32_t& r4)
 {
     Error err = Success;
 
@@ -87,13 +94,13 @@ void dispatch_syscall(uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t&)
         // Intentionally empty, we always yield for system calls
         break;
     case SyscallIdentifiers::Exit:
-        err = sys$exit(static_cast<uintptr_t>(r1));
+        err = sys$exit(static_cast<uintptr_t>(r0));
         break;
     case SyscallIdentifiers::DebugLog:
-        err = sys$debug_log(static_cast<uintptr_t>(r1), static_cast<size_t>(r2));
+        err = sys$debug_log(static_cast<uintptr_t>(r0), static_cast<size_t>(r1));
         break;
     case SyscallIdentifiers::GetProcessInfo:
-        err = sys$get_process_info(static_cast<uintptr_t>(r1));
+        err = sys$get_process_info(static_cast<uintptr_t>(r0));
         break;
     case SyscallIdentifiers::OpenFile:
         break;
@@ -112,10 +119,10 @@ void dispatch_syscall(uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t&)
     case SyscallIdentifiers::ReadDirectory:
         break;
     case SyscallIdentifiers::GetDateTime:
-        err = sys$get_datetime(static_cast<uintptr_t>(r1));
+        err = sys$get_datetime(static_cast<uintptr_t>(r0));
         break;
     case SyscallIdentifiers::Sleep:
-        err = sys$sleep(r1);
+        err = sys$sleep(r0);
         break;
     case SyscallIdentifiers::Poll:
         break;
@@ -133,7 +140,7 @@ void dispatch_syscall(uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t&)
         err = InvalidSystemCall;
     }
 
-    r0 = static_cast<uint32_t>(err.generic_error_code);
+    r7 = static_cast<uint32_t>(err.generic_error_code);
 }
 
 }
