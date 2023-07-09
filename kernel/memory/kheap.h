@@ -24,4 +24,6 @@ Error kfree(T* address)
     return _kfree(reinterpret_cast<uintptr_t>(address));
 }
 
+Error krealloc(void*&, size_t size);
+
 }

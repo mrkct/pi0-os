@@ -1,4 +1,5 @@
 #include <kernel/lib/math.h>
+#include <kernel/lib/memory.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/physicalalloc.h>
@@ -79,6 +80,25 @@ Error _kmalloc(size_t size, uintptr_t& address)
 
 Error _kfree(uintptr_t)
 {
+    return Success;
+}
+
+Error krealloc(void*& addr, size_t size)
+{
+    void* new_addr;
+    TRY(kmalloc(size, new_addr));
+    // FIXME: This is not the correct way of doing this, but in this dumb implementation
+    //        we don't keep the size of the allocated memory anywhere so we don't know
+    //        how much to copy. Anyway we know that we can copy at most 'size' bytes, and
+    //        due to being a bump allocator we know that the memory is contiguous.
+    //        We might be copying some bytes that we shouldn't, but we won't be reading
+    //        outside the current brk
+    klib::kmemcpy(new_addr, addr, size);
+    if (auto err = kfree(addr); !err.is_success()) {
+        kfree(new_addr); // FIXME: How do we handle a double error?
+        return err;
+    }
+    addr = new_addr;
     return Success;
 }
 
