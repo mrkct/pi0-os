@@ -22,7 +22,9 @@ enum class GenericErrorCode {
     NotFound,
     NotAFile,
     NotADirectory,
+    PathTooLong,
     InvalidSystemCall,
+    NotImplemented,
 };
 
 static constexpr char const* __generic_error_code_to_string(GenericErrorCode code)
@@ -62,6 +64,10 @@ static constexpr char const* __generic_error_code_to_string(GenericErrorCode cod
         return "NotADirectory";
     case GenericErrorCode::InvalidSystemCall:
         return "InvalidSystemCall";
+    case GenericErrorCode::PathTooLong:
+        return "PathTooLong";
+    case GenericErrorCode::NotImplemented:
+        return "NotImplemented";
     default:
         return "Unknown";
     }
@@ -119,5 +125,7 @@ static constexpr Error NotFound { GenericErrorCode::NotFound, 0, "Not found", nu
 static constexpr Error NotAFile { GenericErrorCode::NotAFile, 0, "Not a file", nullptr };
 static constexpr Error NotADirectory { GenericErrorCode::NotADirectory, 0, "Not a directory", nullptr };
 static constexpr Error InvalidSystemCall { GenericErrorCode::InvalidSystemCall, 0, "Invalid system call", nullptr };
+static constexpr Error PathTooLong { GenericErrorCode::PathTooLong, 0, "Path too long", nullptr };
+static constexpr Error NotImplemented { GenericErrorCode::NotImplemented, 0, "Not implemented", nullptr };
 
 }
