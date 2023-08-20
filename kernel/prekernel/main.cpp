@@ -8,6 +8,7 @@
 #include <kernel/filesystem/fat32/fat32.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
+#include <kernel/lib/string.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
@@ -61,6 +62,16 @@ static void task_A()
     len = kernel::ksprintf(buf, sizeof(buf), "The date is %d-%d-%d %d:%d:%d\n",
         datetime.year, datetime.month, datetime.day, datetime.hour, datetime.minute, datetime.second);
     api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+
+    api::Stat stat;
+    char const* pathname = "/HELLO.TXT";
+    if (0 == api::syscall(api::SyscallIdentifiers::Stat, reinterpret_cast<uint32_t>(pathname), klib::strlen(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0)) {
+        len = kernel::ksprintf(buf, sizeof(buf), "- isDirectory: %s \n- size: %lu bytes\n", stat.is_directory ? "true" : "false", stat.size);
+        api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+    } else {
+        len = kernel::ksprintf(buf, sizeof(buf), "stat syscall failed. Skipping file system calls...\n");
+        api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+    }
 
     len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
     api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
@@ -129,7 +140,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(kfree(test));
 
     MUST(sdhc_init());
-    if (sdhc_contains_card() && false) {
+    if (sdhc_contains_card()) {
         static SDCard card;
         static Storage card_storage;
         MUST(sdhc_initialize_inserted_card(card));

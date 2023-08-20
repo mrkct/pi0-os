@@ -108,6 +108,15 @@ Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)
     klib::strncpy_safe(task->name, name, sizeof(task->name));
     task->pid = g_next_free_pid++;
     task->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
+
+    task->open_files.allocated = 4;
+    TRY(kmalloc(sizeof(*task->open_files.entries) * task->open_files.allocated, task->open_files.entries));
+    task->open_files.len = 0;
+    // POSIX software reserves 0, 1, 2 for stdin, stdout, stderr.
+    // We're not POSIX, but we want to catch software that attempts to use those fds instead of
+    // using the proper API.
+    task->open_files.next_fd = 4;
+
     task->next_to_run = nullptr;
 
     g_running_tasks_queue.append(task);
@@ -124,7 +133,53 @@ static void idle_task()
     }
 }
 
+Error task_open_file(Task* task, char const* pathname, uint32_t, int& out_fd)
+{
+    if (fs_get_root() == nullptr)
+        return DeviceNotConnected;
+
+    File* file;
+    TRY(kmalloc(sizeof(File), file));
+    TRY(fs_open(*fs_get_root(), pathname, *file));
+
+    if (task->open_files.allocated == task->open_files.len) {
+        void* new_entries = task->open_files.entries;
+        TRY(krealloc(new_entries, task->open_files.allocated * 2));
+        task->open_files.entries = static_cast<decltype(task->open_files.entries)>(new_entries);
+        task->open_files.allocated *= 2;
     }
+    out_fd = task->open_files.next_fd++;
+    task->open_files.entries[task->open_files.len++] = { out_fd, file };
+    file_inc_ref(*file);
+
+    return Success;
+}
+
+Error task_close_file(Task* task, int fd)
+{
+    for (size_t i = 0; i < task->open_files.len; i++) {
+        if (task->open_files.entries[i].fd == fd) {
+            file_dec_ref(*task->open_files.entries[i].file);
+            kfree(task->open_files.entries[i].file);
+            task->open_files.entries[i] = task->open_files.entries[--task->open_files.len];
+            return Success;
+        }
+    }
+
+    return BadParameters;
+}
+
+Error task_get_open_file(Task* task, int fd, File*& file)
+{
+    for (size_t i = 0; i < task->open_files.len; i++) {
+        if (task->open_files.entries[i].fd == fd) {
+            file = task->open_files.entries[i].file;
+            file_inc_ref(*file);
+            return Success;
+        }
+    }
+
+    return NotFound;
 }
 
 void change_task_state(Task* task, TaskState new_state)
@@ -182,6 +237,13 @@ void scheduler_init()
         .name = { 'i', 'd', 'l', 'e', '\0' },
         .pid = g_next_free_pid++,
         .time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH,
+
+        // Should never open files the idle task
+        .open_files = {
+            .len = 0,
+            .allocated = 0,
+            .next_fd = 0,
+            .entries = nullptr },
         .next_to_run = nullptr,
     };
     task->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);

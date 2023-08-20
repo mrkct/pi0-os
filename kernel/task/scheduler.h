@@ -2,6 +2,7 @@
 
 #include <api/syscalls.h>
 #include <kernel/error.h>
+#include <kernel/filesystem/filesystem.h>
 #include <kernel/interrupt.h>
 #include <kernel/memory/vm.h>
 
@@ -23,6 +24,14 @@ struct Task {
     char name[32];
     api::PID pid;
     uint32_t time_slice;
+    struct {
+        size_t len, allocated;
+        int next_fd;
+        struct {
+            int fd;
+            File* file;
+        }* entries;
+    } open_files;
     Task* next_to_run;
 };
 
@@ -37,5 +46,11 @@ Error task_create_kernel_thread(Task*&, char const* name, void (*entry)());
 void scheduler_step(SuspendedTaskState*);
 
 void change_task_state(Task*, TaskState);
+
+Error task_open_file(Task*, char const*, uint32_t flags, int&);
+
+Error task_close_file(Task*, int);
+
+Error task_get_open_file(Task*, int, File*&);
 
 }
