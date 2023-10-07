@@ -30,6 +30,7 @@ struct File {
     Filesystem* fs;
     char name[256];
     uint64_t size;
+    uint64_t current_offset;
     size_t ref_count;
 
     uint8_t impl_data[32];
@@ -61,6 +62,14 @@ Error fs_stat(Filesystem&, char const* path, api::Stat&);
 Error fs_open(Filesystem&, char const* path, File& file);
 
 Error fs_read(File& file, uint8_t* buffer, size_t offset, size_t size, size_t& bytes_read);
+
+enum class SeekMode {
+    Start,
+    Current,
+    End
+};
+
+Error fs_seek(File& file, int64_t offset, SeekMode);
 
 Error fs_close(File& file);
 

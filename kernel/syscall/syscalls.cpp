@@ -2,6 +2,7 @@
 #include <kernel/datetime.h>
 #include <kernel/error.h>
 #include <kernel/interrupt.h>
+#include <kernel/lib/math.h>
 #include <kernel/lib/string.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/vm.h>
@@ -10,6 +11,23 @@
 #include <kernel/timer.h>
 
 namespace kernel {
+
+class SyscallResult {
+public:
+    constexpr SyscallResult(Error e)
+        : m_rc((uintptr_t)(-static_cast<int>(e.generic_error_code)))
+    {
+    }
+    constexpr SyscallResult(uint32_t fd)
+        : m_rc(fd)
+    {
+    }
+
+    constexpr uintptr_t rc() const { return m_rc; }
+
+private:
+    uintptr_t m_rc;
+};
 
 void syscall_init()
 {
@@ -24,7 +42,7 @@ void syscall_init()
     });
 }
 
-static Error sys$debug_log(uintptr_t user_buf, size_t len)
+static SyscallResult sys$debug_log(uintptr_t user_buf, size_t len)
 {
     if (len > 2048)
         len = 2048;
@@ -39,7 +57,7 @@ static Error sys$debug_log(uintptr_t user_buf, size_t len)
     return Success;
 }
 
-static Error sys$exit(int error_code)
+static SyscallResult sys$exit(int error_code)
 {
     auto* current = scheduler_current_task();
     current->exit_code = error_code;
@@ -48,7 +66,7 @@ static Error sys$exit(int error_code)
     return Success;
 }
 
-static Error sys$get_process_info(uintptr_t user_buf)
+static SyscallResult sys$get_process_info(uintptr_t user_buf)
 {
     api::ProcessInfo info;
     info.pid = scheduler_current_task()->pid;
@@ -59,7 +77,7 @@ static Error sys$get_process_info(uintptr_t user_buf)
     return Success;
 }
 
-static Error sys$get_datetime(uintptr_t user_buf)
+static SyscallResult sys$get_datetime(uintptr_t user_buf)
 {
     api::DateTime datetime;
     TRY(datetime_read(datetime));
@@ -68,7 +86,7 @@ static Error sys$get_datetime(uintptr_t user_buf)
     return Success;
 }
 
-static Error sys$sleep(uint32_t ms)
+static SyscallResult sys$sleep(uint32_t ms)
 {
     auto* task = scheduler_current_task();
     kprintf("Suspending task %s\n", task->name);
@@ -83,20 +101,21 @@ static Error sys$sleep(uint32_t ms)
     return Success;
 }
 
-static Error prepare_pathname(uintptr_t user_path, size_t path_len, char const*& path)
+static Error absolute_pathname(uintptr_t user_path, char const*& path)
 {
     static char filepath_temp_buffer[FS_MAX_PATH_LENGTH + 1];
 
-    if (path_len > FS_MAX_PATH_LENGTH)
+    size_t user_path_len = klib::strlen(reinterpret_cast<char const*>(user_path));
+    if (user_path_len > FS_MAX_PATH_LENGTH)
         return PathTooLong;
 
-    TRY(vm_copy_from_user(scheduler_current_task()->address_space, filepath_temp_buffer, user_path, path_len));
-    filepath_temp_buffer[path_len] = '\0';
+    TRY(vm_copy_from_user(scheduler_current_task()->address_space, filepath_temp_buffer, user_path, user_path_len));
+    filepath_temp_buffer[user_path_len] = '\0';
     path = filepath_temp_buffer;
     return Success;
 }
 
-static Error sys$open_file(uint32_t& file_descriptor, uintptr_t pathname, size_t pathname_len, uint32_t flags)
+static SyscallResult sys$open_file(uintptr_t pathname, uint32_t flags)
 {
     if (fs_get_root() == nullptr)
         return NotFound;
@@ -104,16 +123,15 @@ static Error sys$open_file(uint32_t& file_descriptor, uintptr_t pathname, size_t
     auto* task = scheduler_current_task();
 
     char const* absolute_path = nullptr;
-    TRY(prepare_pathname(pathname, pathname_len, absolute_path));
+    TRY(absolute_pathname(pathname, absolute_path));
 
     int fd;
     TRY(task_open_file(task, absolute_path, flags, fd));
-    file_descriptor = static_cast<uint32_t>(fd);
 
-    return Success;
+    return fd;
 }
 
-Error sys$read_file(int fd, uintptr_t user_buf, uint32_t& count, uint64_t file_offset)
+static SyscallResult sys$read_file(int fd, uintptr_t user_buf, uint32_t count)
 {
     kassert(fs_get_root() != nullptr);
 
@@ -122,22 +140,19 @@ Error sys$read_file(int fd, uintptr_t user_buf, uint32_t& count, uint64_t file_o
     File* file;
     TRY(task_get_open_file(task, fd, file));
 
-    if (file_offset > file->size)
-        return BadParameters;
-
-    size_t bytes_to_read = file->size - file_offset;
+    size_t bytes_to_read = file->size - file->current_offset;
     if (bytes_to_read > count)
         bytes_to_read = count;
 
     static uint8_t buf[4096];
     size_t bytes_read = 0;
-    while (bytes_read < count) {
+    while (bytes_read < bytes_to_read) {
         size_t bytes_to_read_now = bytes_to_read - bytes_read;
         if (bytes_to_read_now > sizeof(buf))
             bytes_to_read_now = sizeof(buf);
 
         size_t bytes_read_now;
-        TRY(fs_read(*file, buf, file_offset + bytes_read, bytes_to_read_now, bytes_read_now));
+        TRY(fs_read(*file, buf, file->current_offset + bytes_read, bytes_to_read_now, bytes_read_now));
         TRY(vm_copy_to_user(task->address_space, user_buf + bytes_read, buf, bytes_read_now));
 
         bytes_read += bytes_read_now;
@@ -146,19 +161,24 @@ Error sys$read_file(int fd, uintptr_t user_buf, uint32_t& count, uint64_t file_o
             break;
     }
     count = bytes_read;
+    file->current_offset += bytes_read;
 
-    return Success;
+    return count;
 }
 
-Error sys$write_file(int fd, uintptr_t user_buf, uint32_t& count, uint64_t file_offset)
+static SyscallResult sys$write_file(int fd, uintptr_t user_buf, uint32_t count)
 {
     kassert(fs_get_root() != nullptr);
+
+    (void)fd;
+    (void)user_buf;
+    (void)count;
 
     // TODO: Implement
     return NotImplemented;
 }
 
-Error sys$close_file(int fd)
+static SyscallResult sys$close_file(int fd)
 {
     kassert(fs_get_root() != nullptr);
 
@@ -168,13 +188,13 @@ Error sys$close_file(int fd)
     return Success;
 }
 
-Error sys$stat(uintptr_t pathname, size_t pathname_len, uintptr_t user_stat_buf)
+static SyscallResult sys$stat(uintptr_t pathname, uintptr_t user_stat_buf)
 {
     if (fs_get_root() == nullptr)
         return NotFound;
 
     char const* absolute_path = nullptr;
-    TRY(prepare_pathname(pathname, pathname_len, absolute_path));
+    TRY(absolute_pathname(pathname, absolute_path));
 
     api::Stat stat;
     TRY(fs_stat(*fs_get_root(), absolute_path, stat));
@@ -183,9 +203,29 @@ Error sys$stat(uintptr_t pathname, size_t pathname_len, uintptr_t user_stat_buf)
     return Success;
 }
 
+static SyscallResult sys$seek_file(int fd, int32_t offset, uint32_t mode_u32)
+{
+    auto mode = static_cast<SeekMode>(mode_u32);
+    if (mode != SeekMode::Current && mode != SeekMode::Start && mode != SeekMode::End)
+        return BadParameters;
+
+    kassert(fs_get_root() != nullptr);
+
+    auto* task = scheduler_current_task();
+
+    File* file;
+    TRY(task_get_open_file(task, fd, file));
+    TRY(fs_seek(*file, offset, mode));
+
+    return file->current_offset;
+}
+
 void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t& r3, uint32_t& r4)
 {
-    Error err = Success;
+    SyscallResult result = { 0 };
+
+    (void)r3;
+    (void)r4;
 
     using api::SyscallIdentifiers;
     switch (static_cast<SyscallIdentifiers>(r7)) {
@@ -193,30 +233,31 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         // Intentionally empty, we always yield for system calls
         break;
     case SyscallIdentifiers::Exit:
-        err = sys$exit(static_cast<uintptr_t>(r0));
+        result = sys$exit(static_cast<uintptr_t>(r0));
         break;
     case SyscallIdentifiers::DebugLog:
-        err = sys$debug_log(static_cast<uintptr_t>(r0), static_cast<size_t>(r1));
+        result = sys$debug_log(static_cast<uintptr_t>(r0), static_cast<size_t>(r1));
         break;
     case SyscallIdentifiers::GetProcessInfo:
-        err = sys$get_process_info(static_cast<uintptr_t>(r0));
+        result = sys$get_process_info(static_cast<uintptr_t>(r0));
         break;
-    /*
     case SyscallIdentifiers::OpenFile:
-        err = sys$open_file(r0, static_cast<uintptr_t>(r1), static_cast<size_t>(r2), static_cast<uint32_t>(r3));
+        result = sys$open_file(static_cast<uintptr_t>(r0), static_cast<uint32_t>(r1));
         break;
     case SyscallIdentifiers::ReadFile:
-        err = sys$read_file(static_cast<int>(r0), static_cast<uintptr_t>(r1), r2, static_cast<size_t>(r3));
+        result = sys$read_file(static_cast<int>(r0), static_cast<uintptr_t>(r1), static_cast<size_t>(r2));
         break;
     case SyscallIdentifiers::WriteFile:
-        err = sys$write_file(static_cast<int>(r0), static_cast<uintptr_t>(r1), r2, static_cast<size_t>(r3));
+        result = sys$write_file(static_cast<int>(r0), static_cast<uintptr_t>(r1), static_cast<size_t>(r2));
         break;
     case SyscallIdentifiers::CloseFile:
-        err = sys$close_file(static_cast<int>(r0));
+        result = sys$close_file(static_cast<int>(r0));
         break;
-    */
+    case SyscallIdentifiers::Seek:
+        result = sys$seek_file(static_cast<int>(r0), static_cast<int32_t>(r1), static_cast<uint32_t>(r2));
+        break;
     case SyscallIdentifiers::Stat:
-        err = sys$stat(static_cast<uintptr_t>(r0), static_cast<size_t>(r1), static_cast<uintptr_t>(r2));
+        result = sys$stat(static_cast<uintptr_t>(r0), static_cast<uintptr_t>(r1));
         break;
     case SyscallIdentifiers::MakeDirectory:
         break;
@@ -225,10 +266,10 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
     case SyscallIdentifiers::ReadDirectory:
         break;
     case SyscallIdentifiers::GetDateTime:
-        err = sys$get_datetime(static_cast<uintptr_t>(r0));
+        result = sys$get_datetime(static_cast<uintptr_t>(r0));
         break;
     case SyscallIdentifiers::Sleep:
-        err = sys$sleep(r0);
+        result = sys$sleep(r0);
         break;
     case SyscallIdentifiers::Poll:
         break;
@@ -243,10 +284,10 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
     case SyscallIdentifiers::SetBrk:
         break;
     default:
-        err = InvalidSystemCall;
+        result = InvalidSystemCall;
     }
 
-    r7 = static_cast<uint32_t>(err.generic_error_code);
+    r7 = result.rc();
 }
 
 }

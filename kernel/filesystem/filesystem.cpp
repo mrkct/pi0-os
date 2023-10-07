@@ -1,4 +1,5 @@
 #include <kernel/filesystem/filesystem.h>
+#include <kernel/lib/math.h>
 #include <kernel/lib/string.h>
 
 namespace kernel {
@@ -138,12 +139,47 @@ Error fs_open(Filesystem& fs, char const* path, File& file)
     TRY(fs.open_file_entry(entry, file));
     file_inc_ref(file);
 
-    return NotFound;
+    return Success;
 }
 
 Error fs_read(File& file, uint8_t* buffer, size_t offset, size_t size, size_t& bytes_read)
 {
     return file.fs->read(file, buffer, offset, size, bytes_read);
+}
+
+Error fs_seek(File& file, int64_t offset, SeekMode mode)
+{
+    switch (mode) {
+    case SeekMode::Current:
+        if (offset < 0 && static_cast<uint64_t>(klib::abs(offset)) > file.current_offset) {
+            file.current_offset = 0;
+        } else if (file.size - file.current_offset < static_cast<uint64_t>(offset)) {
+            file.current_offset = file.size;
+        } else {
+            file.current_offset += offset;
+        }
+        break;
+    case SeekMode::Start:
+        if (offset < 0) {
+            file.current_offset = 0;
+        } else if (static_cast<uint64_t>(offset) > file.size) {
+            file.current_offset = file.size;
+        } else {
+            file.current_offset = offset;
+        }
+        break;
+    case SeekMode::End:
+        if (offset > 0) {
+            file.current_offset = file.size;
+        } else if (static_cast<uint64_t>(klib::abs(offset)) > file.size) {
+            file.current_offset = 0;
+        } else {
+            file.current_offset += offset;
+        }
+        break;
+    }
+
+    return Success;
 }
 
 Error fs_close(File& file)

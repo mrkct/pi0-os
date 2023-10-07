@@ -205,6 +205,7 @@ static Error open_file_entry(DirectoryEntry& entry, File& file)
     auto& fat_file = *reinterpret_cast<Fat32File*>(file.impl_data);
 
     file.fs = entry.dir->fs;
+    file.current_offset = 0;
     file.size = fat_entry.size;
     klib::strncpy_safe(file.name, entry.name, sizeof(file.name));
     fat_file.first_cluster = fat_entry.first_cluster;

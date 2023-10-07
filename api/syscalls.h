@@ -18,6 +18,7 @@ enum class SyscallIdentifiers : uint32_t {
     WriteFile = 12,
     CloseFile = 13,
     Stat = 14,
+    Seek = 15,
 
     MakeDirectory = 20,
     OpenDirectory = 21,
@@ -34,6 +35,16 @@ enum class SyscallIdentifiers : uint32_t {
 
     GetBrk = 60,
     SetBrk = 61,
+};
+
+enum OpenFileModes {
+    MODE_READ   = 1 << 0,
+    MODE_WRITE  = 1 << 1,
+    MODE_APPEND = 2 << 2
+};
+
+enum class SeekModes: uint32_t {
+    Start, Current, End
 };
 
 static inline int syscall(SyscallIdentifiers id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)

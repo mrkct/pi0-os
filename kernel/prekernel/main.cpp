@@ -50,37 +50,63 @@ static void task_A()
 {
     char buf[1024];
 
+#define taskprintf(format, args...)                                                                     \
+    do {                                                                                                \
+        len = kernel::ksprintf(buf, sizeof(buf), format, ##args);                                       \
+        api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0); \
+    } while (0)
+
+    size_t len;
+
     api::ProcessInfo info;
     api::syscall(api::SyscallIdentifiers::GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0, 0, 0);
 
-    size_t len = kernel::ksprintf(buf, sizeof(buf), "I am %s and my PID is %d\n", info.name, info.pid);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+    taskprintf("I am %s and my PID is %d\n", info.name, info.pid);
 
     api::DateTime datetime;
     api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
 
-    len = kernel::ksprintf(buf, sizeof(buf), "The date is %d-%d-%d %d:%d:%d\n",
+    taskprintf("The date is %d-%d-%d %d:%d:%d\n",
         datetime.year, datetime.month, datetime.day, datetime.hour, datetime.minute, datetime.second);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
 
     api::Stat stat;
     char const* pathname = "/HELLO.TXT";
-    if (0 == api::syscall(api::SyscallIdentifiers::Stat, reinterpret_cast<uint32_t>(pathname), klib::strlen(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0)) {
-        len = kernel::ksprintf(buf, sizeof(buf), "- isDirectory: %s \n- size: %lu bytes\n", stat.is_directory ? "true" : "false", stat.size);
-        api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+    if (0 == api::syscall(api::SyscallIdentifiers::Stat, reinterpret_cast<uint32_t>(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0, 0)) {
+        taskprintf("- isDirectory: %s \n- size: %lu bytes\n", stat.is_directory ? "true" : "false", stat.size);
+
+        int32_t fd = api::syscall(
+            api::SyscallIdentifiers::OpenFile,
+            reinterpret_cast<uint32_t>(pathname),
+            klib::strlen(pathname),
+            api::MODE_READ | api::MODE_WRITE | api::MODE_APPEND,
+            0, 0);
+        if (fd >= 0) {
+            uint8_t data[64];
+            int count = 1;
+            taskprintf("========== Content of file ==========\n");
+            while (count > 0) {
+                count = api::syscall(api::SyscallIdentifiers::ReadFile, (uint32_t)fd, reinterpret_cast<uint32_t>(data), sizeof(data) - 1, 0, 0);
+                data[count] = '\0';
+                taskprintf("%s", data);
+            }
+            taskprintf("\n========= End of file ==========\n");
+
+            int rc = api::syscall(api::SyscallIdentifiers::CloseFile, (uint32_t)fd, 0, 0, 0, 0);
+            if (rc < 0)
+                taskprintf("failed to close file. rc=%d\n", rc);
+        } else {
+            taskprintf("failed to open %s. rc= %d\n", pathname, fd);
+        }
     } else {
-        len = kernel::ksprintf(buf, sizeof(buf), "stat syscall failed. Skipping file system calls...\n");
-        api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+        taskprintf("stat syscall failed. Skipping file system calls...\n");
     }
 
-    len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+    taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
 
     api::syscall(api::SyscallIdentifiers::Sleep, 10000, 0, 0, 0, 0);
 
     api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
-    len = kernel::ksprintf(buf, sizeof(buf), "Ticks: %lu\n", datetime.ticks_since_boot);
-    api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0);
+    taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
 
     api::syscall(api::SyscallIdentifiers::Exit, 0, 0, 0, 0, 0);
     kassert_not_reached();
