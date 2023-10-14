@@ -25,7 +25,7 @@ static Error brk(uintptr_t new_brk)
             struct PhysicalPage* page;
 
             TRY(physical_page_alloc(PageOrder::_4KB, page));
-            TRY(vm_map(vm_current_address_space(), page, g_last_mapped_chunk + (i + 1) * CHUNK_SIZE));
+            TRY(vm_map(vm_current_address_space(), page, g_last_mapped_chunk + CHUNK_SIZE));
 
             g_last_mapped_chunk += CHUNK_SIZE;
         }
