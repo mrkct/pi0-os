@@ -32,16 +32,16 @@ struct MailboxMessageTail {
 
 template<typename T>
 concept MailboxMessage = requires(T message) {
-                             {
-                                 message.header
-                             };
-                             {
-                                 message.tags
-                             };
-                             {
-                                 message.tail
-                             };
-                         };
+    {
+        message.header
+    };
+    {
+        message.tags
+    };
+    {
+        message.tail
+    };
+};
 
 template<MailboxMessage M>
 Error mailbox_send_and_receive(Channel channel, M volatile& message)
