@@ -296,10 +296,22 @@ Error vm_copy_from_user(struct AddressSpace& as, void* dest, uintptr_t src, size
     return Success;
 }
 
-Error vm_copy_to_user(struct AddressSpace& as, uintptr_t dest, void* src, size_t len)
+Error vm_copy_to_user(struct AddressSpace& as, uintptr_t dest, void const* src, size_t len)
 {
     if (g_current_address_space.ttbr0_page == as.ttbr0_page) {
         memcpy(reinterpret_cast<void*>(dest), src, len);
+        return Success;
+    }
+
+    TODO();
+
+    return Success;
+}
+
+Error vm_memset(struct AddressSpace& as, uintptr_t dest, uint8_t val, size_t size)
+{
+    if (g_current_address_space.ttbr0_page == as.ttbr0_page) {
+        memset(reinterpret_cast<void*>(dest), val, size);
         return Success;
     }
 

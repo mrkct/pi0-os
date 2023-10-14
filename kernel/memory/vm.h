@@ -27,9 +27,22 @@ Error vm_unmap(struct AddressSpace&, uintptr_t, struct PhysicalPage*&);
 
 Error vm_copy_from_user(struct AddressSpace&, void* dest, uintptr_t src, size_t len);
 
-Error vm_copy_to_user(struct AddressSpace& as, uintptr_t dest, void* src, size_t len);
+Error vm_copy_to_user(struct AddressSpace& as, uintptr_t dest, void const* src, size_t len);
+
+Error vm_memset(struct AddressSpace&, uintptr_t dest, uint8_t val, size_t size);
 
 void vm_switch_address_space(struct AddressSpace&);
+
+template<typename Callback>
+auto vm_using_address_space(struct AddressSpace& as, Callback c)
+{
+    auto& previous = vm_current_address_space();
+    vm_switch_address_space(as);
+    auto result = c();
+    vm_switch_address_space(previous);
+
+    return result;
+}
 
 enum class PageFaultHandlerResult {
     Fixed,
