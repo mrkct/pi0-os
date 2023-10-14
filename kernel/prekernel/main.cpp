@@ -53,45 +53,45 @@ static void task_A()
 #define taskprintf(format, args...)                                                                     \
     do {                                                                                                \
         len = kernel::ksprintf(buf, sizeof(buf), format, ##args);                                       \
-        api::syscall(api::SyscallIdentifiers::DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0); \
+        syscall(SyscallIdentifiers::SYS_DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0); \
     } while (0)
 
     size_t len;
 
-    api::ProcessInfo info;
-    api::syscall(api::SyscallIdentifiers::GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0, 0, 0);
+    ProcessInfo info;
+    syscall(SyscallIdentifiers::SYS_GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0, 0, 0);
 
     taskprintf("I am %s and my PID is %d\n", info.name, info.pid);
 
-    api::DateTime datetime;
-    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
+    DateTime datetime;
+    syscall(SyscallIdentifiers::SYS_GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
 
     taskprintf("The date is %d-%d-%d %d:%d:%d\n",
         datetime.year, datetime.month, datetime.day, datetime.hour, datetime.minute, datetime.second);
 
-    api::Stat stat;
+    Stat stat;
     char const* pathname = "/HELLO.TXT";
-    if (0 == api::syscall(api::SyscallIdentifiers::Stat, reinterpret_cast<uint32_t>(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0, 0)) {
+    if (0 == syscall(SyscallIdentifiers::SYS_Stat, reinterpret_cast<uint32_t>(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0, 0)) {
         taskprintf("- isDirectory: %s \n- size: %lu bytes\n", stat.is_directory ? "true" : "false", stat.size);
 
-        int32_t fd = api::syscall(
-            api::SyscallIdentifiers::OpenFile,
+        int32_t fd = syscall(
+            SyscallIdentifiers::SYS_OpenFile,
             reinterpret_cast<uint32_t>(pathname),
             klib::strlen(pathname),
-            api::MODE_READ | api::MODE_WRITE | api::MODE_APPEND,
+            MODE_READ | MODE_WRITE | MODE_APPEND,
             0, 0);
         if (fd >= 0) {
             uint8_t data[64];
             int count = 1;
             taskprintf("========== Content of file ==========\n");
             while (count > 0) {
-                count = api::syscall(api::SyscallIdentifiers::ReadFile, (uint32_t)fd, reinterpret_cast<uint32_t>(data), sizeof(data) - 1, 0, 0);
+                count = syscall(SyscallIdentifiers::SYS_ReadFile, (uint32_t)fd, reinterpret_cast<uint32_t>(data), sizeof(data) - 1, 0, 0);
                 data[count] = '\0';
                 taskprintf("%s", data);
             }
             taskprintf("\n========= End of file ==========\n");
 
-            int rc = api::syscall(api::SyscallIdentifiers::CloseFile, (uint32_t)fd, 0, 0, 0, 0);
+            int rc = syscall(SyscallIdentifiers::SYS_CloseFile, (uint32_t)fd, 0, 0, 0, 0);
             if (rc < 0)
                 taskprintf("failed to close file. rc=%d\n", rc);
         } else {
@@ -103,12 +103,12 @@ static void task_A()
 
     taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
 
-    api::syscall(api::SyscallIdentifiers::Sleep, 10000, 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_Sleep, 10000, 0, 0, 0, 0);
 
-    api::syscall(api::SyscallIdentifiers::GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
     taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
 
-    api::syscall(api::SyscallIdentifiers::Exit, 0, 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_Exit, 0, 0, 0, 0, 0);
     kassert_not_reached();
 }
 
@@ -186,7 +186,9 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     timer_init();
     scheduler_init();
     Task *A, *B;
+
     MUST(task_create_kernel_thread(A, "A", task_A));
+    MUST(task_load_user_elf_from_path(B, "/HELLO.EXE"));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later

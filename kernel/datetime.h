@@ -7,8 +7,8 @@ namespace kernel {
 
 Error datetime_init();
 
-Error datetime_read(api::DateTime& datetime);
+Error datetime_read(DateTime& datetime);
 
-Error datetime_set(api::DateTime& datetime);
+Error datetime_set(DateTime& datetime);
 
 }

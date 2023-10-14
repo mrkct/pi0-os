@@ -57,7 +57,7 @@ void fs_set_root(Filesystem* fs);
 
 Filesystem* fs_get_root();
 
-Error fs_stat(Filesystem&, char const* path, api::Stat&);
+Error fs_stat(Filesystem&, char const* path, Stat&);
 
 Error fs_open(Filesystem&, char const* path, File& file);
 

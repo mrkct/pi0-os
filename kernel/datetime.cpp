@@ -11,7 +11,7 @@ enum class DateTimeSource {
 };
 
 static DateTimeSource g_datetime_source = DateTimeSource::Fake;
-static api::DateTime g_last_read_datetime;
+static DateTime g_last_read_datetime;
 
 static void use_fake_datetime_as_time_source()
 {
@@ -38,7 +38,7 @@ static Error try_using_file_as_time_source()
     TRY(fs_read(file, buf, 0, sizeof(buf) - 1, bytes_read));
     buf[bytes_read] = '\0';
 
-    auto const& parse_datetime_string = [](char const* string, api::DateTime& datetime) -> Error {
+    auto const& parse_datetime_string = [](char const* string, DateTime& datetime) -> Error {
         auto const& expect_num = [](char const*& str, size_t max_digits, int& result) -> Error {
             result = 0;
             for (size_t i = 0; i < max_digits && *str; i++) {
@@ -98,7 +98,7 @@ Error datetime_init()
     return Success;
 }
 
-Error datetime_read(api::DateTime& datetime)
+Error datetime_read(DateTime& datetime)
 {
     datetime = g_last_read_datetime;
     datetime.ticks_since_boot = systimer_get_ticks();
@@ -106,7 +106,7 @@ Error datetime_read(api::DateTime& datetime)
     return Success;
 }
 
-Error datetime_set(api::DateTime& datetime)
+Error datetime_set(DateTime& datetime)
 {
     if (g_datetime_source == DateTimeSource::Fake) {
         g_last_read_datetime = datetime;

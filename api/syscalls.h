@@ -2,50 +2,50 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
-namespace api {
 
-constexpr uint8_t SYSCALL_VECTOR = 0x10;
+#define SYSCALL_VECTOR 0x10
 
-enum class SyscallIdentifiers : uint32_t {
-    Yield = 1,
-    Exit = 2,
-    DebugLog = 3,
-    GetProcessInfo = 4,
+typedef enum SyscallIdentifiers {
+    SYS_Yield = 1,
+    SYS_Exit = 2,
+    SYS_DebugLog = 3,
+    SYS_GetProcessInfo = 4,
 
-    OpenFile = 10,
-    ReadFile = 11,
-    WriteFile = 12,
-    CloseFile = 13,
-    Stat = 14,
-    Seek = 15,
+    SYS_OpenFile = 10,
+    SYS_ReadFile = 11,
+    SYS_WriteFile = 12,
+    SYS_CloseFile = 13,
+    SYS_Stat = 14,
+    SYS_Seek = 15,
 
-    MakeDirectory = 20,
-    OpenDirectory = 21,
-    ReadDirectory = 22,
+    SYS_MakeDirectory = 20,
+    SYS_OpenDirectory = 21,
+    SYS_ReadDirectory = 22,
 
-    GetDateTime = 30,
-    Sleep = 31,
+    SYS_GetDateTime = 30,
+    SYS_Sleep = 31,
 
-    Poll = 40,
-    Send = 41,
+    SYS_Poll = 40,
+    SYS_Send = 41,
 
-    Fork = 50,
-    Exec = 51,
+    SYS_Fork = 50,
+    SYS_Exec = 51,
 
-    GetBrk = 60,
-    SetBrk = 61,
-};
+    SYS_GetBrk = 60,
+    SYS_SetBrk = 61,
+} SyscallIdentifiers;
 
-enum OpenFileModes {
+typedef enum OpenFileModes {
     MODE_READ   = 1 << 0,
     MODE_WRITE  = 1 << 1,
     MODE_APPEND = 2 << 2
-};
+} OpenFileModes;
 
-enum class SeekModes: uint32_t {
+typedef enum SeekModes {
     Start, Current, End
-};
+} SeekModes;
 
 static inline int syscall(SyscallIdentifiers id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
 {
@@ -59,18 +59,18 @@ static inline int syscall(SyscallIdentifiers id, uint32_t arg0, uint32_t arg1, u
                  "svc %7\n"
                  "mov %0, r7\n"
                  : "=r"(result)
-                 : "r"(static_cast<uint32_t>(id)), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "i"(SYSCALL_VECTOR)
+                 : "r"((uint32_t) (id)), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "i"(SYSCALL_VECTOR)
                  : "r0", "r1", "r2", "r3", "r4", "r7", "memory");
     return result;
 }
 
 typedef uint32_t PID;
-struct ProcessInfo {
+typedef struct ProcessInfo {
     PID pid;
     char name[32];
-};
+} ProcessInfo;
 
-struct DateTime {
+typedef struct DateTime {
     int year;
     int month;
     int day;
@@ -78,11 +78,9 @@ struct DateTime {
     int minute;
     int second;
     uint64_t ticks_since_boot;
-};
+} DateTime;
 
-struct Stat {
+typedef struct Stat {
     bool is_directory;
     uint64_t size;
-};
-
-}
+} Stat;

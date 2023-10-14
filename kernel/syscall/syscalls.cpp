@@ -31,7 +31,7 @@ private:
 
 void syscall_init()
 {
-    interrupt_install_swi_handler(api::SYSCALL_VECTOR, [](auto* suspended_state) {
+    interrupt_install_swi_handler(SYSCALL_VECTOR, [](auto* suspended_state) {
         dispatch_syscall(
             suspended_state->r[7],
             suspended_state->r[0],
@@ -68,7 +68,7 @@ static SyscallResult sys$exit(int error_code)
 
 static SyscallResult sys$get_process_info(uintptr_t user_buf)
 {
-    api::ProcessInfo info;
+    ProcessInfo info;
     info.pid = scheduler_current_task()->pid;
     klib::strncpy_safe(info.name, scheduler_current_task()->name, sizeof(info.name));
 
@@ -79,7 +79,7 @@ static SyscallResult sys$get_process_info(uintptr_t user_buf)
 
 static SyscallResult sys$get_datetime(uintptr_t user_buf)
 {
-    api::DateTime datetime;
+    DateTime datetime;
     TRY(datetime_read(datetime));
     TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buf, &datetime, sizeof(datetime)));
 
@@ -196,7 +196,7 @@ static SyscallResult sys$stat(uintptr_t pathname, uintptr_t user_stat_buf)
     char const* absolute_path = nullptr;
     TRY(absolute_pathname(pathname, absolute_path));
 
-    api::Stat stat;
+    Stat stat;
     TRY(fs_stat(*fs_get_root(), absolute_path, stat));
     TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_stat_buf, &stat, sizeof(stat)));
 
@@ -227,61 +227,60 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
     (void)r3;
     (void)r4;
 
-    using api::SyscallIdentifiers;
     switch (static_cast<SyscallIdentifiers>(r7)) {
-    case SyscallIdentifiers::Yield:
+    case SyscallIdentifiers::SYS_Yield:
         // Intentionally empty, we always yield for system calls
         break;
-    case SyscallIdentifiers::Exit:
+    case SyscallIdentifiers::SYS_Exit:
         result = sys$exit(static_cast<uintptr_t>(r0));
         break;
-    case SyscallIdentifiers::DebugLog:
+    case SyscallIdentifiers::SYS_DebugLog:
         result = sys$debug_log(static_cast<uintptr_t>(r0), static_cast<size_t>(r1));
         break;
-    case SyscallIdentifiers::GetProcessInfo:
+    case SyscallIdentifiers::SYS_GetProcessInfo:
         result = sys$get_process_info(static_cast<uintptr_t>(r0));
         break;
-    case SyscallIdentifiers::OpenFile:
+    case SyscallIdentifiers::SYS_OpenFile:
         result = sys$open_file(static_cast<uintptr_t>(r0), static_cast<uint32_t>(r1));
         break;
-    case SyscallIdentifiers::ReadFile:
+    case SyscallIdentifiers::SYS_ReadFile:
         result = sys$read_file(static_cast<int>(r0), static_cast<uintptr_t>(r1), static_cast<size_t>(r2));
         break;
-    case SyscallIdentifiers::WriteFile:
+    case SyscallIdentifiers::SYS_WriteFile:
         result = sys$write_file(static_cast<int>(r0), static_cast<uintptr_t>(r1), static_cast<size_t>(r2));
         break;
-    case SyscallIdentifiers::CloseFile:
+    case SyscallIdentifiers::SYS_CloseFile:
         result = sys$close_file(static_cast<int>(r0));
         break;
-    case SyscallIdentifiers::Seek:
+    case SyscallIdentifiers::SYS_Seek:
         result = sys$seek_file(static_cast<int>(r0), static_cast<int32_t>(r1), static_cast<uint32_t>(r2));
         break;
-    case SyscallIdentifiers::Stat:
+    case SyscallIdentifiers::SYS_Stat:
         result = sys$stat(static_cast<uintptr_t>(r0), static_cast<uintptr_t>(r1));
         break;
-    case SyscallIdentifiers::MakeDirectory:
+    case SyscallIdentifiers::SYS_MakeDirectory:
         break;
-    case SyscallIdentifiers::OpenDirectory:
+    case SyscallIdentifiers::SYS_OpenDirectory:
         break;
-    case SyscallIdentifiers::ReadDirectory:
+    case SyscallIdentifiers::SYS_ReadDirectory:
         break;
-    case SyscallIdentifiers::GetDateTime:
+    case SyscallIdentifiers::SYS_GetDateTime:
         result = sys$get_datetime(static_cast<uintptr_t>(r0));
         break;
-    case SyscallIdentifiers::Sleep:
+    case SyscallIdentifiers::SYS_Sleep:
         result = sys$sleep(r0);
         break;
-    case SyscallIdentifiers::Poll:
+    case SyscallIdentifiers::SYS_Poll:
         break;
-    case SyscallIdentifiers::Send:
+    case SyscallIdentifiers::SYS_Send:
         break;
-    case SyscallIdentifiers::Fork:
+    case SyscallIdentifiers::SYS_Fork:
         break;
-    case SyscallIdentifiers::Exec:
+    case SyscallIdentifiers::SYS_Exec:
         break;
-    case SyscallIdentifiers::GetBrk:
+    case SyscallIdentifiers::SYS_GetBrk:
         break;
-    case SyscallIdentifiers::SetBrk:
+    case SyscallIdentifiers::SYS_SetBrk:
         break;
     default:
         result = InvalidSystemCall;

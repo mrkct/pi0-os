@@ -116,11 +116,11 @@ void file_dec_ref(File& file)
     }
 }
 
-Error fs_stat(Filesystem& fs, char const* path, api::Stat& stat)
+Error fs_stat(Filesystem& fs, char const* path, Stat& stat)
 {
     DirectoryEntry entry;
     TRY(fs_get_directory_entry(fs, path, entry));
-    stat = api::Stat {
+    stat = Stat {
         .is_directory = entry.type == DirectoryEntry::Type::Directory,
         .size = entry.size
     };
