@@ -62,6 +62,7 @@ static inline void iowrite32(uintptr_t reg, T data)
 
 static inline void wait_cycles(uint32_t cycles)
 {
+    // FIXME: This is passing cycles as an output operand, which is not correct
     asm volatile("1: subs %[cycles], %[cycles], #1; bne 1b"
                  : [cycles] "+r"(cycles));
 }
