@@ -14,15 +14,13 @@ enum class TaskState {
     Zombie,
 };
 
-typedef uint32_t PID;
-
 struct Task {
     int exit_code;
     TaskState task_state;
     AddressSpace address_space;
     SuspendedTaskState state;
     char name[32];
-    api::PID pid;
+    PID pid;
     uint32_t time_slice;
     struct {
         size_t len, allocated;
@@ -42,6 +40,10 @@ void scheduler_init();
 Task* scheduler_current_task();
 
 Error task_create_kernel_thread(Task*&, char const* name, void (*entry)());
+
+Error task_load_user_elf(Task*& task, const char *name, uint8_t const *elf_binary, size_t elf_binary_size);
+
+Error task_load_user_elf_from_path(Task*& task, const char *pathname);
 
 void scheduler_step(SuspendedTaskState*);
 

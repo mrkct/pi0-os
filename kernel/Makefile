@@ -52,6 +52,7 @@ SOURCES=\
 	kernel/prekernel/start.S \
 	kernel/prekernel/vector_table.S \
 	kernel/syscall/syscalls.cpp \
+	kernel/task/elf_loader.cpp \
 	kernel/task/scheduler.cpp \
 	kernel/timer.cpp \
 
@@ -77,7 +78,7 @@ qemu-record: Kernel snapshot-drive.qcow2
 
 qemu-gdb: Kernel
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS) $(QEMU_RECORD_FLAGS) -s -S
+	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS) -s -S
 
 qemu-gdb-replay: Kernel snapshot-drive.qcow2
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"

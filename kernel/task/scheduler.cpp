@@ -8,6 +8,7 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/sizes.h>
 #include <kernel/task/scheduler.h>
+#include <kernel/task/elf_loader.h>
 
 namespace kernel {
 
@@ -76,11 +77,18 @@ static void task_free(Task* task);
 void scheduler_step(SuspendedTaskState*);
 
 constexpr size_t IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH = 1;
-static api::PID g_next_free_pid = 0;
+static PID g_next_free_pid = 0;
 static Queue g_running_tasks_queue;
 static Queue g_suspended_tasks_queue;
 
-Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)())
+/**
+ * @brief Prepares a new task by setting everything except loading the program in the address space
+ * 
+ * @param out_task 
+ * @param name 
+ * @return Error 
+ */
+static Error prepare_new_task(Task*& out_task, char const* name, bool is_kernel_task)
 {
     Task* task;
     TRY(kmalloc(sizeof(Task), task));
@@ -95,9 +103,6 @@ Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)
         MUST(physical_page_alloc(PageOrder::_4KB, task_stack_page));
         TRY(vm_map(task->address_space, task_stack_page, areas::user_stack.start + i * _4KB));
     }
-
-    // TODO: Ask the loader to map the executable into the address space and return the entry point
-    task->state.lr = reinterpret_cast<uint32_t>(entry);
 
     task->exit_code = 0;
     task->task_state = TaskState::Running;
@@ -119,9 +124,59 @@ Error task_create_kernel_thread(Task*& out_task, char const* name, void (*entry)
 
     task->next_to_run = nullptr;
 
+    return Success;
+}
+
+Error task_create_kernel_thread(Task*& task, char const* name, void (*entry)())
+{
+    TRY(prepare_new_task(task, name, true));
+    task->state.lr = reinterpret_cast<uint32_t>(entry);
+
+    // No need to map anything as the kernel code is always mapped
+
     g_running_tasks_queue.append(task);
 
     return Success;
+}
+
+Error task_load_user_elf(Task*& task, const char *name, uint8_t const *elf_binary, size_t elf_binary_size)
+{
+    TRY(prepare_new_task(task, name, false));
+    
+    uintptr_t entry;
+    TRY(try_load_elf(elf_binary, elf_binary_size, task->address_space, entry));
+    task->state.lr = entry;
+
+    g_running_tasks_queue.append(task);
+
+    return Success;
+}
+
+Error task_load_user_elf_from_path(Task*& task, const char *pathname)
+{
+    kassert(nullptr != fs_get_root());
+
+    Stat stat;
+    TRY(fs_stat(*fs_get_root(), pathname, stat));
+    
+    uint8_t *elf;
+    TRY(kmalloc(stat.size, elf));
+    
+    for (size_t i = 0; i < stat.size; i++)
+        elf[i] = 0;
+
+    File file;
+    
+    TRY(fs_open(*fs_get_root(), pathname, file));
+    size_t bytes_read;
+    TRY(fs_read(file, elf, 0, stat.size, bytes_read));
+    kassert(bytes_read == stat.size);
+    TRY(fs_close(file));
+
+    auto result = task_load_user_elf(task, pathname, elf, stat.size);
+    MUST(kfree(elf));
+
+    return result;
 }
 
 static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
@@ -129,7 +184,7 @@ static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
 static void idle_task()
 {
     while (1) {
-        api::syscall(api::SyscallIdentifiers::Yield, 0, 0, 0, 0, 0);
+        syscall(SyscallIdentifiers::SYS_Yield, 0, 0, 0, 0, 0);
     }
 }
 
