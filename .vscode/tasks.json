@@ -1,0 +1,36 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Kernel",
+            "options": {
+                "cwd": "${workspaceRoot}/kernel"
+            },
+            "type": "shell",
+            "command": "make"
+        },
+        {
+            "label": "Start Qemu in background",
+            "options": {
+                "cwd": "${workspaceRoot}/kernel"
+            },
+            "type": "shell",
+            "command": "SD_IMAGE=Fat32TestImage.img make qemu-gdb-background",
+            "dependsOn": "Build Kernel"
+        },
+        {
+            "label": "Stop Qemu",
+            "type": "shell",
+            "command": "pkill",
+            "args": ["qemu-system-arm"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}
