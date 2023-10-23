@@ -22,6 +22,17 @@ static void draw_background(VideoConsole& console)
     for (size_t i = 0; i < console.fb.height; ++i)
         for (size_t j = 0; j < console.fb.width; ++j)
             console.fb.address[i * console.fb.width + j] = i * j;
+    
+    for (size_t i = 16; i < console.fb.height - 16; i++) {
+        for (size_t j = 16; j < 548; j++) {
+            uint32_t rgba = console.fb.address[i * console.fb.width + j];
+            rgba = ((((rgba >> 0) & 0xff) / 8) << 0) |
+                ((((rgba >> 8) & 0xff) / 8) << 8) |
+                ((((rgba >> 16) & 0xff) / 8) << 16) |
+                ((((rgba >> 24) & 0xff) / 8) << 24);
+            console.fb.address[i * console.fb.width + j] = rgba;
+        }
+    }
 }
 
 static void redraw_all(VideoConsole& console)
