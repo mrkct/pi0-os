@@ -20,7 +20,9 @@ SECTIONS
     }
     __prekernel_end = .;
 
-    . = 0xe0000000 + 1M;
+    . = 0xe0000000;
+    __higher_half_start = .;
+    . += 1M;
     __kernel_start = .;
     
     .text ALIGN(4K) : AT(ADDR(.text) - 0xe0000000)
@@ -73,7 +75,9 @@ SECTIONS
     }
     __bss_size = __bss_end - __bss_start;
     
-    . = ALIGN(4096);
+    /* This alignment is required due to the current implementation of the physical page allocator */
+    . = ALIGN(1M);
+
     __kernel_end = .;
     __heap_start = .;
 }

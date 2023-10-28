@@ -3,6 +3,7 @@
 #include <kernel/lib/math.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/physicalalloc.h>
+#include <kernel/memory/vm.h>
 #include <kernel/panic.h>
 
 namespace kernel {
@@ -10,6 +11,7 @@ namespace kernel {
 static constexpr size_t _16KB = 16 * _1KB;
 static constexpr size_t _4KB = 4 * _1KB;
 
+extern "C" uint8_t __higher_half_start[];
 extern "C" uint8_t __kernel_end[];
 
 struct {
@@ -26,8 +28,10 @@ struct PhysicalPage* g_free_pages_lists[] = {
 static uintptr_t physical_addr_where_kernel_ends()
 {
     auto kernel_end = reinterpret_cast<uintptr_t>(__kernel_end);
+    kassert(kernel_end % _1MB == 0);
     return kernel_end - areas::kernel.start;
 }
+
 static PageOrder bigger_order(PageOrder order)
 {
     switch (order) {
@@ -114,14 +118,18 @@ Error physical_page_allocator_init(size_t total_physical_memory_size)
     total_physical_memory_size = klib::round_down<size_t>(total_physical_memory_size, _16KB);
     g_pages.len = total_physical_memory_size / _1KB;
 
-    auto start_of_pages_data_addr = physical_addr_where_kernel_ends();
+    auto start_of_pages_data_addr = reinterpret_cast<uintptr_t>(__kernel_end);
     auto end_of_pages_data_addr = klib::round_up(start_of_pages_data_addr + g_pages.len * sizeof(PhysicalPage), _16KB);
     g_pages.data = reinterpret_cast<PhysicalPage*>(start_of_pages_data_addr);
 
     memset(g_pages.data, 0, g_pages.len * sizeof(PhysicalPage));
 
     auto idx_step = _16KB / _1KB;
-    auto first_free_page_idx = end_of_pages_data_addr / _1KB;
+
+    // NOTE: end_of_pages_data_addr is a virtual address, since the first 32MBs of the higher half
+    //       are mapped to the first 32MBs of memory, we can convert the address simply by subtracting
+    //       the offset of the higher half
+    auto first_free_page_idx = (end_of_pages_data_addr - reinterpret_cast<uintptr_t>(__higher_half_start)) / _1KB;
     auto last_free_page_idx = total_physical_memory_size / _1KB - idx_step;
 
     for (auto i = last_free_page_idx; i >= first_free_page_idx; i -= idx_step) {
