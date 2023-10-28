@@ -36,17 +36,15 @@ Error try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSpace& 
 
     return vm_using_address_space(as, [&]() {
         auto const *program_header = reinterpret_cast<Elf32_Phdr const*>(elf_binary + header->e_phoff);
-        kprintf("Program headers: \n");
         for (size_t i = 0; i < header->e_phnum; i++) {
             auto const *p_hdr = &program_header[i];
-            kprintf("Type: %p \t\tvaddr: %p\n", p_hdr->p_type, p_hdr->p_vaddr);
 
             if (p_hdr->p_type != PT_LOAD)
                 continue;
             
             auto start = klib::round_down<uintptr_t>(p_hdr->p_vaddr, 4 * _1KB);
             auto end = klib::round_up<uintptr_t>(p_hdr->p_paddr + p_hdr->p_memsz, 4 * _1KB);         
-            for (uintptr_t addr = start; addr < end; addr += 4 * _1KB) {                
+            for (uintptr_t addr = start; addr < end; addr += 4 * _1KB) {
                 struct PhysicalPage* page;
                 // FIXME: Rollback if this fails
                 MUST(physical_page_alloc(PageOrder::_4KB, page));
