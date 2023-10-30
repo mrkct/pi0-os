@@ -14,6 +14,40 @@ static size_t next_path_separator(char const* path, size_t offset)
 
 static Filesystem* g_root_fs;
 
+static char to_lower(char c)
+{
+    return 'A' <= c && c <= 'Z' ? 'a' + (c - 'A') : c;
+}
+
+static int fs_strcmp(const char *s1, const char *s2)
+{
+    if (g_root_fs->is_case_sensitive) {
+        return klib::strcmp(s1, s2);
+    } else {
+        while (*s1 && *s2 && to_lower(*s1) == to_lower(*s2)) {
+            s1++;
+            s2++;
+        }
+        if (*s1 == '\0' && *s2 == '\0') return 0;
+        if (*s1 != '\0' && *s2 == '\0') return -1;
+        if (*s1 == '\0' && *s2 != '\0') return +1;
+        
+        return *s1 - *s2;
+    }
+}
+
+static bool fs_starts_with(char const* str, char const* prefix)
+{
+    while (*prefix != '\0') {
+        if (*str == '\0' || to_lower(*str) != to_lower(*prefix))
+            return false;
+        ++str;
+        ++prefix;
+    }
+
+    return true;
+}
+
 void fs_set_root(Filesystem* fs)
 {
     kassert(fs != nullptr);
@@ -42,16 +76,6 @@ static Error fs_get_directory_entry(Filesystem& fs, char const* path, DirectoryE
         return Success;
     }
 
-    auto const& starts_with = [](char const* str, char const* prefix) {
-        while (*prefix != '\0') {
-            if (*str == '\0' || *str != *prefix)
-                return false;
-            ++str;
-            ++prefix;
-        }
-        return true;
-    };
-
     Directory dir;
     TRY(fs.root_directory(fs, dir));
 
@@ -69,7 +93,7 @@ static Error fs_get_directory_entry(Filesystem& fs, char const* path, DirectoryE
                 return err;
             }
 
-            if (starts_with(path + start_of_name, entry.name)) {
+            if (fs_starts_with(path + start_of_name, entry.name)) {
                 if (entry.type != DirectoryEntry::Type::Directory)
                     return NotADirectory;
 
@@ -91,7 +115,7 @@ static Error fs_get_directory_entry(Filesystem& fs, char const* path, DirectoryE
             return err;
         }
 
-        if (klib::strcmp(entry.name, path + start_of_name) == 0) {
+        if (fs_strcmp(entry.name, path + start_of_name) == 0) {
             dirent = entry;
             return Success;
         }

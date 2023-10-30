@@ -5,7 +5,7 @@ OBJCOPY=arm-none-eabi-objcopy
 
 CXXFLAGS=-mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc
 CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT)
-CXXFLAGS+=-fno-exceptions -fno-rtti -std=c++2a
+CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
 QEMU:=qemu-system-arm

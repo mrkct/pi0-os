@@ -89,6 +89,7 @@ static Error init(Filesystem& fs)
 {
     static_assert(sizeof(fat32::BiosParameterBlock) == SECTOR_SIZE, "BPB size must be equal to sector size");
 
+    fs.is_case_sensitive = false;
     Fat32RuntimeInfo info;
 
     TRY(READ_SECTOR(fs, 0, reinterpret_cast<uint8_t*>(&info.bpb)));

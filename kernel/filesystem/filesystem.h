@@ -22,6 +22,7 @@ struct Filesystem {
     Error (*open_directory_entry)(DirectoryEntry&, Directory&);
     Error (*read)(File&, uint8_t* buffer, size_t offset, size_t size, size_t& bytes_read);
 
+    bool is_case_sensitive = true;
     Storage* storage;
     void* impl_data;
 };
