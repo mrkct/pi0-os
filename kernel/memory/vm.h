@@ -19,7 +19,7 @@ Error vm_init_kernel_address_space();
 
 Error vm_create_address_space(struct AddressSpace&);
 
-Error vm_map(struct AddressSpace&, struct PhysicalPage*, uintptr_t);
+Error vm_map(struct AddressSpace&, struct PhysicalPage*, uintptr_t, PageAccessPermissions);
 
 Error vm_map_mmio(struct AddressSpace&, uintptr_t phys_addr, uintptr_t virt_addr, size_t size);
 

@@ -39,7 +39,7 @@ public:
 
         for (size_t i = 0; i < consecutive_entries_required; i++) {
             auto& entry = g_temp_mappings_lvl2_table[idx + i];
-            entry.small_page = SmallPageEntry::make_entry(phys_addr + i * _4KB);
+            entry.small_page = SmallPageEntry::make_entry(phys_addr + i * _4KB, PageAccessPermissions::PriviledgedOnly);
             invalidate_tlb_entry(areas::temp_mappings.start + (idx + i) * _4KB);
         }
         m_stored_range_start = idx;
@@ -142,12 +142,12 @@ Error vm_create_address_space(struct AddressSpace& as)
     // it must be always be accessible or we risk a fault loop (the CPU will try to jump to the
     // vector table, but it will fault because it's not mapped, so it will try to jump to the
     // vector table and so on)
-    lvl1_table[0].section = SectionEntry::make_entry(0x00000000);
+    lvl1_table[0].section = SectionEntry::make_entry(0x00000000, PageAccessPermissions::PriviledgedOnly);
 
     return Success;
 }
 
-static Error vm_map_page(FirstLevelEntry* root_table, uintptr_t phys_addr, uintptr_t virt_addr)
+static Error vm_map_page(FirstLevelEntry* root_table, uintptr_t phys_addr, uintptr_t virt_addr, PageAccessPermissions permissions)
 {
     auto& lvl1_entry = root_table[lvl1_index(virt_addr)];
     if (lvl1_entry.section.identifier == SECTION_ENTRY_ID)
@@ -181,26 +181,26 @@ static Error vm_map_page(FirstLevelEntry* root_table, uintptr_t phys_addr, uintp
     if (lvl2_entry.raw != 0)
         panic("vm_map_page: mapping already exists at %p (currenly mapped to %p)", virt_addr, lvl2_entry.small_page.base_address());
 
-    lvl2_entry.small_page = SmallPageEntry::make_entry(phys_addr);
+    lvl2_entry.small_page = SmallPageEntry::make_entry(phys_addr, permissions);
 
     invalidate_tlb_entry(virt_addr);
     return Success;
 }
 
-static Error vm_map_page(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t virt_addr)
+static Error vm_map_page(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t virt_addr, PageAccessPermissions permissions)
 {
     if (areas::higher_half.contains(virt_addr))
-        return vm_map_page(_kernel_translation_table, phys_addr, virt_addr);
+        return vm_map_page(_kernel_translation_table, phys_addr, virt_addr, permissions);
 
     TemporarilyMappedRange lvl1_table { page2addr(as.ttbr0_page), LVL1_TABLE_SIZE };
-    TRY(vm_map_page(lvl1_table.as_ptr<FirstLevelEntry*>(), phys_addr, virt_addr));
+    TRY(vm_map_page(lvl1_table.as_ptr<FirstLevelEntry*>(), phys_addr, virt_addr, permissions));
 
     return Success;
 }
 
-Error vm_map(struct AddressSpace& as, struct PhysicalPage* page, uintptr_t virt_addr)
+Error vm_map(struct AddressSpace& as, struct PhysicalPage* page, uintptr_t virt_addr, PageAccessPermissions permissions)
 {
-    TRY(vm_map_page(as, page2addr(page), virt_addr));
+    TRY(vm_map_page(as, page2addr(page), virt_addr, permissions));
     page->ref_count++;
     return Success;
 }
@@ -209,7 +209,7 @@ Error vm_map_mmio(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t virt_a
 {
     auto pages_to_map = klib::round_up<size_t>(size, _4KB) / _4KB;
     for (size_t i = 0; i < pages_to_map; i++) {
-        TRY(vm_map_page(as, phys_addr + i * _4KB, virt_addr + i * _4KB));
+        TRY(vm_map_page(as, phys_addr + i * _4KB, virt_addr + i * _4KB, PageAccessPermissions::PriviledgedOnly));
     }
 
     return Success;

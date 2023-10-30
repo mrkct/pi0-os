@@ -18,7 +18,7 @@ static Error verify_identification(Elf32_Ehdr const *header)
     return Success;
 }
 
-Error try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSpace& as, uintptr_t &entry_point)
+Error try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSpace& as, uintptr_t &entry_point, bool is_kernel_task)
 {
     if (binary_size < sizeof(Elf32_Ehdr))
         return BadParameters;
@@ -48,7 +48,10 @@ Error try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSpace& 
                 struct PhysicalPage* page;
                 // FIXME: Rollback if this fails
                 MUST(physical_page_alloc(PageOrder::_4KB, page));
-                MUST(vm_map(as, page, addr));
+                // TODO: Would be cool to change permissions to read-only if the header says so
+                MUST(vm_map(as, page, addr, 
+                    is_kernel_task ? PageAccessPermissions::PriviledgedOnly : PageAccessPermissions::UserFullAccess
+                ));
 
                 vm_memset(as, addr, 0, 4 * _1KB);
             }

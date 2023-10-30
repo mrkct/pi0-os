@@ -33,7 +33,7 @@ _start:
     lsl r1, r1, #2                          // Multiply by 4 to get the index in the translation table
     add r1, r0, r1                          // Add the base address of the translation table
 
-    movs r2, #0x2                           // Descriptor with: 1MB section
+    ldr r2, =0x602                          // "Section" to 0x0 with RW permissions for domain 0
     movs r3, #0                             // r3 will be the counter of the loop
 1:
     str r2, [r0]
@@ -55,7 +55,8 @@ _start:
     lsr r1, r1, #20                         // Get the index in the translation table
     lsl r1, r1, #2                          // Multiply by 4 to get the index in the translation table
     add r1, r0, r1                          // Add the base address of the translation table
-    movs r0, #0x20000002                    // Descriptor with: 1MB section
+    
+    ldr r0, =0x20000602                     // "Section" to 0x2000000 with RW permissions for domain 0
     movs r3, #0                             // r3 will be the counter of the loop
 1:
     str r0, [r1]                            // Write the descriptor
@@ -72,7 +73,7 @@ _start:
     mcr p15, 0, r0, c8, c7, 0               // Write "Invalidate Unified TLB Register"
     mcr p15, 0, r0, c7, c10, 4              // Write "Data Memory Barrier Register"
 
-    movs r0, #0xffffffff                    // All domains set to "Manager"(no permission checking)
+    movs r0, #0x00000001                    // Only setup domain zero to "Client" (use permission checking)
     mcr p15, 0, r0, c3, c0, 0               // Write "Domain Access Control Register"
 
     ldr r0, =(_kernel_translation_table - 0xe0000000)

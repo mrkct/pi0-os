@@ -101,15 +101,25 @@ static Error prepare_new_task(Task*& out_task, char const* name, bool is_kernel_
         struct PhysicalPage* task_stack_page;
         // FIXME: Rollback if this fails
         MUST(physical_page_alloc(PageOrder::_4KB, task_stack_page));
-        TRY(vm_map(task->address_space, task_stack_page, areas::user_stack.start + i * _4KB));
+        TRY(vm_map(
+            task->address_space,
+            task_stack_page,
+            areas::user_stack.start + i * _4KB,
+            is_kernel_task ? PageAccessPermissions::PriviledgedOnly : PageAccessPermissions::UserFullAccess
+        ));
     }
 
     task->exit_code = 0;
     task->task_state = TaskState::Running;
 
     task->state.task_sp = static_cast<uint32_t>((areas::user_stack.end - 8) & 0xffffffff);
-    task->state.spsr = 0x1f; // System mode. FIXME: Disable Fast IRQ also?
-
+    if (is_kernel_task) {
+        // System mode
+        task->state.spsr = 0x1f;
+    } else {
+        // User mode
+        task->state.spsr = 0x10;
+    }
     klib::strncpy_safe(task->name, name, sizeof(task->name));
     task->pid = g_next_free_pid++;
     task->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
@@ -144,7 +154,7 @@ Error task_load_user_elf(Task*& task, const char *name, uint8_t const *elf_binar
     TRY(prepare_new_task(task, name, false));
     
     uintptr_t entry;
-    TRY(try_load_elf(elf_binary, elf_binary_size, task->address_space, entry));
+    TRY(try_load_elf(elf_binary, elf_binary_size, task->address_space, entry, false));
     task->state.lr = entry;
 
     g_running_tasks_queue.append(task);

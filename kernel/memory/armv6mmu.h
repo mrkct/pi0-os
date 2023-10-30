@@ -23,6 +23,13 @@ static inline void invalidate_tlb_entry(uintptr_t virt_addr)
     asm volatile("mcr p15, 0, %0, c8, c7, 1" ::"r"(virt_addr));
 }
 
+enum class PageAccessPermissions: uint8_t {
+    Unmapped = 0b00,
+    PriviledgedOnly = 0b01,
+    UserReadOnly = 0b10,
+    UserFullAccess = 0b11
+};
+
 static constexpr uint32_t COARSE_PAGE_TABLE_ENTRY_ID = 0b01;
 struct CoarsePageTableEntry {
     uint32_t identifier : 2;
@@ -61,7 +68,7 @@ struct SectionEntry {
 
     uintptr_t base_address() const { return base_addr << 20; }
 
-    static SectionEntry make_entry(uintptr_t addr)
+    static SectionEntry make_entry(uintptr_t addr, PageAccessPermissions permissions)
     {
         return {
             .identifier = SECTION_ENTRY_ID,
@@ -70,7 +77,7 @@ struct SectionEntry {
             .sbz = 0,
             .domain = 0,
             .impl_defined = 0,
-            .access_permission = 0b00,
+            .access_permission = static_cast<uint8_t>(permissions),
             .tex = 0b000,
             .sbz2 = 0,
             .base_addr = ((uint32_t)addr >> 20) & 0xfff,
@@ -92,16 +99,16 @@ struct SmallPageEntry {
 
     uintptr_t base_address() const { return address << 12; }
 
-    static SmallPageEntry make_entry(uintptr_t address)
+    static SmallPageEntry make_entry(uintptr_t address, PageAccessPermissions permissions)
     {
         return {
             .identifier = SMALL_PAGE_ENTRY_ID,
             .bufferable_writes = 0,
             .cachable = 0,
-            .ap0 = 0b00,
-            .ap1 = 0b00,
-            .ap2 = 0b00,
-            .ap3 = 0b00,
+            .ap0 = static_cast<uint8_t>(permissions),
+            .ap1 = static_cast<uint8_t>(permissions),
+            .ap2 = static_cast<uint8_t>(permissions),
+            .ap3 = static_cast<uint8_t>(permissions),
             .address = ((uint32_t)address >> 12) & 0xfffff,
         };
     }
