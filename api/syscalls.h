@@ -1,9 +1,8 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-
 
 #define SYSCALL_VECTOR 0x10
 
@@ -38,13 +37,15 @@ typedef enum SyscallIdentifiers {
 } SyscallIdentifiers;
 
 typedef enum OpenFileModes {
-    MODE_READ   = 1 << 0,
-    MODE_WRITE  = 1 << 1,
+    MODE_READ = 1 << 0,
+    MODE_WRITE = 1 << 1,
     MODE_APPEND = 2 << 2
 } OpenFileModes;
 
 typedef enum SeekModes {
-    Start, Current, End
+    Start,
+    Current,
+    End
 } SeekModes;
 
 static inline int syscall(SyscallIdentifiers id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
@@ -59,7 +60,7 @@ static inline int syscall(SyscallIdentifiers id, uint32_t arg0, uint32_t arg1, u
                  "svc %7\n"
                  "mov %0, r7\n"
                  : "=r"(result)
-                 : "r"((uint32_t) (id)), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "i"(SYSCALL_VECTOR)
+                 : "r"((uint32_t)(id)), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "i"(SYSCALL_VECTOR)
                  : "r0", "r1", "r2", "r3", "r4", "r7", "memory");
     return result;
 }

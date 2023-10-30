@@ -23,7 +23,7 @@ static inline void invalidate_tlb_entry(uintptr_t virt_addr)
     asm volatile("mcr p15, 0, %0, c8, c7, 1" ::"r"(virt_addr));
 }
 
-enum class PageAccessPermissions: uint8_t {
+enum class PageAccessPermissions : uint8_t {
     Unmapped = 0b00,
     PriviledgedOnly = 0b01,
     UserReadOnly = 0b10,
