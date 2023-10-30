@@ -188,7 +188,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     Task *A, *B;
 
     MUST(task_create_kernel_thread(A, "A", task_A));
-    MUST(task_load_user_elf_from_path(B, "/HELLO.EXE"));
+    MUST(task_load_user_elf_from_path(B, "/bina/hello"));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later
