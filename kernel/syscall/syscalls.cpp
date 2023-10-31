@@ -9,6 +9,8 @@
 #include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
 #include <kernel/timer.h>
+#include <kernel/device/framebuffer.h>
+
 
 namespace kernel {
 
@@ -220,6 +222,19 @@ static SyscallResult sys$seek_file(int fd, int32_t offset, uint32_t mode_u32)
     return file->current_offset;
 }
 
+static SyscallResult sys$blit_framebuffer(
+    uintptr_t user_framebuffer,
+    int32_t x, int32_t y,
+    uint32_t width, uint32_t height
+)
+{
+    // NOTE: We can convert the user's pointer to a direct one without calling vm_copy_from_user
+    //       because we're sure the current address space is the same as the users
+    blit_to_main_framebuffer(reinterpret_cast<uint32_t*>(user_framebuffer), x, y, width, height);
+
+    return Success;
+}
+
 void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t& r3, uint32_t& r4)
 {
     SyscallResult result = { 0 };
@@ -281,6 +296,9 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
     case SyscallIdentifiers::SYS_GetBrk:
         break;
     case SyscallIdentifiers::SYS_SetBrk:
+        break;
+    case SyscallIdentifiers::SYS_BlitFramebuffer:
+        result = sys$blit_framebuffer(static_cast<uintptr_t>(r0), static_cast<intptr_t>(r1), static_cast<int32_t>(r2), r3, r4);
         break;
     default:
         result = InvalidSystemCall;
