@@ -2,7 +2,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <syscalls.h>
+#include <api/syscalls.h>
 
 
 void _exit(int status)
@@ -10,13 +10,14 @@ void _exit(int status)
     syscall(SYS_Exit, status, 0, 0, 0, 0);
 }
 
-static uint8_t s_heap[4096];
+static uint8_t s_heap[16 * 1024 * 1024];
 static uint8_t *s_brk = &s_heap;
 
 void* _sbrk(int incr)
 {
+    uint8_t *brk = s_brk;
     s_brk += incr;
-    return s_brk;
+    return brk;
 }
 
 int _fstat(int file, struct stat* st)
