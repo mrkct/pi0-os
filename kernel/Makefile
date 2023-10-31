@@ -4,7 +4,7 @@ CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
 
 CXXFLAGS=-mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc
-CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT)
+CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT) -I../include
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
@@ -34,6 +34,7 @@ SOURCES=\
 	$(LIBS_SOURCES) \
 	kernel/datetime.cpp \
 	kernel/device/gpio.cpp \
+	kernel/device/framebuffer.cpp \
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \

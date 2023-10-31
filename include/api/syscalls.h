@@ -34,6 +34,8 @@ typedef enum SyscallIdentifiers {
 
     SYS_GetBrk = 60,
     SYS_SetBrk = 61,
+
+    SYS_BlitFramebuffer = 80,
 } SyscallIdentifiers;
 
 typedef enum OpenFileModes {
