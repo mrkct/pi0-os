@@ -25,13 +25,6 @@ struct PhysicalPage* g_free_pages_lists[] = {
     [static_cast<size_t>(PageOrder::_16KB)] = nullptr,
 };
 
-static uintptr_t physical_addr_where_kernel_ends()
-{
-    auto kernel_end = reinterpret_cast<uintptr_t>(__kernel_end);
-    kassert(kernel_end % _1MB == 0);
-    return kernel_end - areas::kernel.start;
-}
-
 static PageOrder bigger_order(PageOrder order)
 {
     switch (order) {
