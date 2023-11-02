@@ -1,6 +1,14 @@
 #include <stdlib.h>
+#include <string.h>
 #include <api/syscalls.h>
 #include "libgfx.h"
+
+
+#define PSF_MAGIC 0x864ab572
+
+extern const uint8_t _resource_default_psf_font[];
+extern const size_t _resource_default_psf_font_size;
+static Font g_default_font;
 
 
 Window open_window(const char *title, int width, int height)
@@ -44,7 +52,7 @@ void draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color
     }
 }
 
-static void set_pixel(Window* window, int x, int y, uint32_t color)
+inline static void set_pixel(Window* window, int x, int y, uint32_t color)
 {
     if (x >= 0 && x < window->width && y >= 0 && y < window->height) {
         window->framebuffer[y * window->width + x] = color;
@@ -123,5 +131,58 @@ void draw_line(Window *window, int x1, int y1, int x2, int y2, int thickness, ui
             err = err + dx;
             y = y + sy;
         }
+    }
+}
+
+Font *get_default_font(void)
+{
+    if (g_default_font.header.magic != PSF_MAGIC) {
+        load_psf_font(_resource_default_psf_font, _resource_default_psf_font_size, &g_default_font);
+    }
+
+    return &g_default_font;
+}
+
+int load_psf_font(uint8_t const* data, size_t size, Font *font)
+{
+    if (size < sizeof(font->header))
+        return -1;
+
+    memcpy(&font->header, data, sizeof(font->header));
+    if (font->header.magic != PSF_MAGIC)
+        return -1;
+
+    font->data = data;
+    font->size = size;
+
+    return 0;
+}
+
+void draw_char(Window *window, Font *font, char c, int x, int y, uint32_t color)
+{
+    if (c < 0) return;
+    if (c >= font->header.num_glyphs) return;
+    if (c < ' ' || c > '~') return;
+
+    uint8_t const* start_of_glyph = &font->data[sizeof(font->header) + font->header.bytes_per_glyph * c];
+
+    size_t glyph_width = x + 8 < window->width ? 8 : window->width - x;
+    size_t glyph_height = y + font->header.height < window->height ? font->header.height : window->height - y;
+
+    for (size_t glyph_y = 0; glyph_y < glyph_height; glyph_y++) {
+        uint8_t glyph_row = start_of_glyph[glyph_y];
+        for (size_t glyph_x = 0; glyph_x < glyph_width; glyph_x++) {
+            if (glyph_row & (1 << (7 - glyph_x)))
+                window->framebuffer[(y + glyph_y) * window->width + x + glyph_x] = color;
+        }
+    }
+}
+
+void draw_text(Window *window, Font *font, const char *text, int x, int y, uint32_t color)
+{
+    while (*text && x < window->width) {
+        draw_char(window, font, *text, x, y, color);
+        text++;
+        x += 8;
     }
 }

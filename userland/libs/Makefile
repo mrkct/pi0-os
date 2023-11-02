@@ -1,6 +1,10 @@
 include ../toolchain.mk 
 
-OBJECTS = libdatetime.c.o libgfx.c.o
+OBJECTS = \
+	libdatetime.c.o\
+	libgfx.c.o \
+	default_font.c.o \
+	libsstring.c.o
 
 .PHONY: clean install
 
