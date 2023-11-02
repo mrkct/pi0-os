@@ -2,7 +2,7 @@ include ../toolchain.mk
 
 OBJECTS = main.c.o
 
-.PHONY: clean install
+.PHONY: clean install clock
 
 all: clock
 

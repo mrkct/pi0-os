@@ -58,6 +58,11 @@ void draw_clock(Window *window, DateTime *datetime)
         1, COL_BLACK
     );
 
+    char text[80];
+    sprintf(text, "The current date is: %d/%d/%d", datetime->day, datetime->month, datetime->year - 2000);
+    draw_text(window, get_default_font(), text, 6, 8, COL_BLACK);
+    printf("%s\n", text);
+
     refresh_window(window);
 }
 
@@ -66,7 +71,7 @@ int main(int argc, char **argv)
     Window window = open_window("Clock", 240, 240);
     DateTime datetime;
     get_datetime(&datetime);
- 
+
     printf("Current time: %d:%d:%d\n", datetime.hour, datetime.minute, datetime.second);
     while (true) {
         draw_clock(&window, &datetime);
