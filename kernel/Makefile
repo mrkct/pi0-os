@@ -26,8 +26,6 @@ endif
 LIBS_SOURCES=\
 	kernel/lib/libc/string.cpp \
 	kernel/lib/memory.cpp \
-	kernel/lib/psf/default_font.cpp \
-	kernel/lib/psf/psf.cpp \
 	kernel/lib/string.cpp \
 
 SOURCES=\
@@ -38,7 +36,6 @@ SOURCES=\
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \
-	kernel/device/videoconsole.cpp \
 	kernel/device/videocore.cpp \
 	kernel/filesystem/fat32/fat32.cpp \
 	kernel/filesystem/filesystem.cpp \

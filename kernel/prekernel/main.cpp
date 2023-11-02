@@ -3,7 +3,6 @@
 #include <kernel/device/sd.h>
 #include <kernel/device/systimer.h>
 #include <kernel/device/uart.h>
-#include <kernel/device/videoconsole.h>
 #include <kernel/device/videocore.h>
 #include <kernel/filesystem/fat32/fat32.h>
 #include <kernel/interrupt.h>
@@ -18,7 +17,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static kernel::VideoConsole vc;
 
 static void __attribute__((unused)) fs_tree(kernel::Filesystem& fs)
 {
@@ -151,9 +149,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 
     Framebuffer &fb = get_main_framebuffer();
     MUST(allocate_framebuffer(fb));
-
-    MUST(videoconsole_init(vc, fb, 24, 32));
-    kprintf_video_init(vc);
 
     interrupt_init();
 

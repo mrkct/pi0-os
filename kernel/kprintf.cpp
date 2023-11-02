@@ -1,5 +1,4 @@
 #include <kernel/device/uart.h>
-#include <kernel/device/videoconsole.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
 #include <kernel/locking/reentrant.h>
@@ -187,8 +186,6 @@ size_t kprintf(char const* format, ...)
     auto uart = uart_device();
     for (size_t i = 0; i < written; i++) {
         uart.write(&uart.data, (unsigned char)buffer[i]);
-        if (g_video_console != nullptr)
-            videoconsole_putc(*g_video_console, buffer[i]);
     }
     release(g_kprintf_lock);
 
