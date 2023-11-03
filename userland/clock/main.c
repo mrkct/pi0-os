@@ -13,7 +13,7 @@ void draw_clock(Window *window, DateTime *datetime)
     const int SECONDS_HAND_LENGTH = 72;
 
     const int center_x = window->width / 2;
-    const int center_y = window->height / 2;
+    const int center_y = window->height / 2 - 4;
 
     draw_filled_rect(window, 0, 0, window->width, window->height, COL_WHITE);
     draw_circle(window, center_x, center_y, CLOCK_RADIUS, COL_BLACK);
@@ -22,12 +22,12 @@ void draw_clock(Window *window, DateTime *datetime)
     for (int i = 0; i < 12 * 5; i++) {
         bool is_thick = i % 5 == 0;
 
-        int x1 = window->width / 2 + cos(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16);
-        int y1 = window->width / 2 + sin(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16);
+        int x1 = center_x + cos(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16);
+        int y1 = center_y + sin(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16);
 
         const int length = 12;
-        int x2 = window->width / 2 + cos(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16 - length);
-        int y2 = window->width / 2 + sin(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16 - length);
+        int x2 = center_x + cos(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16 - length);
+        int y2 = center_y + sin(deg2rad(angle_step * i)) * (CLOCK_RADIUS - 16 - length);
 
         draw_line(window, x1, y1, x2, y2, is_thick ? 2 : 1, COL_BLACK);
     }
@@ -59,7 +59,7 @@ void draw_clock(Window *window, DateTime *datetime)
     );
 
     char text[80];
-    sprintf(text, "The current date is: %d/%d/%d", datetime->day, datetime->month, datetime->year - 2000);
+    sprintf(text, "The current date is: %d-%d-%d", datetime->day, datetime->month, datetime->year);
     draw_text(window, get_default_font(), text, 6, 8, COL_BLACK);
     printf("%s\n", text);
 
@@ -68,7 +68,8 @@ void draw_clock(Window *window, DateTime *datetime)
 
 int main(int argc, char **argv)
 {
-    Window window = open_window("Clock", 240, 240);
+    Window window = open_window("Clock", 240, 240, true);
+
     DateTime datetime;
     get_datetime(&datetime);
 
