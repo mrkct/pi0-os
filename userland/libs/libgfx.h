@@ -5,10 +5,10 @@
 
 
 enum {
-    COL_BLACK = 0x00000000,
-    COL_RED   = 0xff000000,
-    COL_GREEN = 0x00ff0000,
-    COL_BLUE  = 0x0000ff00,
+    COL_BLACK = 0xff000000,
+    COL_RED   = 0xff0000ff,
+    COL_GREEN = 0xff00ff00,
+    COL_BLUE  = 0xffff0000,
     COL_WHITE = 0xffffffff
 };
 
@@ -18,6 +18,7 @@ typedef struct Window {
     uint32_t *framebuffer;
     int x, y;
     int width, height;
+    int y_offset;
 } Window;
 
 typedef struct PSFFont {
@@ -37,11 +38,13 @@ typedef struct PSFFont {
 } Font;
 
 
-Window open_window(const char *title, int width, int height);
+Window open_window(const char *title, int width, int height, bool show_titlebar);
 
 void refresh_window(Window*);
 
 void draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color);
+
+void draw_outlined_rect(Window *window, int x, int y, int w, int h, int thickness, uint32_t color);
 
 void draw_circle(Window *window, int x, int y, int radius, uint32_t color);
 

@@ -6,23 +6,52 @@
 
 #define PSF_MAGIC 0x864ab572
 
+
+#define TITLEBAR_HEIGHT             24
+#define TITLEBAR_BORDER_COLOR       0xff300f0e
+#define TITLEBAR_BACKGROUND_COLOR   0xff521910
+#define TITLEBAR_TEXT_COLOR         COL_WHITE
+
 extern const uint8_t _resource_default_psf_font[];
 extern const size_t _resource_default_psf_font_size;
 static Font g_default_font;
 
+static void draw_titlebar(Window *window);
+static void _draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color);
+static void _draw_outlined_rect(Window *window, int x, int y, int w, int h, int thickness, uint32_t color);
+static void _draw_circle(Window *window, int x, int y, int radius, uint32_t color);
+static void _draw_line(Window *window, int x1, int y1, int x2, int y2, int thickness, uint32_t color);
+static void _draw_char(Window *window, Font *font, char c, int x, int y, uint32_t color);
+static void _draw_text(Window *window, Font *font, const char *text, int x, int y, uint32_t color);
 
-Window open_window(const char *title, int width, int height)
+inline static void set_pixel(Window* window, int x, int y, uint32_t color)
 {
-    uint32_t *framebuffer = malloc(width * height * sizeof(uint32_t));
+    if (x >= 0 && x < window->width && y >= 0 && y < window->height) {
+        window->framebuffer[y * window->width + x] = color;
+    }
+}
 
-    return (Window) {
+Window open_window(const char *title, int width, int height, bool show_titlebar)
+{
+    int alloc_height = height;
+    if (show_titlebar)
+        alloc_height += TITLEBAR_HEIGHT;
+
+    uint32_t *framebuffer = malloc(width * alloc_height * sizeof(uint32_t));
+
+    Window window = (Window) {
         .window_title = title,
         .framebuffer = framebuffer,
         .x = 0,
         .y = 0,
+        .y_offset = show_titlebar ? TITLEBAR_HEIGHT : 0,
         .width = width,
         .height = height
     };
+    if (show_titlebar)
+        draw_titlebar(&window);
+    
+    return window;
 }
 
 void refresh_window(Window *window)
@@ -33,16 +62,16 @@ void refresh_window(Window *window)
         (uint32_t) window->x,
         (uint32_t) window->y,
         (uint32_t) window->width,
-        (uint32_t) window->height
+        (uint32_t) window->height + window->y_offset
     );
 }
 
-void draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color)
+static void _draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color)
 {
     int x1 = MAX(0, MIN(x, x + w));
     int x2 = MIN(window->width, MAX(x, x + w));
     int y1 = MAX(0, MIN(y, y + h));
-    int y2 = MAX(window->height, MAX(y, y + w));
+    int y2 = MIN(window->height, MAX(y, y + w));
 
     for (int _y = y1; _y <= y2; _y++) {
         uint32_t *fb = &window->framebuffer[_y * window->width + x1];
@@ -52,14 +81,39 @@ void draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color
     }
 }
 
-inline static void set_pixel(Window* window, int x, int y, uint32_t color)
+void draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color)
 {
-    if (x >= 0 && x < window->width && y >= 0 && y < window->height) {
-        window->framebuffer[y * window->width + x] = color;
+    _draw_filled_rect(window, x, y + window->y_offset, w, h, color);
+}
+
+static void _draw_outlined_rect(Window *window, int x, int y, int w, int h, int thickness, uint32_t color)
+{
+    int x1 = MAX(0, MIN(x, x + w));
+    int x2 = MIN(window->width, MAX(x, x + w));
+    int y1 = MAX(0, MIN(y, y + h));
+    int y2 = MAX(window->height, MAX(y, y + w));
+
+    for (int i = 0; i < thickness; i++) {
+        for (int _x = x1; _x <= x2; _x++) {
+            set_pixel(window, _x, y1 + i, color);
+            set_pixel(window, _x, y2 - i, color);
+        }
+    }
+
+    for (int i = 0; i < thickness; i++) {
+        for (int _y = y1; _y <= y2; _y++) {
+            set_pixel(window, x1 + i, _y, color);
+            set_pixel(window, x2 - i, _y, color);
+        }
     }
 }
 
-void draw_circle(Window *window, int x, int y, int radius, uint32_t color)
+void draw_outlined_rect(Window *window, int x, int y, int w, int h, int thickness, uint32_t color)
+{
+    _draw_outlined_rect(window, x, y + window->y_offset, w, h, thickness, color);
+}
+
+static void _draw_circle(Window *window, int x, int y, int radius, uint32_t color)
 {
     int cx = radius;
     int cy = 0;
@@ -86,7 +140,12 @@ void draw_circle(Window *window, int x, int y, int radius, uint32_t color)
     }
 }
 
-void draw_line(Window *window, int x1, int y1, int x2, int y2, int thickness, uint32_t color)
+void draw_circle(Window *window, int x, int y, int radius, uint32_t color)
+{
+    _draw_circle(window, x, y + window->y_offset, radius, color);
+}
+
+static void _draw_line(Window *window, int x1, int y1, int x2, int y2, int thickness, uint32_t color)
 {
     int dx = abs(x2 - x1);
     int dy = abs(y2 - y1);
@@ -134,6 +193,11 @@ void draw_line(Window *window, int x1, int y1, int x2, int y2, int thickness, ui
     }
 }
 
+void draw_line(Window *window, int x1, int y1, int x2, int y2, int thickness, uint32_t color)
+{
+    _draw_line(window, x1, y1 + window->y_offset, x2, y2 + window->y_offset, thickness, color);
+}
+
 Font *get_default_font(void)
 {
     if (g_default_font.header.magic != PSF_MAGIC) {
@@ -158,7 +222,7 @@ int load_psf_font(uint8_t const* data, size_t size, Font *font)
     return 0;
 }
 
-void draw_char(Window *window, Font *font, char c, int x, int y, uint32_t color)
+static void _draw_char(Window *window, Font *font, char c, int x, int y, uint32_t color)
 {
     if (c < 0) return;
     if (c >= font->header.num_glyphs) return;
@@ -178,11 +242,28 @@ void draw_char(Window *window, Font *font, char c, int x, int y, uint32_t color)
     }
 }
 
-void draw_text(Window *window, Font *font, const char *text, int x, int y, uint32_t color)
+void draw_char(Window *window, Font *font, char c, int x, int y, uint32_t color)
+{
+    _draw_char(window, font, c, x, y + window->y_offset, color);
+}
+
+static void _draw_text(Window *window, Font *font, const char *text, int x, int y, uint32_t color)
 {
     while (*text && x < window->width) {
-        draw_char(window, font, *text, x, y, color);
+        _draw_char(window, font, *text, x, y, color);
         text++;
         x += 8;
     }
+}
+
+void draw_text(Window *window, Font *font, const char *text, int x, int y, uint32_t color)
+{
+    _draw_text(window, font, text, x, y + window->y_offset, color);
+}
+
+static void draw_titlebar(Window *window)
+{
+    _draw_outlined_rect(window, 0, 0, window->width, TITLEBAR_HEIGHT, 2, TITLEBAR_BORDER_COLOR);
+    _draw_filled_rect(window, 3, 3, window->width - 3*2, TITLEBAR_HEIGHT - 3*2, TITLEBAR_BACKGROUND_COLOR);
+    _draw_text(window, get_default_font(), window->window_title, 12, 10, COL_WHITE);
 }
