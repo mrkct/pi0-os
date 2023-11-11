@@ -1,9 +1,12 @@
 #include <kernel/device/gpio.h>
 #include <kernel/device/io.h>
+#include <kernel/interrupt.h>
+#include <kernel/device/keyboard.h>
 #include <kernel/device/uart.h>
 
 namespace kernel {
 
+static constexpr uint32_t  UART0_IRQ = 57;
 static constexpr uintptr_t UART0_BASE = bcm2835_bus_address_to_physical(0x7E201000);
 static constexpr uintptr_t REG_DR = UART0_BASE + 0x00;
 
@@ -28,6 +31,7 @@ static constexpr uintptr_t REG_TDR = UART0_BASE + 0x8C;
 Error uart_init(void*);
 Error uart_read(void*, uint8_t&);
 Error uart_write(void*, uint8_t);
+static void notify_keyboard_event(uint8_t data);
 
 struct UartData {
     bool initialized { false };
@@ -71,8 +75,9 @@ Error uart_init(void* data)
     static constexpr uint32_t FIFO_ENABLED = 1 << 4;
     iowrite32<uint32_t>(REG_LCRH, FIFO_ENABLED | WORD_LENGTH_EIGHT_BITS);
 
-    // 6. Mask all interrupts
-    iowrite32<uint32_t>(REG_IMSC, 0x7FF);
+    // 6. Enable the "receive" interrupt
+    static constexpr uint32_t RECEIVE_IRQ_MASK = 1 << 4;
+    iowrite32<uint32_t>(REG_IMSC, RECEIVE_IRQ_MASK);
 
     // 7. Enable UART0, receive & transfer part of UART
     static constexpr uint32_t ENABLE_UART0 = 1 << 0;
@@ -80,7 +85,16 @@ Error uart_init(void* data)
     static constexpr uint32_t ENABLE_RECEIVE = 1 << 9;
     iowrite32<uint32_t>(REG_CR, ENABLE_UART0 | ENABLE_TRANSMIT | ENABLE_RECEIVE);
 
+    interrupt_install_irq2_handler(UART0_IRQ - 32, [](auto*) {
+        uint8_t data = ioread32<uint32_t>(REG_DR) & 0xff;
+        static constexpr uint32_t RECEIVE_IRQ_CLEAR = 1 << 4;
+        iowrite32(REG_ICR, RECEIVE_IRQ_CLEAR);
+
+        notify_keyboard_event(data);
+    });
+
     uart_data->initialized = true;
+
     return Success;
 }
 
@@ -110,6 +124,18 @@ Error uart_write(void* data, uint8_t c)
     iowrite32<uint32_t>(REG_DR, c);
 
     return Success;
+}
+
+static void notify_keyboard_event(uint8_t data)
+{
+    KeyEvent event = {
+        .character = data,
+        .keycode = char_to_keycode(data),
+        .press_state = true
+    };
+    g_keyboard_events.push(event);
+    event.press_state = false;
+    g_keyboard_events.push(event);
 }
 
 }

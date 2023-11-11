@@ -51,7 +51,9 @@ static void irq_handler(SuspendedTaskState* suspended_state)
     bool also_check_pending1 = basic & ONE_OR_MORE_BITS_SET_IN_PENDING1;
     bool also_check_pending2 = basic & ONE_OR_MORE_BITS_SET_IN_PENDING2;
 
-    for (int i = 0; i < 32; ++i) {
+    // We only care about the first 10 bits because the rest are repeated
+    // IRQs also readable from the "pending" registers
+    for (int i = 0; i < 10; ++i) {
         auto mask = 1 << i;
         if (mask == ONE_OR_MORE_BITS_SET_IN_PENDING1 || mask == ONE_OR_MORE_BITS_SET_IN_PENDING2)
             continue;
