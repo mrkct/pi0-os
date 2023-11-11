@@ -114,6 +114,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 {
     using namespace kernel;
 
+    interrupt_init();
     auto uart = uart_device();
 
     uart.init(uart.data);
@@ -150,15 +151,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     Framebuffer &fb = get_main_framebuffer();
     MUST(allocate_framebuffer(fb));
 
-    interrupt_init();
-
     MUST(kheap_init());
-
-    char* test;
-    MUST(kmalloc(1024, test));
-    for (int i = 0; i < 1024; ++i)
-        test[i] = 'a';
-    MUST(kfree(test));
 
     MUST(sdhc_init());
     if (sdhc_contains_card()) {
