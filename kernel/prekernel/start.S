@@ -84,6 +84,8 @@ _start:
     mcr p15, 0, r0, c2, c0, 2               // "Translation Table Base Control Register"
 
     mrc p15, 0, r0, c1, c0, 0               // Read "System Control Register"
+    ldr r1, =#0x400000                      // Set '[U]naligned Data Access Operations' enabled
+    orr r0, r0, r1                          // | Reason: https://gitlab.com/qemu-project/qemu/-/issues/1878
     orr r0, r0, #0x1                        // Set MMU Enable bit
     mcr p15, 0, r0, c1, c0, 0               // Write "System Control Register"
 
