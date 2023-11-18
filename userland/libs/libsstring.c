@@ -1,6 +1,18 @@
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "libsstring.h"
 
+
+bool string_startswith(const char *string, const char *prefix)
+{
+    while (*string && *prefix && *string == *prefix) {
+        string++;
+        prefix++;
+    }
+
+    return *prefix == '\0'; 
+}
 
 size_t string_split(const char *string, const char *divider, Range **ranges)
 {
@@ -27,4 +39,10 @@ size_t string_split(const char *string, const char *divider, Range **ranges)
     }
 
     return ranges_length;
+}
+
+void print_string_range(const char *str, Range range)
+{
+    for (size_t i = 0; i < range.length; i++)
+        putchar(str[range.start + i]);
 }

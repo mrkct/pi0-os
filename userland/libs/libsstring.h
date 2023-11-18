@@ -18,4 +18,6 @@ int string_compare_ranges(const char *a, Range a_range, const char *b, Range b_r
 
 int string_compare_to_range(const char *a, const char *b, Range b_range);
 
-static inline void free_range(Range *ranges) { free(ranges); }
+static inline void free_ranges(Range *ranges) { free(ranges); }
+
+void print_string_range(const char *str, Range range);
