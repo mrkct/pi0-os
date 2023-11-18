@@ -5,6 +5,13 @@
 #include <api/syscalls.h>
 
 
+static int sys_debuglog(char const *str, int len)
+{
+    if (0 == syscall(SYS_DebugLog, (uint32_t) str, len, 0, 0, 0))
+        return len;
+    return -1;
+}
+
 void _exit(int status)
 {
     syscall(SYS_Exit, status, 0, 0, 0, 0);
@@ -12,6 +19,8 @@ void _exit(int status)
 
 static uint8_t s_heap[16 * 1024 * 1024];
 static uint8_t *s_brk = &s_heap;
+int(*s_stdout_print_func)(char const *, int) = sys_debuglog;
+int(*s_stderr_print_func)(char const *, int) = sys_debuglog;
 
 void* _sbrk(int incr)
 {
@@ -89,8 +98,10 @@ int _close(int file)
 
 int _write(int file, char* ptr, int len)
 {
-    if (file == 1 || file == 2) {
-        return syscall(SYS_DebugLog, (uint32_t) ptr, len, 0, 0, 0);
+    if (file == 1) {
+        return s_stdout_print_func ? s_stdout_print_func(ptr, len) : -1;
+    } else if (file == 2) {
+        return s_stderr_print_func ? s_stderr_print_func(ptr, len) : -1;
     } else if (file == 0) {
         return -1;
     }
