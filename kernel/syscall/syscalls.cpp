@@ -10,6 +10,7 @@
 #include <kernel/task/scheduler.h>
 #include <kernel/timer.h>
 #include <kernel/device/framebuffer.h>
+#include <kernel/device/keyboard.h>
 
 
 namespace kernel {
@@ -235,6 +236,24 @@ static SyscallResult sys$blit_framebuffer(
     return Success;
 }
 
+static SyscallResult sys$poll_input(uint32_t queue_id, uintptr_t user_buffer)
+{
+    switch (queue_id) {
+    case 0: {
+        KeyEvent event;
+        if (!g_keyboard_events.pop(event))
+            return EndOfData;
+        
+        TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buffer, &event, sizeof(event)));
+        break;
+    }
+    default:
+        return NotFound;
+    }
+
+    return Success;
+}
+
 void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t& r3, uint32_t& r4)
 {
     SyscallResult result = { 0 };
@@ -285,7 +304,8 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
     case SyscallIdentifiers::SYS_Sleep:
         result = sys$sleep(r0);
         break;
-    case SyscallIdentifiers::SYS_Poll:
+    case SyscallIdentifiers::SYS_PollInput:
+        result = sys$poll_input(static_cast<uint32_t>(r0), static_cast<uintptr_t>(r1));
         break;
     case SyscallIdentifiers::SYS_Send:
         break;

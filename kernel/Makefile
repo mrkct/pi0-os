@@ -33,6 +33,7 @@ SOURCES=\
 	kernel/datetime.cpp \
 	kernel/device/gpio.cpp \
 	kernel/device/framebuffer.cpp \
+	kernel/device/keyboard.cpp \
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \
