@@ -35,6 +35,8 @@ typedef enum SyscallIdentifiers {
     SYS_GetBrk = 60,
     SYS_SetBrk = 61,
 
+    SYS_PollInput = 70,
+
     SYS_BlitFramebuffer = 80,
 } SyscallIdentifiers;
 
@@ -87,3 +89,9 @@ typedef struct Stat {
     bool is_directory;
     uint64_t size;
 } Stat;
+
+typedef struct KeyEvent {
+    char character;
+    uint32_t keycode;
+    bool press_state;
+} KeyEvent;
