@@ -8,5 +8,5 @@ void _my_start(void)
 
     const char *argv[] = {"hello.exe", "\0"};
     int result = main(1, argv);
-    exit(0);
+    exit(result);
 }

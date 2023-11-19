@@ -4,7 +4,7 @@ LD=arm-none-eabi-ld
 AR=arm-none-eabi-ar
 
 BSP_HERE := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-CFLAGS := -g \
+CFLAGS := -g -Wall -Wextra \
 	-fno-unwind-tables \
 	-T $(BSP_HERE)/bsp/linker.ld \
 	-mcpu=arm1176jzf-s \

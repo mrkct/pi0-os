@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -15,22 +18,35 @@ static int sys_debuglog(char const *str, int len)
 void _exit(int status)
 {
     syscall(SYS_Exit, status, 0, 0, 0, 0);
+    while(1);
 }
 
 static uint8_t s_heap[16 * 1024 * 1024];
-static uint8_t *s_brk = &s_heap;
+static uint8_t *s_brk = s_heap;
 int(*s_stdout_print_func)(char const *, int) = sys_debuglog;
 int(*s_stderr_print_func)(char const *, int) = sys_debuglog;
+
+static const char *OUT_OF_MEMORY_ERROR_MSG = "\n"
+    "@@@@@@@@@@@@@@@@@@@@@@@@@\n"
+    "@@@@@ OUT OF MEMORY @@@@@\n"
+    "@@@@@@@@@@@@@@@@@@@@@@@@@\n";
 
 void* _sbrk(int incr)
 {
     uint8_t *brk = s_brk;
+    if (s_brk + incr > s_heap + sizeof(s_heap)) {
+        write(2, OUT_OF_MEMORY_ERROR_MSG, sizeof(OUT_OF_MEMORY_ERROR_MSG));
+        exit(-1);
+        return NULL;
+    }
     s_brk += incr;
     return brk;
 }
 
 int _fstat(int file, struct stat* st)
 {
+    (void) file;
+    (void) st;
     st->st_mode = S_IFCHR;
 
     return 0;
@@ -38,26 +54,38 @@ int _fstat(int file, struct stat* st)
 
 int _isatty(int file)
 {
+    (void)file;
+
     return 1;
 }
 
 int _lseek(int file, int ptr, int dir)
 {
+    (void)file;
+    (void)ptr;
+    (void)dir;
+
     return 0;
 }
 
 int _link(char const* oldpath, char const* newpath)
 {
+    (void)oldpath;
+    (void)newpath;
+
     return -1;
 }
 
 int _unlink(char const* pathname)
 {
+    (void)pathname;
     return -1;
 }
 
 void _kill(int pid, int sig)
 {
+    (void)pid;
+    (void)sig;
     return;
 }
 
@@ -71,7 +99,9 @@ int _getpid(void)
 
 int _open(char const* pathname, int flags, int mode)
 {
-    if (flags & ~(O_RDONLY | O_RDWR | O_WRONLY | O_APPEND) != 0)
+    (void) mode;
+
+    if ((flags & ~(O_RDONLY | O_RDWR | O_WRONLY | O_APPEND)) != 0)
         return -1;
 
     int rc = syscall(
@@ -122,5 +152,8 @@ int _read(int file, char* ptr, int len)
 
 int mkdir(char const* pathname, mode_t mode)
 {
+    (void) pathname;
+    (void) mode;
+    
     return -1;
 }
