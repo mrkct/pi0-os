@@ -23,6 +23,14 @@ void vm_switch_address_space(struct AddressSpace& as)
     asm volatile("mcr p15, 0, %0, c2, c0, 0" ::"r"(page2addr(as.ttbr0_page)));
     g_current_address_space = as;
 }
+
+uintptr_t vm_read_current_ttbr0()
+{
+    uintptr_t ttbr0;
+    asm volatile("mrc p15, 0, %0, c2, c0, 0" : "=r"(ttbr0));
+    return ttbr0;
+}
+
 class TemporarilyMappedRange {
 public:
     TemporarilyMappedRange(uintptr_t phys_addr, size_t size)

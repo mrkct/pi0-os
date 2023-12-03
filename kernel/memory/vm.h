@@ -13,6 +13,8 @@ struct AddressSpace {
 
 struct AddressSpace& vm_current_address_space();
 
+uintptr_t vm_read_current_ttbr0();
+
 uintptr_t virt2phys(uintptr_t virt);
 
 Error vm_init_kernel_address_space();

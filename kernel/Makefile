@@ -47,6 +47,7 @@ SOURCES=\
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \
+	kernel/prekernel/early.cpp \
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \
 	kernel/prekernel/vector_table.S \
@@ -83,8 +84,8 @@ qemu-gdb-replay: Kernel snapshot-drive.qcow2
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
 	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
 
-kernel7.img: Kernel
-	$(OBJCOPY) Kernel -O binary kernel7.img
+kernel.img: Kernel
+	$(OBJCOPY) Kernel -O binary kernel.img
 
 Kernel: $(OBJS)
 	$(CXX) -T linker.ld -o Kernel $(OBJS) $(CXXFLAGS) -lgcc
