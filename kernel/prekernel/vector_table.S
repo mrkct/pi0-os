@@ -1,17 +1,7 @@
-.section ".vector_table.table", "a"
-vector_table:
-    ldr pc, =reset_trampoline
-    ldr pc, =undefined_instruction_trampoline
-    ldr pc, =software_interrupt_trampoline
-    ldr pc, =prefetch_abort_trampoline
-    ldr pc, =data_abort_trampoline
-    nop
-    ldr pc, =irq_trampoline
-    ldr pc, =fast_irq_trampoline
-
-.section ".vector_table.trampolines", "ax"
+.section ".text", "ax"
 .extern irq_and_exception_handler
 .macro TRAMPOLINE name, vector_offset
+.global \name
 \name :
 /*
     HACK: The lr register normally contains the address of the next instruction.

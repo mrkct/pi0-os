@@ -1,16 +1,44 @@
-.section ".prekernel.text", "ax"
-.globl _start
+.set KERN_LINK_ADDR, 0xe0000000
+
+.section ".text.start.boot", "ax"
+.global _start
 _start:
+#ifdef BOARD_RASPI2
+    // Shut off extra cores
+	mrc p15, 0, r5, c0, c0, 5
+	and r5, r5, #3
+	cmp r5, #0
+	bne boot_halt
+#endif
     // 1. The RPi firmware passes some useful info in r0, r1, r2
     //    so let's setup the stack to save them
-    ldr sp, =(_kernel_stack_end - 0xe0000000)
+    ldr sp, =(_kernel_stack_end - KERN_LINK_ADDR)
     push {r0, r1, r2}
 
-    // 2. Let's setup the MMU so we can start using the higher half kernel    
+    ldr r0, =boot_msg
+    bl boot_miniuart_puts
+
+    // 2. Copy the vector table to address 0.
+    //    We do this here because it's easier to access address 0
+    //    before the MMU is setup
+    //    NOTE: You cannot place data before 0x8000 in the binary,
+    //    otherwise or the RPi firmware will refuse to load it 
+    mov r0, #0
+    ldr r1, =vector_table_data_start
+    ldr r2, =vector_table_data_end
+1:
+    ldr r3, [r1]
+    str r3, [r0]
+    add r1, r1, #4
+    add r0, r0, #4
+    cmp r1, r2
+    bne 1b
+
+    // 3. Let's setup the MMU so we can start using the higher half kernel    
     
-    // 2.1 First, let's zero out the translation table
-    ldr r0, =(_kernel_translation_table - 0xe0000000)
-    ldr r1, =(_kernel_translation_table_end - 0xe0000000)
+    // 3.1 First, let's zero out the translation table
+    ldr r0, =(_kernel_translation_table - KERN_LINK_ADDR)
+    ldr r1, =(_kernel_translation_table_end - KERN_LINK_ADDR)
     mov r2, #0
 1:
     str r2, [r0]
@@ -18,17 +46,17 @@ _start:
     cmp r0, r1
     blo 1b
 
-    // 2.2 Then, let's add some entries.
+    // 3.2 Then, let's add some entries.
     //     We'll always use "Sections", which are a quick way
     //     of mapping 1MB areas without having a 2 level page table.
     
-    // 2.2.1: Start by mapping the ranges
+    // 3.2.1: Start by mapping the ranges
     //            [0x00000000, 0x02000000]
     //            [0xe0000000, 0xe2000000]
     //        to the first 32MBs of physical RAM 
 
-    ldr r0, =(_kernel_translation_table - 0xe0000000)
-    movs r1, #0xe0000000                    // Start address of higher half kernel
+    ldr r0, =(_kernel_translation_table - KERN_LINK_ADDR)
+    movs r1, #KERN_LINK_ADDR                // Start address of higher half kernel
     lsr r1, r1, #20                         // Get the index in the translation table
     lsl r1, r1, #2                          // Multiply by 4 to get the index in the translation table
     add r1, r0, r1                          // Add the base address of the translation table
@@ -46,16 +74,16 @@ _start:
     cmp r3, #32
     blo 1b
 
-    // 2.2.2 Let's also map the peripherals so we can get some
+    // 3.2.2 Let's also map the peripherals so we can get some
     //       UART output for debugging.
     //       The peripherals memory area starts at 0x20000000 and its 16MBs,
     //       so we'll map it to the 16MBs after the higher half kernel
-    ldr r0, =(_kernel_translation_table - 0xe0000000)
+    ldr r0, =(_kernel_translation_table - KERN_LINK_ADDR)
     movs r1, #0xe2000000                    // Start address of peripherals memory area
     lsr r1, r1, #20                         // Get the index in the translation table
     lsl r1, r1, #2                          // Multiply by 4 to get the index in the translation table
     add r1, r0, r1                          // Add the base address of the translation table
-    
+
     ldr r0, =0x20000602                     // "Section" to 0x2000000 with RW permissions for domain 0
     movs r3, #0                             // r3 will be the counter of the loop
 1:
@@ -67,7 +95,7 @@ _start:
     cmp r3, #16                             // Check if we reached the end of the peripherals memory area
     blo 1b
 
-    // 3 Finally, we activate the MMU
+    // 4. Finally, we activate the MMU
     movs r0, #0
     mcr p15, 0, r0, c7, c7, 0               // Write "Invalidate Both Caches Register"
     mcr p15, 0, r0, c8, c7, 0               // Write "Invalidate Unified TLB Register"
@@ -76,7 +104,7 @@ _start:
     movs r0, #0x00000001                    // Only setup domain zero to "Client" (use permission checking)
     mcr p15, 0, r0, c3, c0, 0               // Write "Domain Access Control Register"
 
-    ldr r0, =(_kernel_translation_table - 0xe0000000)
+    ldr r0, =(_kernel_translation_table - KERN_LINK_ADDR)
     mcr p15, 0, r0, c2, c0, 0               // Write "Translation Table Base Register 0"
     mcr p15, 0, r0, c2, c0, 1               // Write "Translation Table Base Register 1"
 
@@ -89,19 +117,57 @@ _start:
     orr r0, r0, #0x1                        // Set MMU Enable bit
     mcr p15, 0, r0, c1, c0, 0               // Write "System Control Register"
 
-    // 4. Now that the MMU is active let's jump to the higher half kernel
+    // 5. Now that the MMU is active let's jump to the higher half kernel
     ldr r0, =_stage2
     mov pc, r0
 
+boot_halt:
+    wfi
+    b boot_halt
+
+.extern reset_handler_trampoline
+.extern undefined_instruction_trampoline
+.extern software_interrupt_trampoline
+.extern prefetch_abort_trampoline
+.extern data_abort_trampoline
+.extern irq_trampoline
+.extern fast_irq_trampoline
+
+vector_table_data_start:
+    ldr pc, [pc, #24]
+    ldr pc, [pc, #24]
+    ldr pc, [pc, #24]
+    ldr pc, [pc, #24]
+    ldr pc, [pc, #24]
+    nop
+    ldr pc, [pc, #24]
+    ldr pc, [pc, #24]
+
+    reset_addr:                 .word reset_trampoline
+    undefined_instruction_addr: .word undefined_instruction_trampoline
+    software_interrupt_addr:    .word software_interrupt_trampoline
+    prefetch_abort_addr:        .word prefetch_abort_trampoline
+    data_abort_addr:            .word data_abort_trampoline
+    .word 0
+    irq_addr:                   .word irq_trampoline
+    fast_irq_addr:              .word fast_irq_trampoline
+vector_table_data_end:
+
 .section ".text", "ax"
 _stage2:
-    // 5. We're now in the higher half kernel, let's change the stack address
+    // 6. We're now in the higher half kernel, let's change the stack address
     //    to the higher half one.
     //    Nothing changes practically, it's still the same stack
-    mov r0, #0xe0000000
+    mov r0, #KERN_LINK_ADDR
     add sp, sp, r0
 
-    // 6. Let's setup the C runtime environment, first we need to zero out the bss
+    mov r0, #'D'
+    bl miniuart_putc
+
+    ldr r0, =mmu_setup
+    bl miniuart_puts
+
+    // 7. Let's setup the C runtime environment, first we need to zero out the bss
     ldr r4, =__bss_start
     ldr r9, =__bss_end
     mov r5, #0
@@ -124,6 +190,13 @@ _stage2:
 halt:
     wfe
     b halt
+
+
+.section ".rodata.start", "a"
+boot_msg: .ascii "OS is booting..."
+
+.section ".rodata", "a"
+mmu_setup: .ascii "MMU was setup"
 
 .section ".data", "aw"
 .global _kernel_stack_start

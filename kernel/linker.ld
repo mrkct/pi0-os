@@ -1,33 +1,23 @@
 ENTRY(_start)
- 
+
 SECTIONS
 {
-    . = 0x0000;
-    .vector_table :
+    .text.start :
     {
-        KEEP(*(.vector_table.table))
-    }
-    .vector_table.trampolines ALIGN(4K) :
-    {
-        KEEP(*(.vector_table.trampolines))
+        . = 0x8000;
+        KEEP(*(.text.start.boot))
+        KEEP(*(.text.start))
     }
 
-    . = 0x8000;
-    __prekernel_start = .;
-    .prekernel.text ALIGN(4K) :
+    .rodata.start :
     {
-        KEEP(*(.prekernel.text))
+        KEEP(*(.rodata.start))
     }
-    __prekernel_end = .;
 
-    . = 0xe0000000;
-    __higher_half_start = .;
-    . += 1M;
-    __kernel_start = .;
-    
-    .text ALIGN(4K) : AT(ADDR(.text) - 0xe0000000)
+    .text (0xe0100000) : AT(ADDR(.text) - 0xe0000000)
     {
-        . = ALIGN(4);
+        __higher_half_start = .;
+        __kernel_start = .;
         __text_start = .;
 
         *(.text)
@@ -35,7 +25,6 @@ SECTIONS
         __text_end = .;
         . = ALIGN(4);
     }
-    
     
     .rodata ALIGN(4K) : AT(ADDR(.rodata) - 0xe0000000)
     {
@@ -72,8 +61,8 @@ SECTIONS
 
         . = ALIGN(4);
         __bss_end = .;
+        __bss_size = __bss_end - __bss_start;
     }
-    __bss_size = __bss_end - __bss_start;
     
     /* This alignment is required due to the current implementation of the physical page allocator */
     . = ALIGN(1M);
