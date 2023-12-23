@@ -1,7 +1,8 @@
-#include <kernel/device/uart.h>
+#include <kernel/device/miniuart.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
 #include <kernel/locking/reentrant.h>
+
 
 namespace kernel {
 
@@ -183,9 +184,8 @@ size_t kprintf(char const* format, ...)
     va_end(args);
 
     take(g_kprintf_lock);
-    auto uart = uart_device();
     for (size_t i = 0; i < written; i++) {
-        uart.write(&uart.data, (unsigned char)buffer[i]);
+        miniuart_putc((unsigned char)buffer[i]);
     }
     release(g_kprintf_lock);
 

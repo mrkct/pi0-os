@@ -3,13 +3,20 @@ SOURCES_ROOT=../
 CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
 
-CXXFLAGS=-mcpu=arm1176jzf-s -fpic -ffreestanding -nostdlib -lgcc
+CXXFLAGS=-fpic -ffreestanding -nostdlib -lgcc
 CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT) -I../include
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
+BOARD:=raspi0
+ifeq ($(BOARD), raspi0)
+	CXXFLAGS+=-mcpu=arm1176jzf-s
+else
+	CXXFLAGS+=-mcpu=cortex-a7 -DBOARD_RASPI2
+endif
+
 QEMU:=qemu-system-arm
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M raspi0 -serial stdio -kernel Kernel
+QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel Kernel
 QEMU_REPLAY_FILENAME:=replay.bin
 QEMU_RECORD_FLAGS:=\
 	-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
@@ -34,6 +41,7 @@ SOURCES=\
 	kernel/device/gpio.cpp \
 	kernel/device/framebuffer.cpp \
 	kernel/device/keyboard.cpp \
+	kernel/device/miniuart.cpp \
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \
