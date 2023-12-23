@@ -9,7 +9,7 @@ void sleep(int ms)
 
 int get_datetime(DateTime *dt)
 {
-    syscall(SYS_GetDateTime, (uint32_t) dt, 0, 0, 0, 0);
+    return syscall(SYS_GetDateTime, (uint32_t) dt, 0, 0, 0, 0);
 }
 
 DateTime datetime_add(DateTime dt, int hours_to_add, int minutes_to_add, int seconds_to_add)
