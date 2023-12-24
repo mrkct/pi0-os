@@ -137,8 +137,9 @@ static Error prepare_new_task(Task*& out_task, char const* name, bool is_kernel_
     return Success;
 }
 
-Error task_create_kernel_thread(Task*& task, char const* name, void (*entry)())
+Error task_create_kernel_thread(char const* name, void (*entry)())
 {
+    Task *task;
     TRY(prepare_new_task(task, name, true));
     task->state.lr = reinterpret_cast<uint32_t>(entry);
 
@@ -149,8 +150,9 @@ Error task_create_kernel_thread(Task*& task, char const* name, void (*entry)())
     return Success;
 }
 
-Error task_load_user_elf(Task*& task, const char *name, uint8_t const *elf_binary, size_t elf_binary_size)
+Error task_load_user_elf(const char *name, uint8_t const *elf_binary, size_t elf_binary_size)
 {
+    Task *task;
     TRY(prepare_new_task(task, name, false));
     
     uintptr_t entry;
@@ -162,7 +164,7 @@ Error task_load_user_elf(Task*& task, const char *name, uint8_t const *elf_binar
     return Success;
 }
 
-Error task_load_user_elf_from_path(Task*& task, const char *pathname)
+Error task_load_user_elf_from_path(const char *pathname)
 {
     kassert(nullptr != fs_get_root());
 
@@ -183,7 +185,7 @@ Error task_load_user_elf_from_path(Task*& task, const char *pathname)
     kassert(bytes_read == stat.size);
     TRY(fs_close(file));
 
-    auto result = task_load_user_elf(task, pathname, elf, stat.size);
+    auto result = task_load_user_elf(pathname, elf, stat.size);
     MUST(kfree(elf));
 
     return result;

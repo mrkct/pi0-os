@@ -149,7 +149,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     kprintf("done\n");
 
     Framebuffer &fb = get_main_framebuffer();
-    MUST(allocate_framebuffer(fb));
+    MUST(allocate_framebuffer(fb));    
 
     MUST(kheap_init());
 
@@ -173,10 +173,9 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 
     timer_init();
     scheduler_init();
-    Task *A, *B;
 
-    MUST(task_create_kernel_thread(A, "A", task_A));
-    MUST(task_load_user_elf_from_path(B, "/bina/clock"));
+    MUST(task_create_kernel_thread("A", task_A));
+    // MUST(task_load_user_elf_from_path(B, "/bina/clock"));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later
