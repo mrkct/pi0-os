@@ -106,6 +106,9 @@ static void task_A()
     syscall(SyscallIdentifiers::SYS_GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
     taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
 
+    int pid = syscall(SyscallIdentifiers::SYS_SpawnProcess, reinterpret_cast<uint32_t>("/bina/clock"), 0, 0, 0, 0);
+    taskprintf("Clock PID: %u\n", pid);
+
     syscall(SyscallIdentifiers::SYS_Exit, 0, 0, 0, 0, 0);
     kassert_not_reached();
 }
@@ -175,7 +178,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     scheduler_init();
 
     MUST(task_create_kernel_thread("A", task_A));
-    // MUST(task_load_user_elf_from_path(B, "/bina/clock"));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later

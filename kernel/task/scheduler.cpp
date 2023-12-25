@@ -71,6 +71,19 @@ struct Queue {
 
         return nullptr;
     }
+
+    Task *find_by_pid(PID pid)
+    {
+        Task *current = head;
+        while (current != tail) {
+            if (current->pid == pid)
+                return current;
+            
+            current = current->next_to_run;
+        }
+
+        return nullptr;
+    }
 };
 
 static void task_free(Task* task);
@@ -109,6 +122,7 @@ static Error prepare_new_task(Task*& out_task, char const* name, bool is_kernel_
         ));
     }
 
+    task->on_task_exit_list = nullptr;
     task->exit_code = 0;
     task->task_state = TaskState::Running;
 
@@ -249,6 +263,29 @@ Error task_get_open_file(Task* task, int fd, File*& file)
     return NotFound;
 }
 
+Task *find_task_by_pid(PID pid)
+{
+    Task *t = g_running_tasks_queue.find_by_pid(pid);
+    if (t != nullptr)
+        return t;
+
+    return g_suspended_tasks_queue.find_by_pid(pid);
+}
+
+Error task_add_on_exit_handler(Task *task, OnTaskExitHandler handler, void *arg)
+{
+    OnTaskExitHandlerListItem *item;
+    TRY(kmalloc(sizeof(OnTaskExitHandlerListItem), item));
+    *item = (OnTaskExitHandlerListItem){
+        .callback = handler,
+        .arg = arg,
+        .next = task->on_task_exit_list
+    };
+    task->on_task_exit_list = item;
+
+    return Success;
+}
+
 void change_task_state(Task* task, TaskState new_state)
 {
     if (task->task_state == new_state)
@@ -283,9 +320,13 @@ void change_task_state(Task* task, TaskState new_state)
     case TaskState::Suspended:
         g_suspended_tasks_queue.append(task);
         break;
-    case TaskState::Zombie:
+    case TaskState::Zombie: {
+        
+        
+
         task_free(task);
         break;
+    }
     }
 }
 
@@ -312,6 +353,7 @@ void scheduler_init()
             .next_fd = 0,
             .entries = nullptr },
         .next_to_run = nullptr,
+        .on_task_exit_list = nullptr
     };
     task->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
     task->state.lr = reinterpret_cast<uint32_t>(idle_task);
@@ -320,6 +362,13 @@ void scheduler_init()
 
 static void task_free(Task* task)
 {
+    auto *item = task->on_task_exit_list;
+    while (item) {
+        item->callback(item->arg);
+        kfree(item);
+        item = item->next;
+    }
+
     // TODO: Free the address space
     kfree(task);
 }

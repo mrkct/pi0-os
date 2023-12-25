@@ -14,6 +14,14 @@ enum class TaskState {
     Zombie,
 };
 
+typedef void (*OnTaskExitHandler)(void *arg);
+
+struct OnTaskExitHandlerListItem {
+    OnTaskExitHandler callback;
+    void *arg;
+    struct OnTaskExitHandlerListItem *next;
+};
+
 struct Task {
     int exit_code;
     TaskState task_state;
@@ -31,6 +39,8 @@ struct Task {
         }* entries;
     } open_files;
     Task* next_to_run;
+
+    OnTaskExitHandlerListItem *on_task_exit_list;
 };
 
 void scheduler_init();
@@ -54,5 +64,9 @@ Error task_open_file(Task*, char const*, uint32_t flags, int&);
 Error task_close_file(Task*, int);
 
 Error task_get_open_file(Task*, int, File*&);
+
+Task *find_task_by_pid(PID);
+
+Error task_add_on_exit_handler(Task*, OnTaskExitHandler handler, void *arg);
 
 }

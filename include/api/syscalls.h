@@ -29,8 +29,8 @@ typedef enum SyscallIdentifiers {
     SYS_Poll = 40,
     SYS_Send = 41,
 
-    SYS_Fork = 50,
-    SYS_Exec = 51,
+    SYS_SpawnProcess = 50,
+    SYS_AwaitProcess = 51,
 
     SYS_GetBrk = 60,
     SYS_SetBrk = 61,

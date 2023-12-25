@@ -254,6 +254,40 @@ static SyscallResult sys$poll_input(uint32_t queue_id, uintptr_t user_buffer)
     return Success;
 }
 
+static SyscallResult sys$spawn_process(uintptr_t path, uintptr_t args)
+{
+    // NOTE: We can convert the user's pointers to direct ones without calling vm_copy_from_user
+    //       because we're sure the current address space is the same as the users
+
+    // TODO: Support args
+    (void) args;
+    TRY(task_load_user_elf_from_path(reinterpret_cast<const char*>(path)));
+
+    return Success;
+}
+
+static SyscallResult sys$await_process(int32_t pid)
+{
+    Task *this_task = scheduler_current_task();
+
+    Task *task = find_task_by_pid(pid);
+    if (task == nullptr)
+        return NotFound;
+    
+    change_task_state(this_task, TaskState::Suspended);
+    task_add_on_exit_handler(task, [](void *_pid) {
+            Task *task = find_task_by_pid(reinterpret_cast<PID>(_pid));
+
+            // User might have manually killed the process while it was waiting
+            if (task != nullptr)
+                change_task_state(task, TaskState::Running);
+        },
+        reinterpret_cast<void*>(scheduler_current_task()->pid)
+    );
+
+    return Success;
+}
+
 void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, uint32_t& r3, uint32_t& r4)
 {
     SyscallResult result = { 0 };
@@ -307,11 +341,13 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
     case SyscallIdentifiers::SYS_PollInput:
         result = sys$poll_input(static_cast<uint32_t>(r0), static_cast<uintptr_t>(r1));
         break;
+    case SyscallIdentifiers::SYS_SpawnProcess:
+        result = sys$spawn_process(static_cast<uintptr_t>(r0), static_cast<uintptr_t>(r1));
+        break;
+    case SyscallIdentifiers::SYS_AwaitProcess:
+        result = sys$await_process(static_cast<int32_t>(r0));
+        break;
     case SyscallIdentifiers::SYS_Send:
-        break;
-    case SyscallIdentifiers::SYS_Fork:
-        break;
-    case SyscallIdentifiers::SYS_Exec:
         break;
     case SyscallIdentifiers::SYS_GetBrk:
         break;
