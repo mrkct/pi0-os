@@ -5,7 +5,7 @@ OBJECTS = main.c.o
 .PHONY: clean install
 
 hello: bsp $(OBJECTS)
-	$(CC) $(CFLAGS) $(BSP_OBJECTS) $(OBJECTS) -o hello 
+	$(CC) $(CFLAGS) $(BSP_OBJECTS) $(OBJECTS) -o hello $(BSP_LIBS)
 
 clean:
 	$(RM) hello

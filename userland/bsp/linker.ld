@@ -5,7 +5,7 @@
 OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm",
               "elf32-littlearm")
 OUTPUT_ARCH(arm)
-ENTRY(_my_start)
+ENTRY(_start)
 SEARCH_DIR("/usr/lib/arm-none-eabi/lib");
 SECTIONS
 {

@@ -7,7 +7,7 @@ OBJECTS = main.c.o
 all: clock
 
 clock: bsp $(OBJECTS)
-	$(CC) $(CFLAGS) $(BSP_OBJECTS) $(OBJECTS) -lapp -lm -o clock 
+	$(CC) $(CFLAGS) $(BSP_OBJECTS) $(OBJECTS) -lapp -o clock $(BSP_LIBS) 
 
 clean:
 	$(RM) clock
