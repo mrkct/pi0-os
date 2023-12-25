@@ -97,11 +97,12 @@ static Queue g_suspended_tasks_queue;
 /**
  * @brief Prepares a new task by setting everything except loading the program in the address space
  * 
+ * @param pid
  * @param out_task 
  * @param name 
  * @return Error 
  */
-static Error prepare_new_task(Task*& out_task, char const* name, bool is_kernel_task)
+static Error prepare_new_task(PID& pid, Task*& out_task, char const* name, bool is_kernel_task)
 {
     Task* task;
     TRY(kmalloc(sizeof(Task), task));
@@ -147,14 +148,15 @@ static Error prepare_new_task(Task*& out_task, char const* name, bool is_kernel_
     task->open_files.next_fd = 4;
 
     task->next_to_run = nullptr;
+    pid = task->pid;
 
     return Success;
 }
 
-Error task_create_kernel_thread(char const* name, void (*entry)())
+Error task_create_kernel_thread(PID& pid, char const* name, void (*entry)())
 {
     Task *task;
-    TRY(prepare_new_task(task, name, true));
+    TRY(prepare_new_task(pid, task, name, true));
     task->state.lr = reinterpret_cast<uint32_t>(entry);
 
     // No need to map anything as the kernel code is always mapped
@@ -164,10 +166,10 @@ Error task_create_kernel_thread(char const* name, void (*entry)())
     return Success;
 }
 
-Error task_load_user_elf(const char *name, uint8_t const *elf_binary, size_t elf_binary_size)
+Error task_load_user_elf(PID& pid, const char *name, uint8_t const *elf_binary, size_t elf_binary_size)
 {
     Task *task;
-    TRY(prepare_new_task(task, name, false));
+    TRY(prepare_new_task(pid, task, name, false));
     
     uintptr_t entry;
     TRY(try_load_elf(elf_binary, elf_binary_size, task->address_space, entry, false));
@@ -178,7 +180,7 @@ Error task_load_user_elf(const char *name, uint8_t const *elf_binary, size_t elf
     return Success;
 }
 
-Error task_load_user_elf_from_path(const char *pathname)
+Error task_load_user_elf_from_path(PID& pid, const char *pathname)
 {
     kassert(nullptr != fs_get_root());
 
@@ -199,7 +201,7 @@ Error task_load_user_elf_from_path(const char *pathname)
     kassert(bytes_read == stat.size);
     TRY(fs_close(file));
 
-    auto result = task_load_user_elf(pathname, elf, stat.size);
+    auto result = task_load_user_elf(pid, pathname, elf, stat.size);
     MUST(kfree(elf));
 
     return result;
@@ -210,11 +212,11 @@ static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
 static void idle_task()
 {
     while (1) {
-        syscall(SyscallIdentifiers::SYS_Yield, 0, 0, 0, 0, 0);
+        syscall(SyscallIdentifiers::SYS_Yield, nullptr, 0, 0, 0, 0, 0);
     }
 }
 
-Error task_open_file(Task* task, char const* pathname, uint32_t, int& out_fd)
+Error task_open_file(Task* task, char const* pathname, uint32_t, uint32_t& out_fd)
 {
     if (fs_get_root() == nullptr)
         return DeviceNotConnected;
@@ -236,7 +238,7 @@ Error task_open_file(Task* task, char const* pathname, uint32_t, int& out_fd)
     return Success;
 }
 
-Error task_close_file(Task* task, int fd)
+Error task_close_file(Task* task, uint32_t fd)
 {
     for (size_t i = 0; i < task->open_files.len; i++) {
         if (task->open_files.entries[i].fd == fd) {
@@ -250,7 +252,7 @@ Error task_close_file(Task* task, int fd)
     return BadParameters;
 }
 
-Error task_get_open_file(Task* task, int fd, File*& file)
+Error task_get_open_file(Task* task, uint32_t fd, File*& file)
 {
     for (size_t i = 0; i < task->open_files.len; i++) {
         if (task->open_files.entries[i].fd == fd) {

@@ -18,18 +18,19 @@ namespace kernel {
 class SyscallResult {
 public:
     constexpr SyscallResult(Error e)
-        : m_rc((uintptr_t)(-static_cast<int>(e.generic_error_code)))
+        : m_rc((uintptr_t)(e.generic_error_code)), m_value(0)
     {
     }
-    constexpr SyscallResult(uint32_t fd)
-        : m_rc(fd)
+    constexpr SyscallResult(uint32_t value)
+        : m_rc(static_cast<uintptr_t>(GenericErrorCode::Success)), m_value(value)
     {
     }
 
     constexpr uintptr_t rc() const { return m_rc; }
+    constexpr uintptr_t value() const { return m_value; }
 
 private:
-    uintptr_t m_rc;
+    uintptr_t m_rc, m_value;
 };
 
 void syscall_init()
@@ -128,13 +129,13 @@ static SyscallResult sys$open_file(uintptr_t pathname, uint32_t flags)
     char const* absolute_path = nullptr;
     TRY(absolute_pathname(pathname, absolute_path));
 
-    int fd;
+    uint32_t fd;
     TRY(task_open_file(task, absolute_path, flags, fd));
 
-    return fd;
+    return { reinterpret_cast<uint32_t>(fd) };
 }
 
-static SyscallResult sys$read_file(int fd, uintptr_t user_buf, uint32_t count)
+static SyscallResult sys$read_file(uint32_t fd, uintptr_t user_buf, uint32_t count)
 {
     kassert(fs_get_root() != nullptr);
 
@@ -169,7 +170,7 @@ static SyscallResult sys$read_file(int fd, uintptr_t user_buf, uint32_t count)
     return count;
 }
 
-static SyscallResult sys$write_file(int fd, uintptr_t user_buf, uint32_t count)
+static SyscallResult sys$write_file(uint32_t fd, uintptr_t user_buf, uint32_t count)
 {
     kassert(fs_get_root() != nullptr);
 
@@ -181,7 +182,7 @@ static SyscallResult sys$write_file(int fd, uintptr_t user_buf, uint32_t count)
     return NotImplemented;
 }
 
-static SyscallResult sys$close_file(int fd)
+static SyscallResult sys$close_file(uint32_t fd)
 {
     kassert(fs_get_root() != nullptr);
 
@@ -206,7 +207,7 @@ static SyscallResult sys$stat(uintptr_t pathname, uintptr_t user_stat_buf)
     return Success;
 }
 
-static SyscallResult sys$seek_file(int fd, int32_t offset, uint32_t mode_u32)
+static SyscallResult sys$seek_file(uint32_t fd, int32_t offset, uint32_t mode_u32)
 {
     auto mode = static_cast<SeekMode>(mode_u32);
     if (mode != SeekMode::Current && mode != SeekMode::Start && mode != SeekMode::End)
@@ -261,9 +262,10 @@ static SyscallResult sys$spawn_process(uintptr_t path, uintptr_t args)
 
     // TODO: Support args
     (void) args;
-    TRY(task_load_user_elf_from_path(reinterpret_cast<const char*>(path)));
+    PID pid;
+    TRY(task_load_user_elf_from_path(pid, reinterpret_cast<const char*>(path)));
 
-    return Success;
+    return pid;
 }
 
 static SyscallResult sys$await_process(int32_t pid)
@@ -360,7 +362,8 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         result = InvalidSystemCall;
     }
 
-    r7 = result.rc();
+    r0 = result.rc();
+    r1 = result.value();
 }
 
 }

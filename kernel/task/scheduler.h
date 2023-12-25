@@ -34,7 +34,7 @@ struct Task {
         size_t len, allocated;
         int next_fd;
         struct {
-            int fd;
+            uint32_t fd;
             File* file;
         }* entries;
     } open_files;
@@ -49,21 +49,21 @@ void scheduler_init();
 
 Task* scheduler_current_task();
 
-Error task_create_kernel_thread(char const* name, void (*entry)());
+Error task_create_kernel_thread(PID&, char const* name, void (*entry)());
 
-Error task_load_user_elf(char const* name, uint8_t const* elf_binary, size_t elf_binary_size);
+Error task_load_user_elf(PID&, char const* name, uint8_t const* elf_binary, size_t elf_binary_size);
 
-Error task_load_user_elf_from_path(char const* pathname);
+Error task_load_user_elf_from_path(PID&, char const* pathname);
 
 void scheduler_step(SuspendedTaskState*);
 
 void change_task_state(Task*, TaskState);
 
-Error task_open_file(Task*, char const*, uint32_t flags, int&);
+Error task_open_file(Task*, char const*, uint32_t flags, uint32_t&);
 
-Error task_close_file(Task*, int);
+Error task_close_file(Task*, uint32_t);
 
-Error task_get_open_file(Task*, int, File*&);
+Error task_get_open_file(Task*, uint32_t, File*&);
 
 Task *find_task_by_pid(PID);
 

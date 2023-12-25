@@ -51,45 +51,48 @@ static void task_A()
 #define taskprintf(format, args...)                                                                     \
     do {                                                                                                \
         len = kernel::ksprintf(buf, sizeof(buf), format, ##args);                                       \
-        syscall(SyscallIdentifiers::SYS_DebugLog, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0); \
+        syscall(SyscallIdentifiers::SYS_DebugLog, nullptr, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0); \
     } while (0)
 
     size_t len;
+    uint32_t result;
 
     ProcessInfo info;
-    syscall(SyscallIdentifiers::SYS_GetProcessInfo, reinterpret_cast<uint32_t>(&info), 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_GetProcessInfo, nullptr, reinterpret_cast<uint32_t>(&info), 0, 0, 0, 0);
 
     taskprintf("I am %s and my PID is %d\n", info.name, info.pid);
 
     DateTime datetime;
-    syscall(SyscallIdentifiers::SYS_GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_GetDateTime, nullptr, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
 
     taskprintf("The date is %d-%d-%d %d:%d:%d\n",
         datetime.year, datetime.month, datetime.day, datetime.hour, datetime.minute, datetime.second);
 
     Stat stat;
-    char const* pathname = "/HELLO.TXT";
-    if (0 == syscall(SyscallIdentifiers::SYS_Stat, reinterpret_cast<uint32_t>(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0, 0)) {
+    char const* pathname = "/README.MD";
+    if (0 == syscall(SyscallIdentifiers::SYS_Stat, nullptr, reinterpret_cast<uint32_t>(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0, 0)) {
         taskprintf("- isDirectory: %s \n- size: %lu bytes\n", stat.is_directory ? "true" : "false", stat.size);
 
-        int32_t fd = syscall(
+        int32_t fd;
+        result = syscall(
             SyscallIdentifiers::SYS_OpenFile,
+            reinterpret_cast<uint32_t*>(&fd),
             reinterpret_cast<uint32_t>(pathname),
             klib::strlen(pathname),
             MODE_READ | MODE_WRITE | MODE_APPEND,
             0, 0);
-        if (fd >= 0) {
+        if (result == 0) {
             uint8_t data[64];
-            int count = 1;
+            uint32_t count = 1;
             taskprintf("========== Content of file ==========\n");
             while (count > 0) {
-                count = syscall(SyscallIdentifiers::SYS_ReadFile, (uint32_t)fd, reinterpret_cast<uint32_t>(data), sizeof(data) - 1, 0, 0);
+                syscall(SyscallIdentifiers::SYS_ReadFile, &count, fd, reinterpret_cast<uint32_t>(data), sizeof(data) - 1, 0, 0);
                 data[count] = '\0';
                 taskprintf("%s", data);
             }
             taskprintf("\n========= End of file ==========\n");
 
-            int rc = syscall(SyscallIdentifiers::SYS_CloseFile, (uint32_t)fd, 0, 0, 0, 0);
+            int rc = syscall(SyscallIdentifiers::SYS_CloseFile, nullptr, fd, 0, 0, 0, 0);
             if (rc < 0)
                 taskprintf("failed to close file. rc=%d\n", rc);
         } else {
@@ -101,15 +104,21 @@ static void task_A()
 
     taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
 
-    syscall(SyscallIdentifiers::SYS_Sleep, 10000, 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_Sleep, nullptr, 10000, 0, 0, 0, 0);
 
-    syscall(SyscallIdentifiers::SYS_GetDateTime, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_GetDateTime, nullptr, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
     taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
 
-    int pid = syscall(SyscallIdentifiers::SYS_SpawnProcess, reinterpret_cast<uint32_t>("/bina/clock"), 0, 0, 0, 0);
+    PID pid;
+    result = syscall(
+        SyscallIdentifiers::SYS_SpawnProcess,
+        reinterpret_cast<uint32_t*>(&pid),
+        reinterpret_cast<uint32_t>("/bina/clock"),
+        0, 0, 0, 0
+    );
     taskprintf("Clock PID: %u\n", pid);
 
-    syscall(SyscallIdentifiers::SYS_Exit, 0, 0, 0, 0, 0);
+    syscall(SyscallIdentifiers::SYS_Exit, nullptr, 0, 0, 0, 0, 0);
     kassert_not_reached();
 }
 
@@ -177,7 +186,8 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     timer_init();
     scheduler_init();
 
-    MUST(task_create_kernel_thread("A", task_A));
+    PID pid;
+    MUST(task_create_kernel_thread(pid, "A", task_A));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later
