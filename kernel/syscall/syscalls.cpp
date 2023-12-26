@@ -263,7 +263,7 @@ static SyscallResult sys$spawn_process(uintptr_t path, uintptr_t args)
     // TODO: Support args
     (void) args;
     PID pid;
-    TRY(task_load_user_elf_from_path(pid, reinterpret_cast<const char*>(path)));
+    TRY(task_load_user_elf_from_path(pid, reinterpret_cast<const char*>(path), 0, {}));
 
     return pid;
 }

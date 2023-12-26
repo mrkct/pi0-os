@@ -49,11 +49,23 @@ void scheduler_init();
 
 Task* scheduler_current_task();
 
-Error task_create_kernel_thread(PID&, char const* name, void (*entry)());
+Error task_create_kernel_thread(PID&, char const* name, int argc, const char *argv[], void (*entry)());
 
-Error task_load_user_elf(PID&, char const* name, uint8_t const* elf_binary, size_t elf_binary_size);
+Error task_load_user_elf(
+    PID&,
+    char const* name,
+    int argc,
+    const char *argv[],
+    uint8_t const* elf_binary,
+    size_t elf_binary_size
+);
 
-Error task_load_user_elf_from_path(PID&, char const* pathname);
+Error task_load_user_elf_from_path(
+    PID&,
+    char const* pathname,
+    int argc,
+    const char *argv[]
+);
 
 void scheduler_step(SuspendedTaskState*);
 

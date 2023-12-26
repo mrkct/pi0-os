@@ -187,7 +187,10 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     scheduler_init();
 
     PID pid;
-    MUST(task_create_kernel_thread(pid, "A", task_A));
+    // MUST(task_create_kernel_thread(pid, "A", 0, {}, task_A));
+
+    const char *args[] = {"/bina/echo", "Hello", "world"};
+    MUST(task_load_user_elf_from_path(pid, "/bina/echo", 3, args));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later

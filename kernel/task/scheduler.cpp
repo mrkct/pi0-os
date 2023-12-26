@@ -4,6 +4,8 @@
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
 #include <kernel/lib/string.h>
+#include <kernel/lib/libc/string.h>
+#include <kernel/lib/memory.h>
 #include <kernel/locking/reentrant.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/sizes.h>
@@ -102,7 +104,14 @@ static Queue g_suspended_tasks_queue;
  * @param name 
  * @return Error 
  */
-static Error prepare_new_task(PID& pid, Task*& out_task, char const* name, bool is_kernel_task)
+static Error prepare_new_task(
+    PID& pid,
+    Task*& out_task,
+    char const* name,
+    int argc,
+    const char *argv[], 
+    bool is_kernel_task
+)
 {
     Task* task;
     TRY(kmalloc(sizeof(Task), task));
@@ -128,6 +137,40 @@ static Error prepare_new_task(PID& pid, Task*& out_task, char const* name, bool 
     task->task_state = TaskState::Running;
 
     task->state.task_sp = static_cast<uint32_t>((areas::user_stack.end - 8) & 0xffffffff);
+
+    // Push argv to the process's stack
+    vm_using_address_space(task->address_space, [&]() {
+        uint8_t *sp = reinterpret_cast<uint8_t*>(task->state.task_sp);
+        
+        sp -= sizeof(char*) * (argc + 1);
+        char **_argv = reinterpret_cast<char**>(sp);
+
+        for (int i = 0; i < argc; i++) {
+            size_t len = klib::strlen(argv[i]) + 1;
+            sp -= len;
+            memcpy(sp, argv[i], len);
+            _argv[i] = reinterpret_cast<char*>(sp);
+        }
+
+        sp -= 1;
+        *sp = '\0';
+        _argv[argc] = reinterpret_cast<char*>(sp);
+        sp -= 3;
+       
+        // NOTE: Ensure the stack is always aligned to 8 bytes at the end!
+        sp = reinterpret_cast<uint8_t*>(klib::round_down<uint32_t>(reinterpret_cast<uint32_t>(sp), 8));
+        
+        sp -= sizeof(uint32_t);
+        *reinterpret_cast<uint32_t*>(sp) = reinterpret_cast<uint32_t>(_argv);
+
+        sp -= sizeof(int32_t);
+        *reinterpret_cast<int32_t*>(sp) = argc;
+
+        task->state.task_sp = reinterpret_cast<uint32_t>(sp);
+
+        return 0;
+    });
+
     if (is_kernel_task) {
         // System mode
         task->state.spsr = 0x1f;
@@ -153,10 +196,15 @@ static Error prepare_new_task(PID& pid, Task*& out_task, char const* name, bool 
     return Success;
 }
 
-Error task_create_kernel_thread(PID& pid, char const* name, void (*entry)())
+Error task_create_kernel_thread(
+    PID& pid,
+    char const* name,
+    int argc,
+    const char *argv[],
+    void (*entry)())
 {
     Task *task;
-    TRY(prepare_new_task(pid, task, name, true));
+    TRY(prepare_new_task(pid, task, name, argc, argv, true));
     task->state.lr = reinterpret_cast<uint32_t>(entry);
 
     // No need to map anything as the kernel code is always mapped
@@ -166,10 +214,17 @@ Error task_create_kernel_thread(PID& pid, char const* name, void (*entry)())
     return Success;
 }
 
-Error task_load_user_elf(PID& pid, const char *name, uint8_t const *elf_binary, size_t elf_binary_size)
+Error task_load_user_elf(
+    PID& pid,
+    const char *name,
+    int argc,
+    const char *argv[],
+    uint8_t const *elf_binary,
+    size_t elf_binary_size
+)
 {
     Task *task;
-    TRY(prepare_new_task(pid, task, name, false));
+    TRY(prepare_new_task(pid, task, name, argc, argv, false));
     
     uintptr_t entry;
     TRY(try_load_elf(elf_binary, elf_binary_size, task->address_space, entry, false));
@@ -180,7 +235,12 @@ Error task_load_user_elf(PID& pid, const char *name, uint8_t const *elf_binary, 
     return Success;
 }
 
-Error task_load_user_elf_from_path(PID& pid, const char *pathname)
+Error task_load_user_elf_from_path(
+    PID& pid,
+    const char *pathname,
+    int argc,
+    const char *argv[]
+)
 {
     kassert(nullptr != fs_get_root());
 
@@ -201,7 +261,7 @@ Error task_load_user_elf_from_path(PID& pid, const char *pathname)
     kassert(bytes_read == stat.size);
     TRY(fs_close(file));
 
-    auto result = task_load_user_elf(pid, pathname, elf, stat.size);
+    auto result = task_load_user_elf(pid, pathname, argc, argv, elf, stat.size);
     MUST(kfree(elf));
 
     return result;
