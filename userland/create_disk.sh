@@ -8,7 +8,7 @@ mkdir -p mp
 sudo mount disk.img mp
 sudo cp -r base/* mp/
 
-TO_INSTALL="hello clock"
+TO_INSTALL="hello clock echo"
 for software in $TO_INSTALL; do
     echo "Installing $software..."
     sudo MOUNT_POINT=$(pwd)/mp make -C $software install

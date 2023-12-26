@@ -1,3 +1,6 @@
+#include <stdint.h>
+
+
 extern void __libc_init_array(void);
 extern int main(int argc, const char *argv[]);
 extern void exit(int status);
@@ -10,11 +13,21 @@ void _fini()
 {
 }
 
-void _start(void)
+asm (
+    ".global _start \n"
+    "_start: \n"
+    "  mov r0, sp \n"
+    "  b _cstart \n"
+);
+
+void _cstart(void *sp)
 {
+    int argc = *(int32_t*)sp;
+    sp += sizeof(int32_t);
+
+    const char **argv = *(const char ***)sp;
+
     __libc_init_array();
 
-    const char *argv[] = {"\0"};
-    int result = main(0, argv);
-    exit(result);
+    exit(main(argc, argv));
 }
