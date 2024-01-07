@@ -93,7 +93,10 @@ qemu-gdb-replay: Kernel snapshot-drive.qcow2
 	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
 
 kernel.img: Kernel
-	$(OBJCOPY) Kernel -O binary kernel.img
+	$(OBJCOPY) Kernel -O binary _kernel.img
+	# Note that the RPi loads the binary at 0x8000,
+	# so we need to trim the first 0x8000 bytes from the binary
+	dd if=_kernel.img of=kernel.img bs=1024 skip=32
 
 Kernel: $(OBJS)
 	$(CXX) -T linker.ld -o Kernel $(OBJS) $(CXXFLAGS) -lgcc
