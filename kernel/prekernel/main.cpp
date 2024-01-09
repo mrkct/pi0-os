@@ -2,7 +2,6 @@
 #include <kernel/datetime.h>
 #include <kernel/device/sd.h>
 #include <kernel/device/systimer.h>
-#include <kernel/device/uart.h>
 #include <kernel/device/videocore.h>
 #include <kernel/filesystem/fat32/fat32.h>
 #include <kernel/interrupt.h>
@@ -127,9 +126,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     using namespace kernel;
 
     interrupt_init();
-    auto uart = uart_device();
-
-    uart.init(uart.data);
 
     kprintf("Hello, kernel world!\n");
     kprintf("int test. negative value: %d, positive value: %d\n", -1, 1);

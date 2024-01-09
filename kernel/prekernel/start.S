@@ -15,6 +15,8 @@ _start:
     ldr sp, =(_kernel_stack_end - KERN_LINK_ADDR)
     push {r0, r1, r2}
 
+    bl boot_init_console_uart
+
     ldr r0, =boot_msg
     bl boot_miniuart_puts
 

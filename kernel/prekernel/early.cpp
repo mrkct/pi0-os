@@ -4,7 +4,7 @@
 
 
 /**
- * THIS CODE IS SPECIFIC FOR THE RASPBERRY PI ZERO W
+ *  THIS CODE IS SPECIFIC FOR THE RASPBERRY PI ZERO W
  *  This is because on the Pi Zero W the uart0 is not actually available
  *  outside because it's reserved for Bluetooth, instead what you have
  *  is the mini-uart. Don't trust what people say online, it's not true
@@ -36,7 +36,6 @@ namespace kernel {
 
 static BOOT_TEXT constexpr uintptr_t bcm2835_bus_address_to_physical(uintptr_t addr)
 {
-
     return (addr - 0x7e000000) + IO_BASE;
 }
 
@@ -48,11 +47,20 @@ static BOOT_DATA constexpr uintptr_t GPPUDCLK1 = GPIO_BASE + 0x9c;
 
 static BOOT_DATA constexpr uintptr_t AUX_BASE = bcm2835_bus_address_to_physical(0x7e215000);
 static BOOT_DATA constexpr uintptr_t AUX_ENABLES = AUX_BASE + 0x04;
-static BOOT_DATA constexpr uintptr_t AUX_MU_IO	= AUX_BASE + 0x40;
-static BOOT_DATA constexpr uintptr_t AUX_MU_LSR = AUX_BASE + 0x54;
-static BOOT_DATA constexpr uintptr_t AUX_MU_CNTL = AUX_BASE + 0x60;
-static BOOT_DATA constexpr uintptr_t AUX_MU_STAT = AUX_BASE + 0x64;
+static BOOT_DATA constexpr uintptr_t AUX_MU_IO_REG	= AUX_BASE + 0x40;
+static BOOT_DATA constexpr uintptr_t AUX_MU_IER_REG = AUX_BASE + 0x44;
+static BOOT_DATA constexpr uintptr_t AUX_MU_IIR_REG = AUX_BASE + 0x48;
+static BOOT_DATA constexpr uintptr_t AUX_MU_LCR_REG = AUX_BASE + 0x4c;
+static BOOT_DATA constexpr uintptr_t AUX_MU_MCR_REG = AUX_BASE + 0x50;
+static BOOT_DATA constexpr uintptr_t AUX_MU_LSR_REG = AUX_BASE + 0x54;
+static BOOT_DATA constexpr uintptr_t AUX_MU_CNTL_REG = AUX_BASE + 0x60;
+static BOOT_DATA constexpr uintptr_t AUX_MU_STAT_REG = AUX_BASE + 0x64;
+static BOOT_DATA constexpr uintptr_t AUX_MU_BAUD_REG = AUX_BASE + 0x68;
 
+static inline BOOT_TEXT void delay(uint32_t ticks)
+{
+    while (ticks--);
+}
 
 static inline BOOT_TEXT void boot_memory_barrier()
 {
@@ -81,10 +89,10 @@ static inline BOOT_TEXT uint32_t boot_ioread32(uintptr_t reg)
 extern "C" BOOT_TEXT void boot_miniuart_putc(char c)
 {
     static BOOT_DATA constexpr uint32_t TRANSMITTER_EMPTY = 1 << 5;
-    while (!(boot_ioread32(AUX_MU_LSR) & TRANSMITTER_EMPTY))
+    while (!(boot_ioread32(AUX_MU_LSR_REG) & TRANSMITTER_EMPTY))
 	    ;
 	
-    boot_iowrite32(AUX_MU_IO, c);
+    boot_iowrite32(AUX_MU_IO_REG, c);
 }
 
 // static BOOT_DATA const char boot_msg[] = "ciaoo";
@@ -106,9 +114,49 @@ extern "C" BOOT_TEXT void boot_init_console_uart()
     static BOOT_DATA constexpr uint32_t MINI_UART_ENABLED = 1;
     boot_iowrite32(AUX_ENABLES, MINI_UART_ENABLED);
 
-    static BOOT_DATA constexpr uint32_t TX_ENABLE = 1;
-    static BOOT_DATA constexpr uint32_t RX_ENABLE = 1;
-    boot_iowrite32(AUX_MU_CNTL, TX_ENABLE | RX_ENABLE);
+    boot_iowrite32(AUX_MU_IER_REG, 0);
+
+    // Disable TX and RX while setting up the UART
+    boot_iowrite32(AUX_MU_CNTL_REG, 0);
+    
+    // WARNING: Check the errata for this register
+    static BOOT_DATA constexpr uint32_t EIGHT_BIT_DATA_SIZE = 0b11;
+    boot_iowrite32(AUX_MU_LCR_REG, EIGHT_BIT_DATA_SIZE);
+
+    static BOOT_DATA constexpr uint32_t RTS_HIGH = 0;
+    boot_iowrite32(AUX_MU_MCR_REG, RTS_HIGH);
+
+    boot_iowrite32(AUX_MU_IER_REG, 0);
+
+    static BOOT_DATA constexpr uint32_t CLEAR_FIFOS = 0xc6;
+    boot_iowrite32(AUX_MU_IIR_REG, CLEAR_FIFOS);
+    
+    static BOOT_DATA constexpr uint32_t divisor = 250000000 / (8 * 115200) - 1;
+    boot_iowrite32(AUX_MU_BAUD_REG, divisor);
+
+    // Set pins 14-15 as Alternate Function 5 (TX1, RX1)
+    static BOOT_DATA constexpr auto PIN_FUNCTIONS = static_cast<uint32_t>(0b010010) << 12;
+    boot_iowrite32(GPFSEL1, PIN_FUNCTIONS);
+
+    // Disable pull-ups for pins 14-15
+    {
+        boot_iowrite32(GPPUD, 0);
+        delay(150);
+        boot_iowrite32(GPPUDCLK0, 1 << 14);
+        delay(150);
+        boot_iowrite32(GPPUDCLK0, 0);
+
+        boot_iowrite32(GPPUD, 0);
+        delay(150);
+        boot_iowrite32(GPPUDCLK0, 1 << 15);
+        delay(150);
+        boot_iowrite32(GPPUDCLK0, 0);
+    }
+
+    // Enable receiving and transmitting.
+    static BOOT_DATA constexpr uint32_t TX_ENABLE = 1 << 1;
+    static BOOT_DATA constexpr uint32_t RX_ENABLE = 1 << 0;
+    boot_iowrite32(AUX_MU_CNTL_REG, TX_ENABLE | RX_ENABLE);
 }
 
 }
