@@ -82,11 +82,13 @@ struct Error {
     bool is_success() const { return generic_error_code == GenericErrorCode::Success; }
 };
 
-#define TRY(expr)                   \
-    do {                            \
-        auto __result = (expr);     \
-        if (!__result.is_success()) \
-            return __result;        \
+#define TRY(expr)                                       \
+    do {                                                \
+        auto __result = (expr);                         \
+        if (!__result.is_success()) {                   \
+            kprintf("Expression %s failed\n", #expr);   \
+            return __result;                            \
+        }                                               \
     } while (0)
 
 #define MUST(expr)                                                                        \
