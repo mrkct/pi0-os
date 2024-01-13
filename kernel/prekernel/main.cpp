@@ -156,15 +156,19 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(vm_init_kernel_address_space());
     kprintf("done\n");
 
-    Framebuffer &fb = get_main_framebuffer();
-    MUST(allocate_framebuffer(fb));    
-
     MUST(kheap_init());
+
+    Framebuffer &fb = get_main_framebuffer();
+    if (!allocate_videocore_framebuffer(fb).is_success()) {
+        MUST(allocate_simulated_framebuffer(fb));
+    }
+
 
     MUST(sdhc_init());
     if (sdhc_contains_card()) {
         static SDCard card;
         static Storage card_storage;
+        kprintf("Initializing sdhc\n");
         MUST(sdhc_initialize_inserted_card(card));
         MUST(sd_storage_interface(card, card_storage));
         kprintf("sdhc card initialized\n");

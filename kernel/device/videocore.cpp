@@ -1,5 +1,6 @@
 #include <kernel/device/bus/mailbox.h>
 #include <kernel/device/videocore.h>
+#include <kernel/memory/kheap.h>
 #include <kernel/lib/memory.h>
 
 namespace kernel {
@@ -128,7 +129,7 @@ Error get_clock_rate(ClockId clock, uint32_t& rate)
     return Success;
 }
 
-Error allocate_framebuffer(struct Framebuffer& fb)
+Error allocate_videocore_framebuffer(struct Framebuffer& fb)
 {
     constexpr uint32_t width = 1280;
     constexpr uint32_t height = 720;
@@ -225,7 +226,7 @@ Error allocate_framebuffer(struct Framebuffer& fb)
 
     TRY(mailbox_send_and_receive(Channel::PropertyTagsARMToVc, message));
 
-    if (message.tags.set_physical_width_height_tag.width != width || message.tags.set_physical_width_height_tag.height != height || message.tags.set_virtual_width_height_tag.width != width || message.tags.set_virtual_width_height_tag.height != height || message.tags.set_depth_tag.depth != depth || message.tags.set_pixel_order_tag.pixel_order != 1 || message.tags.get_pitch_tag.pitch == 0 || message.tags.allocate_buffer_tag.alignment_or_address == 0)
+    if (message.tags.set_physical_width_height_tag.width != width || message.tags.set_physical_width_height_tag.height != height || message.tags.set_virtual_width_height_tag.width != width || message.tags.set_virtual_width_height_tag.height != height || message.tags.set_depth_tag.depth != depth  || /* message.tags.set_pixel_order_tag.pixel_order != 1 || */ message.tags.get_pitch_tag.pitch == 0 || message.tags.allocate_buffer_tag.alignment_or_address == 0)
         return Error {
             .generic_error_code = GenericErrorCode::BadResponse,
             .device_specific_error_code = message.header.request_response_code,
@@ -247,6 +248,24 @@ Error allocate_framebuffer(struct Framebuffer& fb)
         .physical_address = phys_addr,
         .address = virt_addr,
         .size = size
+    };
+
+    return Success;
+}
+
+Error allocate_simulated_framebuffer(struct Framebuffer &fb)
+{
+    uint32_t *data;
+    TRY(kmalloc(1280 * 720 * 4, data));
+    
+    fb = Framebuffer {
+        .width = 1280,
+        .height = 720,
+        .pitch = 1280 * 4,
+        .depth = 32,
+        .physical_address = 0,
+        .address = data,
+        .size = 1280 * 720 * 4
     };
 
     return Success;
