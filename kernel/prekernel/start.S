@@ -3,6 +3,7 @@
 .section ".text.start.boot", "ax"
 .global _start
 _start:
+    // b _start
 #ifdef BOARD_RASPI2
     // Shut off extra cores
 	mrc p15, 0, r5, c0, c0, 5
@@ -162,9 +163,6 @@ _stage2:
     //    Nothing changes practically, it's still the same stack
     mov r0, #KERN_LINK_ADDR
     add sp, sp, r0
-
-    mov r0, #'D'
-    bl miniuart_putc
 
     ldr r0, =mmu_setup
     bl miniuart_puts

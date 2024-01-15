@@ -3,6 +3,7 @@
 #include <kernel/device/sd.h>
 #include <kernel/device/systimer.h>
 #include <kernel/device/videocore.h>
+#include <kernel/device/keyboard.h>
 #include <kernel/filesystem/fat32/fat32.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
@@ -182,6 +183,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     datetime_init();
     syscall_init();
     systimer_init();
+    init_user_keyboard(KeyboardSource::MiniUart);
 
     timer_init();
     scheduler_init();
@@ -189,8 +191,8 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     PID pid;
     // MUST(task_create_kernel_thread(pid, "A", 0, {}, task_A));
 
-    const char *args[] = {"/bina/echo", "Hello", "world"};
-    MUST(task_load_user_elf_from_path(pid, "/bina/echo", 3, args));
+    const char *args[] = {"/bina/shell"};
+    MUST(task_load_user_elf_from_path(pid, "/bina/echo", 1, args));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later

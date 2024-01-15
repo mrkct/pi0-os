@@ -28,6 +28,8 @@ static constexpr uintptr_t REG_ITIP = UART0_BASE + 0x84;
 static constexpr uintptr_t REG_ITOP = UART0_BASE + 0x88;
 static constexpr uintptr_t REG_TDR = UART0_BASE + 0x8C;
 
+static void (*g_irq_callback)(uint8_t) = nullptr;
+
 Error uart_init(void*);
 Error uart_read(void*, uint8_t&);
 Error uart_write(void*, uint8_t);
@@ -75,23 +77,11 @@ Error uart_init(void* data)
     static constexpr uint32_t FIFO_ENABLED = 1 << 4;
     iowrite32<uint32_t>(REG_LCRH, FIFO_ENABLED | WORD_LENGTH_EIGHT_BITS);
 
-    // 6. Enable the "receive" interrupt
-    static constexpr uint32_t RECEIVE_IRQ_MASK = 1 << 4;
-    iowrite32<uint32_t>(REG_IMSC, RECEIVE_IRQ_MASK);
-
-    // 7. Enable UART0, receive & transfer part of UART
+    // 6. Enable UART0, receive & transfer part of UART
     static constexpr uint32_t ENABLE_UART0 = 1 << 0;
     static constexpr uint32_t ENABLE_TRANSMIT = 1 << 8;
     static constexpr uint32_t ENABLE_RECEIVE = 1 << 9;
     iowrite32<uint32_t>(REG_CR, ENABLE_UART0 | ENABLE_TRANSMIT | ENABLE_RECEIVE);
-
-    interrupt_install_irq2_handler(UART0_IRQ - 32, [](auto*) {
-        uint8_t data = ioread32<uint32_t>(REG_DR) & 0xff;
-        static constexpr uint32_t RECEIVE_IRQ_CLEAR = 1 << 4;
-        iowrite32(REG_ICR, RECEIVE_IRQ_CLEAR);
-
-        notify_keyboard_event(data);
-    });
 
     uart_data->initialized = true;
 
@@ -126,16 +116,20 @@ Error uart_write(void* data, uint8_t c)
     return Success;
 }
 
-static void notify_keyboard_event(uint8_t data)
+void uart_enable_rx_irq(void (*callback)(uint8_t))
 {
-    KeyEvent event = {
-        .character = data,
-        .keycode = char_to_keycode(data),
-        .press_state = true
-    };
-    g_keyboard_events.push(event);
-    event.press_state = false;
-    g_keyboard_events.push(event);
+    // 6. Enable the "receive" interrupt
+    static constexpr uint32_t RECEIVE_IRQ_MASK = 1 << 4;
+    iowrite32<uint32_t>(REG_IMSC, RECEIVE_IRQ_MASK);
+
+    g_irq_callback = callback;
+    interrupt_install_irq2_handler(UART0_IRQ - 32, [](auto*) {
+        uint8_t data = ioread32<uint32_t>(REG_DR) & 0xff;
+        static constexpr uint32_t RECEIVE_IRQ_CLEAR = 1 << 4;
+        iowrite32(REG_ICR, RECEIVE_IRQ_CLEAR);
+
+        g_irq_callback(data);
+    });
 }
 
 }
