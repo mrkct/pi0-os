@@ -33,7 +33,6 @@ static void (*g_irq_callback)(uint8_t) = nullptr;
 Error uart_init(void*);
 Error uart_read(void*, uint8_t&);
 Error uart_write(void*, uint8_t);
-static void notify_keyboard_event(uint8_t data);
 
 struct UartData {
     bool initialized { false };

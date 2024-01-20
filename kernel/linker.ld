@@ -63,6 +63,15 @@ SECTIONS
         __bss_end = .;
         __bss_size = __bss_end - __bss_start;
     }
+
+    .ramdisk ALIGN(4K) : AT(ADDR(.ramdisk) - 0xe0000000)
+    {
+        __start_of_ramdisk = .;
+        KEEP(*(.ramdisk));
+        KEEP(*(.ramdisk.*));
+        __end_of_ramdisk = .;
+    }
+
     
     /* This alignment is required due to the current implementation of the physical page allocator */
     . = ALIGN(1M);

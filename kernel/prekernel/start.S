@@ -24,8 +24,11 @@ _start:
     // 2. Copy the vector table to address 0.
     //    We do this here because it's easier to access address 0
     //    before the MMU is setup
-    //    NOTE: You cannot place data before 0x8000 in the binary,
-    //    otherwise or the RPi firmware will refuse to load it 
+    //    NOTE: The RPi firmware just copies the binary image at
+    //    0x8000, so we cannot have data before that address or
+    //    it will cause everything to be shifted.
+    //    Therefore you can't place the vector table statically
+    //    by linking it at 0x0
     mov r0, #0
     ldr r1, =vector_table_data_start
     ldr r2, =vector_table_data_end

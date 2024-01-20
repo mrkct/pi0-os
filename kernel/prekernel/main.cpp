@@ -4,6 +4,7 @@
 #include <kernel/device/systimer.h>
 #include <kernel/device/videocore.h>
 #include <kernel/device/keyboard.h>
+#include <kernel/device/ramdisk.h>
 #include <kernel/filesystem/fat32/fat32.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
@@ -164,21 +165,26 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         MUST(allocate_simulated_framebuffer(fb));
     }
 
-
-    MUST(sdhc_init());
-    if (sdhc_contains_card()) {
+    static Filesystem fs;
+    static Storage fs_storage;
+    if (ramdisk_probe()) {
+        kprintf("Detected ramdisk in kernel image\r\n");
+        MUST(ramdisk_init(fs_storage));
+    } else {
+        kprintf("No ramdisk found, using sd card instead\r\n");
+        MUST(sdhc_init());
+        kassert(sdhc_contains_card());
+        
         static SDCard card;
-        static Storage card_storage;
         kprintf("Initializing sdhc\n");
         MUST(sdhc_initialize_inserted_card(card));
-        MUST(sd_storage_interface(card, card_storage));
+        MUST(sd_storage_interface(card, fs_storage));
         kprintf("sdhc card initialized\n");
-
-        static Filesystem fs;
-        MUST(fat32_create(fs, card_storage));
-        MUST(fs.init(fs));
-        fs_set_root(&fs);
     }
+
+    MUST(fat32_create(fs, fs_storage));
+    MUST(fs.init(fs));
+    fs_set_root(&fs);
 
     datetime_init();
     syscall_init();
@@ -192,7 +198,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     // MUST(task_create_kernel_thread(pid, "A", 0, {}, task_A));
 
     const char *args[] = {"/bina/shell"};
-    MUST(task_load_user_elf_from_path(pid, "/bina/echo", 1, args));
+    MUST(task_load_user_elf_from_path(pid, "/bina/shell", 1, args));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later

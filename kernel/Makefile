@@ -15,6 +15,10 @@ else
 	CXXFLAGS+=-mcpu=cortex-a7 -DBOARD_RASPI2
 endif
 
+ifdef RAMDISK
+	CXXFLAGS+=-DRAMDISK_FILE=$(RAMDISK)
+endif
+
 QEMU:=qemu-system-arm
 QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel Kernel
 QEMU_REPLAY_FILENAME:=replay.bin
@@ -42,6 +46,7 @@ SOURCES=\
 	kernel/device/framebuffer.cpp \
 	kernel/device/keyboard.cpp \
 	kernel/device/miniuart.cpp \
+	kernel/device/ramdisk.cpp \
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \

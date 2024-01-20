@@ -6,8 +6,6 @@ namespace kernel {
 size_t kprintf(char const* format, ...);
 }
 
-#define __STRINGIFY(x) #x
-
 #define panic(...)                                                       \
     do {                                                                 \
         asm volatile("cpsid i");                                         \
