@@ -2,7 +2,6 @@
 
 #include <api/syscalls.h>
 
-
 void sleep(int ms);
 
 int get_datetime(DateTime*);

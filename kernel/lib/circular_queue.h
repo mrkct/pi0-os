@@ -10,13 +10,15 @@ struct CircularQueue {
     bool is_full;
     T data[Size];
 
-    void push(T element) {
+    void push(T element)
+    {
         data[first_free] = element;
         first_free = (first_free + 1) % Size;
         is_full = first_free == last_occupied;
     }
 
-    bool pop(T &element) {
+    bool pop(T& element)
+    {
         if (!is_full && last_occupied == first_free)
             return false;
 

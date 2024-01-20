@@ -14,12 +14,12 @@ enum class TaskState {
     Zombie,
 };
 
-typedef void (*OnTaskExitHandler)(void *arg);
+typedef void (*OnTaskExitHandler)(void* arg);
 
 struct OnTaskExitHandlerListItem {
     OnTaskExitHandler callback;
-    void *arg;
-    struct OnTaskExitHandlerListItem *next;
+    void* arg;
+    struct OnTaskExitHandlerListItem* next;
 };
 
 struct Task {
@@ -40,7 +40,7 @@ struct Task {
     } open_files;
     Task* next_to_run;
 
-    OnTaskExitHandlerListItem *on_task_exit_list;
+    OnTaskExitHandlerListItem* on_task_exit_list;
 };
 
 void scheduler_init();
@@ -49,23 +49,21 @@ void scheduler_init();
 
 Task* scheduler_current_task();
 
-Error task_create_kernel_thread(PID&, char const* name, int argc, const char *argv[], void (*entry)());
+Error task_create_kernel_thread(PID&, char const* name, int argc, char const* argv[], void (*entry)());
 
 Error task_load_user_elf(
     PID&,
     char const* name,
     int argc,
-    const char *argv[],
+    char const* argv[],
     uint8_t const* elf_binary,
-    size_t elf_binary_size
-);
+    size_t elf_binary_size);
 
 Error task_load_user_elf_from_path(
     PID&,
     char const* pathname,
     int argc,
-    const char *argv[]
-);
+    char const* argv[]);
 
 void scheduler_step(SuspendedTaskState*);
 
@@ -77,8 +75,8 @@ Error task_close_file(Task*, uint32_t);
 
 Error task_get_open_file(Task*, uint32_t, File*&);
 
-Task *find_task_by_pid(PID);
+Task* find_task_by_pid(PID);
 
-Error task_add_on_exit_handler(Task*, OnTaskExitHandler handler, void *arg);
+Error task_add_on_exit_handler(Task*, OnTaskExitHandler handler, void* arg);
 
 }
