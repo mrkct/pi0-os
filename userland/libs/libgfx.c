@@ -58,6 +58,7 @@ void refresh_window(Window *window)
 {
     syscall(
         SYS_BlitFramebuffer, 
+        NULL,
         (uint32_t) window->framebuffer,
         (uint32_t) window->x,
         (uint32_t) window->y,
