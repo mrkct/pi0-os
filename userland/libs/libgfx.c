@@ -74,9 +74,9 @@ static void _draw_filled_rect(Window *window, int x, int y, int w, int h, uint32
     int y1 = MAX(0, MIN(y, y + h));
     int y2 = MIN(window->height, MAX(y, y + w));
 
-    for (int _y = y1; _y <= y2; _y++) {
+    for (int _y = y1; _y < y2; _y++) {
         uint32_t *fb = &window->framebuffer[_y * window->width + x1];
-        for (int _x = x1; _x <= x2; _x++, fb++) {
+        for (int _x = x1; _x < x2; _x++, fb++) {
             *fb = color;
         }
     }
@@ -95,14 +95,14 @@ static void _draw_outlined_rect(Window *window, int x, int y, int w, int h, int 
     int y2 = MAX(window->height, MAX(y, y + w));
 
     for (int i = 0; i < thickness; i++) {
-        for (int _x = x1; _x <= x2; _x++) {
+        for (int _x = x1; _x < x2; _x++) {
             set_pixel(window, _x, y1 + i, color);
             set_pixel(window, _x, y2 - i, color);
         }
     }
 
     for (int i = 0; i < thickness; i++) {
-        for (int _y = y1; _y <= y2; _y++) {
+        for (int _y = y1; _y < y2; _y++) {
             set_pixel(window, x1 + i, _y, color);
             set_pixel(window, x2 - i, _y, color);
         }
@@ -225,7 +225,6 @@ int load_psf_font(uint8_t const* data, size_t size, Font *font)
 
 static void _draw_char(Window *window, Font *font, char c, int x, int y, uint32_t color)
 {
-    if (c < 0) return;
     if (c >= font->header.num_glyphs) return;
     if (c < ' ' || c > '~') return;
 
@@ -238,7 +237,7 @@ static void _draw_char(Window *window, Font *font, char c, int x, int y, uint32_
         uint8_t glyph_row = start_of_glyph[glyph_y];
         for (size_t glyph_x = 0; glyph_x < glyph_width; glyph_x++) {
             if (glyph_row & (1 << (7 - glyph_x)))
-                window->framebuffer[(y + glyph_y) * window->width + x + glyph_x] = color;
+                set_pixel(window, x + glyph_x, y + glyph_y, color);
         }
     }
 }
