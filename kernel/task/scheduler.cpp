@@ -109,7 +109,7 @@ static Error prepare_new_task(
     Task*& out_task,
     char const* name,
     int argc,
-    const char *argv[], 
+    char const* const argv[], 
     bool is_kernel_task
 )
 {
@@ -139,6 +139,7 @@ static Error prepare_new_task(
     task->state.task_sp = static_cast<uint32_t>((areas::user_stack.end - 8) & 0xffffffff);
 
     // Push argv to the process's stack
+    kassert(areas::higher_half.contains(reinterpret_cast<uintptr_t>(argv)));
     vm_using_address_space(task->address_space, [&]() {
         uint8_t *sp = reinterpret_cast<uint8_t*>(task->state.task_sp);
         
@@ -218,7 +219,7 @@ Error task_load_user_elf(
     PID& pid,
     const char *name,
     int argc,
-    const char *argv[],
+    char const* const argv[],
     uint8_t const *elf_binary,
     size_t elf_binary_size
 )
@@ -239,7 +240,7 @@ Error task_load_user_elf_from_path(
     PID& pid,
     const char *pathname,
     int argc,
-    const char *argv[]
+    char const* const argv[]
 )
 {
     kassert(nullptr != fs_get_root());

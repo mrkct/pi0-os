@@ -63,7 +63,7 @@ Error task_load_user_elf_from_path(
     PID&,
     char const* pathname,
     int argc,
-    char const* argv[]);
+    char const* const argv[]);
 
 void scheduler_step(SuspendedTaskState*);
 
