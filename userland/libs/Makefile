@@ -3,6 +3,7 @@ include ../toolchain.mk
 OBJECTS = \
 	libdatetime.c.o\
 	libgfx.c.o \
+	libterm.c.o \
 	default_font.c.o \
 	libsstring.c.o
 

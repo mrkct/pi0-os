@@ -2,6 +2,6 @@
 
 #include <stdlib.h>
 
-char* read_line(char const* prompt);
+void terminal_init(void);
 
-static inline void free_line(char* line) { free(line); }
+char* read_line(char const* prompt);
