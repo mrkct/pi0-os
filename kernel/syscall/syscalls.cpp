@@ -255,15 +255,33 @@ static SyscallResult sys$poll_input(uint32_t queue_id, uintptr_t user_buffer)
     return Success;
 }
 
-static SyscallResult sys$spawn_process(uintptr_t path, uintptr_t args)
+static SyscallResult sys$spawn_process(uintptr_t path, uint32_t argc, const char **argv)
 {
-    // NOTE: We can convert the user's pointers to direct ones without calling vm_copy_from_user
-    //       because we're sure the current address space is the same as the users
+    // The args need to be copied in the new process's address space, therefore we
+    // cannot pass a direct pointer to the running process's one.
+    // we have to copy the entire array in kernel space, then that gets copied in
+    // the new process's AS and at last we free the array in kernel space
 
-    // TODO: Support args
-    (void) args;
+    // TODO: This "works", but has a million memory leaks in case of failures
+
+    char **k_argv;
+    TRY(kmalloc(sizeof(char*) * argc, k_argv));
+    for (size_t i = 0; i < argc; i++) {
+        size_t len = klib::strlen(argv[i]);
+        MUST(kmalloc(sizeof(char) * len + 1, k_argv[i]));
+        klib::strncpy_safe(k_argv[i], argv[i], len + 1);
+    }
+
     PID pid;
-    TRY(task_load_user_elf_from_path(pid, reinterpret_cast<const char*>(path), 0, {}));
+    TRY(task_load_user_elf_from_path(
+        pid, 
+        reinterpret_cast<const char*>(path), 
+        (int) argc, 
+        k_argv));
+
+    for (size_t i = 0; i < argc; i++)
+        kfree(k_argv[i]);
+    kfree(k_argv);
 
     return pid;
 }
@@ -344,7 +362,7 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         result = sys$poll_input(static_cast<uint32_t>(r0), static_cast<uintptr_t>(r1));
         break;
     case SyscallIdentifiers::SYS_SpawnProcess:
-        result = sys$spawn_process(static_cast<uintptr_t>(r0), static_cast<uintptr_t>(r1));
+        result = sys$spawn_process(static_cast<uintptr_t>(r0), r1, reinterpret_cast<const char**>(r2));
         break;
     case SyscallIdentifiers::SYS_AwaitProcess:
         result = sys$await_process(static_cast<int32_t>(r0));

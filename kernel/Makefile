@@ -76,7 +76,7 @@ DEPENDS:= $(addprefix $(SOURCES_ROOT), $(DEPENDS))
 OBJS:=$(addsuffix .o, $(SOURCES))
 OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 
-.PHONY: all clean qemu qemu-gdb
+.PHONY: all clean qemu qemu-gdb 
 
 all: Kernel
 
