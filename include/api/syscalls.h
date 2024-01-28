@@ -52,7 +52,7 @@ typedef enum SeekModes {
     End
 } SeekModes;
 
-static inline uint32_t syscall(SyscallIdentifiers id, uint32_t *extra_return, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
+static inline uint32_t syscall(SyscallIdentifiers id, uint32_t* extra_return, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
 {
     uint32_t result, value;
 
@@ -68,10 +68,10 @@ static inline uint32_t syscall(SyscallIdentifiers id, uint32_t *extra_return, ui
                  : "=r"(result), "=r"(value)
                  : "r"((uint32_t)(id)), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "i"(SYSCALL_VECTOR)
                  : "r0", "r1", "r2", "r3", "r4", "r7", "memory");
-    
+
     if (extra_return)
         *extra_return = value;
-    
+
     return result;
 }
 

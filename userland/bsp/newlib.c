@@ -10,14 +10,14 @@
 
 static int sys_debuglog(char const *str, int len)
 {
-    if (0 == syscall(SYS_DebugLog, (uint32_t) str, len, 0, 0, 0))
+    if (0 == syscall(SYS_DebugLog, NULL, (uint32_t) str, len, 0, 0, 0))
         return len;
     return -1;
 }
 
 void _exit(int status)
 {
-    syscall(SYS_Exit, status, 0, 0, 0, 0);
+    syscall(SYS_Exit, NULL, status, 0, 0, 0, 0);
     while(1);
 }
 
@@ -92,7 +92,7 @@ void _kill(int pid, int sig)
 int _getpid(void)
 {
     ProcessInfo info;
-    syscall(SYS_GetProcessInfo, (uint32_t) &info, 0, 0, 0, 0);
+    syscall(SYS_GetProcessInfo, NULL, (uint32_t) &info, 0, 0, 0, 0);
 
     return (int) info.pid;
 }
@@ -104,8 +104,10 @@ int _open(char const* pathname, int flags, int mode)
     if ((flags & ~(O_RDONLY | O_RDWR | O_WRONLY | O_APPEND)) != 0)
         return -1;
 
+    uint32_t fd;
     int rc = syscall(
         SYS_OpenFile,
+        (uint32_t*)&fd,
         (uint32_t) pathname,
         strlen(pathname),
         MODE_READ | MODE_WRITE,
@@ -115,7 +117,7 @@ int _open(char const* pathname, int flags, int mode)
     if (rc > 0 && (flags & O_APPEND))
         _lseek(rc, 0, 2);
     
-    return rc;
+    return (int) fd;
 }
 
 int _close(int file)
@@ -123,7 +125,7 @@ int _close(int file)
     if (file <= 2)
         return -1;
 
-    return syscall(SYS_CloseFile, (uint32_t) file, 0, 0, 0, 0);
+    return syscall(SYS_CloseFile, NULL, (uint32_t) file, 0, 0, 0, 0);
 }
 
 int _write(int file, char* ptr, int len)
@@ -143,7 +145,8 @@ int _read(int file, char* ptr, int len)
 {
     return syscall(
         SYS_ReadFile,
-        (uint32_t)file,
+        NULL,
+        (uint32_t) file,
         (uint32_t) ptr,
         len,
         0, 0
