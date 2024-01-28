@@ -209,26 +209,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
             kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
         },
         (void*)0x1);
-    timer_exec_after(
-        2000, [](void* id) {
-            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
-        },
-        (void*)0x2);
-    timer_exec_after(
-        3000, [](void* id) {
-            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
-        },
-        (void*)0x3);
-    timer_exec_after(
-        4000, [](void* id) {
-            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
-        },
-        (void*)0x4);
-    timer_exec_after(
-        5000, [](void* id) {
-            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
-        },
-        (void*)0x5);
 
     scheduler_begin();
 
