@@ -31,6 +31,7 @@ uint8_t *__end_of_ramdisk = nullptr;
 
 #endif
 
+#pragma GCC diagnostic ignored "-Waddress"
 bool ramdisk_probe()
 {
     return __start_of_ramdisk != nullptr;
