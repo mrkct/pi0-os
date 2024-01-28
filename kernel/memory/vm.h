@@ -38,7 +38,7 @@ void vm_switch_address_space(struct AddressSpace&);
 template<typename Callback>
 auto vm_using_address_space(struct AddressSpace& as, Callback c)
 {
-    auto& previous = vm_current_address_space();
+    auto previous = vm_current_address_space();
     vm_switch_address_space(as);
     auto result = c();
     vm_switch_address_space(previous);
