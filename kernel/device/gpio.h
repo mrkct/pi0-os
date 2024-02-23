@@ -17,6 +17,7 @@ enum class PinFunction {
 
 Error gpio_set_pin_function(uint8_t pin, PinFunction);
 Error gpio_set_pin_high_detect_enable(uint8_t pin, bool);
+int gpio_read_pin(uint8_t pin);
 
 enum class PullUpDownState {
     Disable = 0,

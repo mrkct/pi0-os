@@ -13,6 +13,9 @@ static constexpr uintptr_t GPFSEL4 = GPIO_BASE + 0x10;
 static constexpr uintptr_t GPFSEL5 = GPIO_BASE + 0x14;
 static constexpr uintptr_t GPFSEL_REGS[] = { GPFSEL0, GPFSEL1, GPFSEL2, GPFSEL3, GPFSEL4, GPFSEL5 };
 
+static constexpr uintptr_t GPLEV0 = GPIO_BASE + 0x34;
+static constexpr uintptr_t GPLEV1 = GPIO_BASE + 0x38;
+
 static constexpr uintptr_t GPHEN0 = GPIO_BASE + 0x64;
 static constexpr uintptr_t GPHEN1 = GPIO_BASE + 0x68;
 
@@ -71,6 +74,12 @@ Error gpio_set_pin_high_detect_enable(uint8_t pin, bool enable)
         iowrite32(reg, ioread32<uint32_t>(reg) & ~(1 << (pin % 32)));
 
     return Success;
+}
+
+int gpio_read_pin(uint8_t pin)
+{
+    auto reg = pin < 32 ? GPLEV0 : GPLEV1;
+    return ioread32<uint32_t>(reg) & (1 << (pin % 32)) ? 1 : 0;
 }
 
 }

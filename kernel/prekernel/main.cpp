@@ -5,6 +5,7 @@
 #include <kernel/device/videocore.h>
 #include <kernel/device/keyboard.h>
 #include <kernel/device/ramdisk.h>
+#include <kernel/device/gpio.h>
 #include <kernel/filesystem/fat32/fat32.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
@@ -150,6 +151,22 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     kprintf("emmc clock rate: %dHz\n", clock_rate);
     MUST(get_clock_rate(ClockId::ARM, clock_rate));
     kprintf("arm clock rate: %dHz\n", clock_rate);
+
+    /**
+     * On bare-metal we want to wait until we attach with the debugger.
+     * For convenience, if the GPIO pin below is high during boot we
+     * start spinning to give us time to attach with a debugger.
+     * 
+     * Tip: Your VCC line from the UART-USB converter is nice to use
+     * for this purpose...
+    */
+    static constexpr int HALT_PIN = 4;
+    gpio_set_pin_pull_up_down_state(HALT_PIN, PullUpDownState::PullDown);
+    gpio_set_pin_function(HALT_PIN, PinFunction::Input);
+    if (gpio_read_pin(HALT_PIN) == 1)
+        kprintf("Halt pin %d is high, make it low to continue booting\n", HALT_PIN);
+    while (gpio_read_pin(HALT_PIN) == 1);
+
 
     kprintf("Initializing physical page allocator...");
     MUST(physical_page_allocator_init(450 * 1024 * 1024));
