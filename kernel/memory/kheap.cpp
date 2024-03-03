@@ -24,8 +24,8 @@ static Error brk(uintptr_t new_brk)
         for (size_t i = 0; i < chunks_to_add; i++) {
             struct PhysicalPage* page;
 
-            TRY(physical_page_alloc(PageOrder::_4KB, page));
-            TRY(vm_map(vm_current_address_space(), page, g_last_mapped_chunk + CHUNK_SIZE, PageAccessPermissions::PriviledgedOnly));
+            MUST(physical_page_alloc(PageOrder::_4KB, page));
+            MUST(vm_map(vm_current_address_space(), page, g_last_mapped_chunk + CHUNK_SIZE, PageAccessPermissions::PriviledgedOnly));
 
             g_last_mapped_chunk += CHUNK_SIZE;
         }
@@ -64,7 +64,7 @@ Error kheap_init()
     struct PhysicalPage* first_page;
 
     TRY(physical_page_alloc(PageOrder::_4KB, first_page));
-    TRY(vm_map(vm_current_address_space(), first_page, g_last_mapped_chunk, PageAccessPermissions::PriviledgedOnly));
+    MUST(vm_map(vm_current_address_space(), first_page, g_last_mapped_chunk, PageAccessPermissions::PriviledgedOnly));
 
     return Success;
 }
