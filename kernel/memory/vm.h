@@ -3,6 +3,7 @@
 #include <kernel/error.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/armv6mmu.h>
+#include <kernel/interrupt.h>
 #include <kernel/memory/physicalalloc.h>
 
 namespace kernel {
@@ -50,8 +51,9 @@ auto vm_using_address_space(struct AddressSpace& as, Callback c)
 
 enum class PageFaultHandlerResult {
     Fixed,
-    Fatal
+    ProcessFatal,
+    KernelFatal
 };
-PageFaultHandlerResult vm_page_fault_handler(uintptr_t phys_ttbr0_addr, uintptr_t fault_addr, uintptr_t status);
+PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr);
 
 }

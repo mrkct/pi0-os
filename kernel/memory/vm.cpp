@@ -337,33 +337,33 @@ Error vm_memset(struct AddressSpace& as, uintptr_t dest, uint8_t val, size_t siz
     return Success;
 }
 
-PageFaultHandlerResult vm_page_fault_handler(uintptr_t phys_ttbr0_addr, uintptr_t virt_fault_addr, uintptr_t status)
+PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr)
 {
-    if (areas::higher_half.contains(virt_fault_addr)) {
-        // If the fault is in the kernel area, but the main kernel address space has
-        // a valid entry, then it's just that the address space was created before the
-        // that new mapping was added, so we can just fix it and return
+    uintptr_t phys_ttbr0_addr = vm_read_current_ttbr0();
+    if (phys_ttbr0_addr == virt2phys(reinterpret_cast<uintptr_t>(_kernel_translation_table)))
+        return PageFaultHandlerResult::KernelFatal;
 
-        if (_kernel_translation_table[lvl1_index(virt_fault_addr)].raw != 0) {
-            TemporarilyMappedRange ttbr0 { phys_ttbr0_addr, LVL1_TABLE_SIZE };
-            auto& ttbr0_lvl1_entry = ttbr0.as_ptr<FirstLevelEntry*>()[lvl1_index(virt_fault_addr)];
-            ttbr0_lvl1_entry = _kernel_translation_table[lvl1_index(virt_fault_addr)];
-            invalidate_tlb_entry(virt_fault_addr);
+    // We don't implement any sort of swap memory, so this is an error in the application for sure
+    if (!areas::higher_half.contains(fault_addr))
+        return PageFaultHandlerResult::ProcessFatal;
 
-            return PageFaultHandlerResult::Fixed;
-        } else {
-            // The fault is in the kernel area, but there's not a valid entry in the kernel address space
-            // This is a kernel bug, so we panic
-            panic(
-                "vm_page_fault_handler: fault in kernel area, but no valid entry in kernel address space\n"
-                "    phys_ttbr0_addr: %p\n"
-                "    virt_fault_addr: %p\n"
-                "    status: %p\n",
-                phys_ttbr0_addr, virt_fault_addr, status);
-        }
+    if (_kernel_translation_table[lvl1_index(fault_addr)].raw == 0)
+        return PageFaultHandlerResult::KernelFatal;
+    
+    FirstLevelEntry kernel_lvl1_entry = _kernel_translation_table[lvl1_index(fault_addr)];
+    TemporarilyMappedRange ttbr0 { phys_ttbr0_addr, LVL1_TABLE_SIZE };
+    auto& ttbr0_lvl1_entry = ttbr0.as_ptr<FirstLevelEntry*>()[lvl1_index(fault_addr)];
+
+    // If the fault is due to a missing lvl1 table in the kernel area, but the main
+    // kernel address space has a valid entry, then it's just that the process' address
+    // space was created before the new mapping was added
+    if (ttbr0_lvl1_entry.raw == 0) {
+        ttbr0_lvl1_entry = kernel_lvl1_entry;
+        invalidate_tlb_entry(fault_addr);
+        return PageFaultHandlerResult::Fixed;
     }
 
-    return PageFaultHandlerResult::Fatal;
+    return PageFaultHandlerResult::KernelFatal;
 }
 
 }

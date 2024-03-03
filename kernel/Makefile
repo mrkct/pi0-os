@@ -57,6 +57,7 @@ SOURCES=\
 	kernel/kprintf.cpp \
 	kernel/locking/reentrant.cpp \
 	kernel/locking/spinlock.cpp \
+	kernel/memory/armv6mmu.cpp \
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \

@@ -1,27 +1,17 @@
 #include <kernel/device/io.h>
 #include <kernel/error.h>
+#include <kernel/panic.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/memory.h>
 #include <kernel/task/scheduler.h>
 
+
 namespace kernel {
 
-static InterruptHandler g_swi_handlers[256] = { nullptr };
-static InterruptHandler g_basic_irq_handlers[32] = { nullptr };
-static InterruptHandler g_irq1_handlers[32] = { nullptr };
-static InterruptHandler g_irq2_handlers[32] = { nullptr };
-
-static void software_interrupt_handler(SuspendedTaskState* suspended_state)
+static inline const char *get_running_task_name()
 {
-    auto swi_number = *reinterpret_cast<uint32_t*>(suspended_state->lr - 4) & 0xff;
-
-    if (g_swi_handlers[swi_number] == nullptr) {
-        kprintf("Unknown software interrupt: %d\n", swi_number);
-        return;
-    }
-
-    g_swi_handlers[swi_number](suspended_state);
+    return scheduler_current_task() ? scheduler_current_task()->name : "kernel";
 }
 
 static constexpr uintptr_t IRQ_CONTROLLER_BASE = bcm2835_bus_address_to_physical(0x7E00B000);
@@ -36,6 +26,79 @@ static constexpr uintptr_t ENABLE_BASIC_IRQS = IRQ_CONTROLLER_BASE + 0x218;
 static constexpr uintptr_t DISABLE_IRQS_1 = IRQ_CONTROLLER_BASE + 0x21c;
 static constexpr uintptr_t DISABLE_IRQS_2 = IRQ_CONTROLLER_BASE + 0x220;
 static constexpr uintptr_t DISABLE_BASIC_IRQS = IRQ_CONTROLLER_BASE + 0x224;
+
+static InterruptHandler g_swi_handlers[256] = { nullptr };
+static InterruptHandler g_basic_irq_handlers[32] = { nullptr };
+static InterruptHandler g_irq1_handlers[32] = { nullptr };
+static InterruptHandler g_irq2_handlers[32] = { nullptr };
+
+
+static void software_interrupt_handler(SuspendedTaskState* suspended_state)
+{
+    auto swi_number = *reinterpret_cast<uint32_t*>(suspended_state->lr - 4) & 0xff;
+
+    if (g_swi_handlers[swi_number] == nullptr) {
+        kprintf("Unknown software interrupt: %d\n", swi_number);
+        return;
+    }
+
+    g_swi_handlers[swi_number](suspended_state);
+    scheduler_step(suspended_state);
+}
+
+static void data_abort_handler(SuspendedTaskState* state)
+{
+    state->task_lr -= 8;
+
+    uintptr_t faulting_addr = read_fault_address_register();
+    auto result = vm_try_fix_page_fault(faulting_addr);
+    if (result == PageFaultHandlerResult::Fixed)
+        return;
+    
+    if (result == PageFaultHandlerResult::ProcessFatal) {
+        uint32_t dfsr = read_dfsr();
+        uint32_t fault_status = dfsr_fault_status(dfsr);
+        kprintf(
+            "[DATA ABORT]: Process %s crashed\n"
+            "Reason: %s accessing memory address %p while executing instruction %p\n"
+            FORMAT_TASK_STATE,
+            get_running_task_name(),
+            dfsr_status_to_string(fault_status),
+            faulting_addr,
+            state->task_lr,
+            FORMAT_ARGS_TASK_STATE(state)
+        );
+        change_task_state(scheduler_current_task(), TaskState::Zombie);
+        scheduler_step(state);
+        return;
+    }
+
+    kassert(result == PageFaultHandlerResult::KernelFatal);
+    uint32_t dfsr = read_dfsr();
+    uint32_t fault_status = dfsr_fault_status(dfsr);
+    panic(
+        "[DATA ABORT]\n"
+        "Running process %s\n"
+        "Reason: %s accessing memory address %p while executing instruction %p\n"
+        FORMAT_TASK_STATE,
+        get_running_task_name(),
+        dfsr_status_to_string(fault_status),
+        faulting_addr,
+        state->task_lr,
+        FORMAT_ARGS_TASK_STATE(state)
+    );
+}
+
+static void prefetch_abort_handler(SuspendedTaskState* suspended_state)
+{
+    panic("unhandled PREFETCH_ABORT");
+}
+
+static void undefined_instruction_handler(SuspendedTaskState *suspended_state)
+{
+    panic("unhandled UNDEFINED_INSTRUCTION");
+}
+
 
 static void irq_handler(SuspendedTaskState* suspended_state)
 {
@@ -91,6 +154,8 @@ static void irq_handler(SuspendedTaskState* suspended_state)
             }
         }
     }
+
+    scheduler_step(suspended_state);
 }
 
 void interrupt_init()
@@ -156,45 +221,41 @@ void interrupt_install_irq2_handler(uint32_t irq_number, InterruptHandler handle
 // This gets called by the assembly code in vector_table.S
 extern "C" void irq_and_exception_handler(uint32_t vector_offset, SuspendedTaskState* suspended_state)
 {
-    char const* vector_name[] = {
-        "RESET",
-        "UNDEFINED INSTRUCTION",
-        "SOFTWARE INTERRUPT",
-        "PREFETCH ABORT",
-        "DATA ABORT",
-        "UNUSED",
-        "IRQ",
-        "FIQ"
-    };
     auto vector_index = vector_offset / 4;
-
-    if (vector_index > klib::array_size(vector_name))
+    if (vector_index > 8)
         panic("UNEXPECTED VECTOR OFFSET: %x\n", vector_offset);
 
-    if (vector_index == 2) {
+    switch (static_cast<InterruptVector>(vector_index)) {
+    case InterruptVector::SoftwareInterrupt:
         software_interrupt_handler(suspended_state);
-    } else if (vector_index == 6) {
-        irq_handler(suspended_state);
-    } else {
-        panic(
-            "%s caused by instruction at %p by task %s\n"
-            "\t r0: %x\t r1: %x\t r2: %x\t r3: %x\n"
-            "\t r4: %x\t r5: %x\t r6: %x\t r7: %x\n"
-            "\t r8: %x\t r9: %x\t r10: %x\t r11: %x\n"
-            "\t sp: %p\n"
-            "\t user lr: %p\n"
-            "\t spsr: %x",
-            vector_name[vector_index], suspended_state->lr,
-            scheduler_current_task() ? scheduler_current_task()->name : "kernel",
-            suspended_state->r[0], suspended_state->r[1], suspended_state->r[2], suspended_state->r[3],
-            suspended_state->r[4], suspended_state->r[5], suspended_state->r[6], suspended_state->r[7],
-            suspended_state->r[8], suspended_state->r[9], suspended_state->r[10], suspended_state->r[11],
-            suspended_state->task_sp,
-            suspended_state->task_lr,
-            suspended_state->spsr);
-    }
+        break;
 
-    scheduler_step(suspended_state);
+    case InterruptVector::IRQ:
+        irq_handler(suspended_state);
+        break;
+    
+    case InterruptVector::PrefetchAbort:
+        prefetch_abort_handler(suspended_state);
+        break;
+    
+    case InterruptVector::DataAbort:
+        data_abort_handler(suspended_state);
+        break;
+    
+    case InterruptVector::UndefinedInstruction:
+        undefined_instruction_handler(suspended_state);
+        break;
+    
+    case InterruptVector::FIQ:
+    default:
+        panic(
+            "Unhandled vector %d caused by instruction %p "
+            "while running task %s\n" FORMAT_TASK_STATE,
+            vector_index, suspended_state->task_lr,
+            get_running_task_name(),
+            FORMAT_ARGS_TASK_STATE(suspended_state)
+        );
+    }
 }
 
 }

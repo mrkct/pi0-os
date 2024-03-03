@@ -5,6 +5,17 @@
 
 namespace kernel {
 
+enum class InterruptVector: int {
+    Reset = 0,
+    UndefinedInstruction,
+    SoftwareInterrupt,
+    PrefetchAbort,
+    DataAbort,
+    Unused,
+    IRQ,
+    FIQ
+};
+
 struct SuspendedTaskState {
     uint32_t task_lr;
     uint32_t task_sp;

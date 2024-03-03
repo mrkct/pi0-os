@@ -23,6 +23,33 @@ static inline void invalidate_tlb_entry(uintptr_t virt_addr)
     asm volatile("mcr p15, 0, %0, c8, c7, 1" ::"r"(virt_addr));
 }
 
+/**
+ * \brief Read the 'Data Fault Status' register
+ */
+static inline uint32_t read_dfsr()
+{
+    uint32_t status;
+    asm volatile("mrc p15, 0, %0, c5, c0, 0" :"=r"(status));
+    return status;
+}
+
+/**
+ * \brief Extract the "Fault Status" value from a "Data Fault Status Register"
+*/
+static inline uint32_t dfsr_fault_status(uint32_t dfsr)
+{
+    return (dfsr & 0xf) | ((dfsr >> 10 & 1) << 4);
+}
+
+const char *dfsr_status_to_string(uint32_t dfsr_status);
+
+static inline uintptr_t read_fault_address_register()
+{
+    uintptr_t addr;
+    asm volatile("mrc p15, 0, %0, c6, c0, 0" :"=r"(addr));
+    return addr;
+}
+
 enum class PageAccessPermissions : uint8_t {
     Unmapped = 0b00,
     PriviledgedOnly = 0b01,
