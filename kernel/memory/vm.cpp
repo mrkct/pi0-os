@@ -11,11 +11,17 @@ static constexpr size_t LVL2_ENTRIES = _1KB / sizeof(SecondLevelEntry);
 extern "C" FirstLevelEntry _kernel_translation_table[];
 static __attribute__((aligned(_1KB))) SecondLevelEntry g_temp_mappings_lvl2_table[LVL2_ENTRIES];
 
+static AddressSpace g_kernel_address_space;
 static AddressSpace g_current_address_space;
 
 struct AddressSpace& vm_current_address_space()
 {
     return g_current_address_space;
+}
+
+struct AddressSpace& vm_kernel_address_space()
+{
+    return g_kernel_address_space;
 }
 
 void vm_switch_address_space(struct AddressSpace& as)
@@ -122,6 +128,7 @@ uintptr_t virt2phys(uintptr_t virt)
 Error vm_init_kernel_address_space()
 {
     g_current_address_space.ttbr0_page = addr2page(virt2phys(reinterpret_cast<uintptr_t>(_kernel_translation_table)));
+    g_kernel_address_space = g_current_address_space;
 
     // Note that we already mapped the kernel and peripherals in the start.S file
     _kernel_translation_table[lvl1_index(areas::temp_mappings.start)].coarse = CoarsePageTableEntry::make_entry(
@@ -198,9 +205,10 @@ static Error vm_map_page(FirstLevelEntry* root_table, uintptr_t phys_addr, uintp
 
 static Error vm_map_page(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t virt_addr, PageAccessPermissions permissions)
 {
-    if (areas::higher_half.contains(virt_addr))
+    // Fast path for the kernel address space
+    if (as.ttbr0_page == g_kernel_address_space.ttbr0_page)
         return vm_map_page(_kernel_translation_table, phys_addr, virt_addr, permissions);
-
+    
     TemporarilyMappedRange lvl1_table { page2addr(as.ttbr0_page), LVL1_TABLE_SIZE };
     TRY(vm_map_page(lvl1_table.as_ptr<FirstLevelEntry*>(), phys_addr, virt_addr, permissions));
 
