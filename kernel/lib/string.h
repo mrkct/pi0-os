@@ -3,12 +3,28 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace klib {
+
+extern "C" void* memset(void* s, int c, size_t n);
+
+extern "C" void* memcpy(void* dest, void const* src, size_t n);
+
+extern "C" char *strcpy(char *dst, const char *src);
+
+constexpr char *constexpr_strcpy(char *dst, const char *src)
+{
+    char *ret_dst = dst;
+    while (*src) {
+        *dst = *src;
+        dst++;
+        src++;
+    }
+    *dst = '\0';
+
+    return ret_dst;
+}
 
 char* strncpy_safe(char* dest, char const* src, size_t n);
 
 int strcmp(char const* s1, char const* s2);
 
 size_t strlen(char const* s);
-
-}

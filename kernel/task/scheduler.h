@@ -2,7 +2,7 @@
 
 #include <api/syscalls.h>
 #include <kernel/error.h>
-#include <kernel/filesystem/filesystem.h>
+#include <kernel/vfs/vfs.h>
 #include <kernel/interrupt.h>
 #include <kernel/memory/vm.h>
 
@@ -73,7 +73,7 @@ Error task_open_file(Task*, char const*, uint32_t flags, uint32_t&);
 
 Error task_close_file(Task*, uint32_t);
 
-Error task_get_open_file(Task*, uint32_t, File*&);
+Error task_get_open_file(Task*, uint32_t, FileCustody*&);
 
 Task* find_task_by_pid(PID);
 

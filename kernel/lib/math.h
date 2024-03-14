@@ -3,7 +3,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-namespace klib {
 
 template<typename T>
 T min(T a, T b) { return a < b ? a : b; }
@@ -19,8 +18,3 @@ T round_down(T a, T b) { return a / b * b; }
 
 template<typename T>
 T abs(T a) { return a < 0 ? -a : a; }
-
-}
-
-using klib::max;
-using klib::min;

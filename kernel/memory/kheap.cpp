@@ -17,7 +17,7 @@ static Error brk(uintptr_t new_brk)
     if (new_brk < areas::heap.start || new_brk > areas::heap.end)
         return BadParameters;
 
-    auto must_be_mapped_up_to = klib::round_down<uintptr_t>(new_brk, CHUNK_SIZE);
+    auto must_be_mapped_up_to = round_down<uintptr_t>(new_brk, CHUNK_SIZE);
     if (g_last_mapped_chunk < must_be_mapped_up_to) {
         auto chunks_to_add = (must_be_mapped_up_to - g_last_mapped_chunk) / CHUNK_SIZE;
 
@@ -71,7 +71,7 @@ Error kheap_init()
 
 Error _kmalloc(size_t size, uintptr_t& address)
 {
-    size = klib::round_up<size_t>(size, 8);
+    size = round_up<size_t>(size, 8);
 
     TRY(sbrk(size, address));
 

@@ -75,6 +75,9 @@ struct DirectoryEntry8_3 {
     uint16_t DIR_WrtDate;
     uint16_t DIR_FstClusLO;
     uint32_t DIR_FileSize;
+
+    bool is_end_of_directory() const { return DIR_Name[0] == 0; }
+    bool is_cancelled() const { return DIR_Name[0] == 0xe5; }
 } __attribute__((packed));
 static_assert(sizeof(DirectoryEntry8_3) == 32, "DirectoryEntry8_3 size must be 32 bytes");
 
@@ -83,5 +86,10 @@ union DirectoryEntry {
     DirectoryEntry8_3 entry;
 };
 static_assert(sizeof(DirectoryEntry) == 32, "DirectoryEntry size must be 32 bytes");
+
+static inline bool is_valid_cluster(uint32_t cluster)
+{
+    return cluster < 0x0ffffff8;
+}
 
 }

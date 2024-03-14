@@ -74,7 +74,7 @@ static SyscallResult sys$get_process_info(uintptr_t user_buf)
 {
     ProcessInfo info;
     info.pid = scheduler_current_task()->pid;
-    klib::strncpy_safe(info.name, scheduler_current_task()->name, sizeof(info.name));
+    strncpy_safe(info.name, scheduler_current_task()->name, sizeof(info.name));
 
     TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buf, &info, sizeof(info)));
 
@@ -109,7 +109,7 @@ static Error absolute_pathname(uintptr_t user_path, char const*& path)
 {
     static char filepath_temp_buffer[FS_MAX_PATH_LENGTH + 1];
 
-    size_t user_path_len = klib::strlen(reinterpret_cast<char const*>(user_path));
+    size_t user_path_len = strlen(reinterpret_cast<char const*>(user_path));
     if (user_path_len > FS_MAX_PATH_LENGTH)
         return PathTooLong;
 
@@ -121,9 +121,6 @@ static Error absolute_pathname(uintptr_t user_path, char const*& path)
 
 static SyscallResult sys$open_file(uintptr_t pathname, uint32_t flags)
 {
-    if (fs_get_root() == nullptr)
-        return NotFound;
-
     auto* task = scheduler_current_task();
 
     char const* absolute_path = nullptr;
@@ -137,55 +134,28 @@ static SyscallResult sys$open_file(uintptr_t pathname, uint32_t flags)
 
 static SyscallResult sys$read_file(uint32_t fd, uintptr_t user_buf, uint32_t count)
 {
-    kassert(fs_get_root() != nullptr);
-
     auto* task = scheduler_current_task();
 
-    File* file;
-    TRY(task_get_open_file(task, fd, file));
-
-    size_t bytes_to_read = file->size - file->current_offset;
-    if (bytes_to_read > count)
-        bytes_to_read = count;
-
-    static uint8_t buf[4096];
-    size_t bytes_read = 0;
-    while (bytes_read < bytes_to_read) {
-        size_t bytes_to_read_now = bytes_to_read - bytes_read;
-        if (bytes_to_read_now > sizeof(buf))
-            bytes_to_read_now = sizeof(buf);
-
-        size_t bytes_read_now;
-        TRY(fs_read(*file, buf, file->current_offset + bytes_read, bytes_to_read_now, bytes_read_now));
-        TRY(vm_copy_to_user(task->address_space, user_buf + bytes_read, buf, bytes_read_now));
-
-        bytes_read += bytes_read_now;
-
-        if (bytes_read_now < bytes_to_read_now)
-            break;
-    }
-    count = bytes_read;
-    file->current_offset += bytes_read;
+    FileCustody *custody;
+    TRY(task_get_open_file(task, fd, custody));
+    TRY(vfs_read(*custody, reinterpret_cast<uint8_t*>(user_buf), count, count));
 
     return count;
 }
 
 static SyscallResult sys$write_file(uint32_t fd, uintptr_t user_buf, uint32_t count)
 {
-    kassert(fs_get_root() != nullptr);
+    auto* task = scheduler_current_task();
 
-    (void)fd;
-    (void)user_buf;
-    (void)count;
+    FileCustody *custody;
+    TRY(task_get_open_file(task, fd, custody));
+    TRY(vfs_write(*custody, reinterpret_cast<uint8_t const*>(user_buf), count, count));
 
-    // TODO: Implement
-    return NotImplemented;
+    return count;
 }
 
 static SyscallResult sys$close_file(uint32_t fd)
 {
-    kassert(fs_get_root() != nullptr);
-
     auto* task = scheduler_current_task();
     TRY(task_close_file(task, fd));
 
@@ -194,34 +164,24 @@ static SyscallResult sys$close_file(uint32_t fd)
 
 static SyscallResult sys$stat(uintptr_t pathname, uintptr_t user_stat_buf)
 {
-    if (fs_get_root() == nullptr)
-        return NotFound;
-
     char const* absolute_path = nullptr;
     TRY(absolute_pathname(pathname, absolute_path));
 
-    Stat stat;
-    TRY(fs_stat(*fs_get_root(), absolute_path, stat));
-    TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_stat_buf, &stat, sizeof(stat)));
+    api::Stat *stat = reinterpret_cast<api::Stat*>(user_stat_buf);
+    TRY(vfs_stat(absolute_path, *stat));
 
     return Success;
 }
 
 static SyscallResult sys$seek_file(uint32_t fd, int32_t offset, uint32_t mode_u32)
 {
-    auto mode = static_cast<SeekMode>(mode_u32);
-    if (mode != SeekMode::Current && mode != SeekMode::Start && mode != SeekMode::End)
-        return BadParameters;
-
-    kassert(fs_get_root() != nullptr);
-
     auto* task = scheduler_current_task();
 
-    File* file;
-    TRY(task_get_open_file(task, fd, file));
-    TRY(fs_seek(*file, offset, mode));
+    FileCustody *custody;
+    TRY(task_get_open_file(task, fd, custody));
+    TRY(vfs_seek(*custody, static_cast<api::FileSeekMode>(mode_u32), offset));
 
-    return file->current_offset;
+    return custody->seek_position;
 }
 
 static SyscallResult sys$blit_framebuffer(
@@ -267,9 +227,9 @@ static SyscallResult sys$spawn_process(uintptr_t path, uint32_t argc, const char
     char **k_argv;
     TRY(kmalloc(sizeof(char*) * argc, k_argv));
     for (size_t i = 0; i < argc; i++) {
-        size_t len = klib::strlen(argv[i]);
+        size_t len = strlen(argv[i]);
         MUST(kmalloc(sizeof(char) * len + 1, k_argv[i]));
-        klib::strncpy_safe(k_argv[i], argv[i], len + 1);
+        strncpy_safe(k_argv[i], argv[i], len + 1);
     }
 
     PID pid;

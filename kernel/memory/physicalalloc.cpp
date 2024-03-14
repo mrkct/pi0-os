@@ -1,5 +1,5 @@
 #include <kernel/kprintf.h>
-#include <kernel/lib/libc/string.h>
+#include <kernel/lib/string.h>
 #include <kernel/lib/math.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/physicalalloc.h>
@@ -108,11 +108,11 @@ static void remove_page_from_free_pages_list(struct PhysicalPage* page, PageOrde
 
 Error physical_page_allocator_init(size_t total_physical_memory_size)
 {
-    total_physical_memory_size = klib::round_down<size_t>(total_physical_memory_size, _16KB);
+    total_physical_memory_size = round_down<size_t>(total_physical_memory_size, _16KB);
     g_pages.len = total_physical_memory_size / _1KB;
 
     auto start_of_pages_data_addr = reinterpret_cast<uintptr_t>(__kernel_end);
-    auto end_of_pages_data_addr = klib::round_up(start_of_pages_data_addr + g_pages.len * sizeof(PhysicalPage), _16KB);
+    auto end_of_pages_data_addr = round_up(start_of_pages_data_addr + g_pages.len * sizeof(PhysicalPage), _16KB);
     g_pages.data = reinterpret_cast<PhysicalPage*>(start_of_pages_data_addr);
 
     memset(g_pages.data, 0, g_pages.len * sizeof(PhysicalPage));
@@ -205,7 +205,7 @@ static Error _physical_page_free(PhysicalPage* page, PageOrder order)
 
     size_t page_index_in_array = page2array_index(page);
     size_t distance_between_buddies = order2page_size(order) / _1KB;
-    size_t first_buddy_index_in_array = klib::round_down(page_index_in_array, 4 * distance_between_buddies);
+    size_t first_buddy_index_in_array = round_down(page_index_in_array, 4 * distance_between_buddies);
 
     bool all_buddies_free = true;
     for (auto i = 0; i < 4; i++) {

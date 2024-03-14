@@ -6,7 +6,9 @@
 #include <kernel/device/keyboard.h>
 #include <kernel/device/ramdisk.h>
 #include <kernel/device/gpio.h>
-#include <kernel/filesystem/fat32/fat32.h>
+#include <kernel/vfs/vfs.h>
+#include <kernel/vfs/fat32/fat32.h>
+#include <kernel/vfs/sysfs/sysfs.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/string.h>
@@ -19,110 +21,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-
-static void __attribute__((unused)) fs_tree(kernel::Filesystem& fs)
-{
-    using namespace kernel;
-
-    static void (*helper)(Filesystem&, Directory&, size_t) = [](auto& fs, auto& dir, auto tab_size) {
-        using namespace kernel;
-
-        DirectoryEntry entry;
-        while (fs.directory_next_entry(dir, entry).is_success()) {
-            for (size_t i = 0; i < tab_size; i++)
-                kernel::kprintf(" ");
-
-            kernel::kprintf("%s\n", entry.name);
-            if (entry.type == DirectoryEntry::Type::Directory && entry.name[0] != '.') {
-                Directory sub_dir;
-                MUST(fs.open_directory_entry(entry, sub_dir));
-                helper(fs, sub_dir, tab_size + 2);
-            }
-        }
-    };
-
-    Directory root_dir;
-    MUST(fs.root_directory(fs, root_dir));
-    helper(fs, root_dir, 0);
-}
-
-static void task_A()
-{
-    char buf[1024];
-
-#define taskprintf(format, args...)                                                                     \
-    do {                                                                                                \
-        len = kernel::ksprintf(buf, sizeof(buf), format, ##args);                                       \
-        syscall(SyscallIdentifiers::SYS_DebugLog, nullptr, reinterpret_cast<uint32_t>(buf), len, 0, 0, 0); \
-    } while (0)
-
-    size_t len;
-    uint32_t result;
-
-    ProcessInfo info;
-    syscall(SyscallIdentifiers::SYS_GetProcessInfo, nullptr, reinterpret_cast<uint32_t>(&info), 0, 0, 0, 0);
-
-    taskprintf("I am %s and my PID is %d\n", info.name, info.pid);
-
-    DateTime datetime;
-    syscall(SyscallIdentifiers::SYS_GetDateTime, nullptr, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
-
-    taskprintf("The date is %d-%d-%d %d:%d:%d\n",
-        datetime.year, datetime.month, datetime.day, datetime.hour, datetime.minute, datetime.second);
-
-    Stat stat;
-    char const* pathname = "/README.MD";
-    if (0 == syscall(SyscallIdentifiers::SYS_Stat, nullptr, reinterpret_cast<uint32_t>(pathname), reinterpret_cast<uint32_t>(&stat), 0, 0, 0)) {
-        taskprintf("- isDirectory: %s \n- size: %lu bytes\n", stat.is_directory ? "true" : "false", stat.size);
-
-        int32_t fd;
-        result = syscall(
-            SyscallIdentifiers::SYS_OpenFile,
-            reinterpret_cast<uint32_t*>(&fd),
-            reinterpret_cast<uint32_t>(pathname),
-            klib::strlen(pathname),
-            MODE_READ | MODE_WRITE | MODE_APPEND,
-            0, 0);
-        if (result == 0) {
-            uint8_t data[64];
-            uint32_t count = 1;
-            taskprintf("========== Content of file ==========\n");
-            while (count > 0) {
-                syscall(SyscallIdentifiers::SYS_ReadFile, &count, fd, reinterpret_cast<uint32_t>(data), sizeof(data) - 1, 0, 0);
-                data[count] = '\0';
-                taskprintf("%s", data);
-            }
-            taskprintf("\n========= End of file ==========\n");
-
-            int rc = syscall(SyscallIdentifiers::SYS_CloseFile, nullptr, fd, 0, 0, 0, 0);
-            if (rc < 0)
-                taskprintf("failed to close file. rc=%d\n", rc);
-        } else {
-            taskprintf("failed to open %s. rc= %d\n", pathname, fd);
-        }
-    } else {
-        taskprintf("stat syscall failed. Skipping file system calls...\n");
-    }
-
-    taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
-
-    syscall(SyscallIdentifiers::SYS_Sleep, nullptr, 10000, 0, 0, 0, 0);
-
-    syscall(SyscallIdentifiers::SYS_GetDateTime, nullptr, reinterpret_cast<uint32_t>(&datetime), 0, 0, 0, 0);
-    taskprintf("Ticks: %lu\n", datetime.ticks_since_boot);
-
-    PID pid;
-    result = syscall(
-        SyscallIdentifiers::SYS_SpawnProcess,
-        reinterpret_cast<uint32_t*>(&pid),
-        reinterpret_cast<uint32_t>("/bina/clock"),
-        0, 0, 0, 0
-    );
-    taskprintf("Clock PID: %u\n", pid);
-
-    syscall(SyscallIdentifiers::SYS_Exit, nullptr, 0, 0, 0, 0, 0);
-    kassert_not_reached();
-}
 
 extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 {
@@ -182,7 +80,7 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         MUST(allocate_simulated_framebuffer(fb));
     }
 
-    static Filesystem fs;
+    
     static Storage fs_storage;
     if (ramdisk_probe()) {
         kprintf("Detected ramdisk in kernel image\r\n");
@@ -199,9 +97,13 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         kprintf("sdhc card initialized\n");
     }
 
-    MUST(fat32_create(fs, fs_storage));
-    MUST(fs.init(fs));
-    fs_set_root(&fs);
+    static Filesystem fat32_fs;
+    MUST(fat32_create(fat32_fs, fs_storage));
+    vfs_mount("", &fat32_fs);
+
+    static Filesystem sysfs;
+    MUST(sysfs_init(sysfs));
+    vfs_mount("/sys", &sysfs);
 
     datetime_init();
     syscall_init();

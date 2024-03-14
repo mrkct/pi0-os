@@ -1,7 +1,8 @@
 #pragma once
 
 #include <kernel/error.h>
-#include <kernel/filesystem/storage.h>
+#include <kernel/device/storage.h>
+
 
 namespace kernel {
 

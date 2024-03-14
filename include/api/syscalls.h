@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "files.h"
+#include "input.h"
+#include "time.h"
 
 #define SYSCALL_VECTOR 0x10
 
@@ -40,17 +43,6 @@ typedef enum SyscallIdentifiers {
     SYS_BlitFramebuffer = 80,
 } SyscallIdentifiers;
 
-typedef enum OpenFileModes {
-    MODE_READ = 1 << 0,
-    MODE_WRITE = 1 << 1,
-    MODE_APPEND = 2 << 2
-} OpenFileModes;
-
-typedef enum SeekModes {
-    Start,
-    Current,
-    End
-} SeekModes;
 
 static inline uint32_t syscall(SyscallIdentifiers id, uint32_t* extra_return, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
 {
@@ -80,24 +72,3 @@ typedef struct ProcessInfo {
     PID pid;
     char name[32];
 } ProcessInfo;
-
-typedef struct DateTime {
-    int year;
-    int month;
-    int day;
-    int hour;
-    int minute;
-    int second;
-    uint64_t ticks_since_boot;
-} DateTime;
-
-typedef struct Stat {
-    bool is_directory;
-    uint64_t size;
-} Stat;
-
-typedef struct KeyEvent {
-    char character;
-    uint32_t keycode;
-    bool press_state;
-} KeyEvent;

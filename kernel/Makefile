@@ -35,9 +35,8 @@ QEMU_SD_FLAGS:=
 endif
 
 LIBS_SOURCES=\
-	kernel/lib/libc/string.cpp \
-	kernel/lib/memory.cpp \
 	kernel/lib/string.cpp \
+	kernel/lib/memory.cpp \
 
 SOURCES=\
 	$(LIBS_SOURCES) \
@@ -51,8 +50,6 @@ SOURCES=\
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \
 	kernel/device/videocore.cpp \
-	kernel/filesystem/fat32/fat32.cpp \
-	kernel/filesystem/filesystem.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
 	kernel/locking/reentrant.cpp \
@@ -69,6 +66,10 @@ SOURCES=\
 	kernel/task/elf_loader.cpp \
 	kernel/task/scheduler.cpp \
 	kernel/timer.cpp \
+	kernel/vfs/fat32/fat32.cpp \
+	kernel/vfs/sysfs/sysfs.cpp \
+	kernel/vfs/path.cpp \
+	kernel/vfs/vfs.cpp \
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))

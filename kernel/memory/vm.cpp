@@ -1,4 +1,4 @@
-#include <kernel/lib/libc/string.h>
+#include <kernel/lib/string.h>
 #include <kernel/lib/math.h>
 #include <kernel/memory/vm.h>
 #include <kernel/sizes.h>
@@ -47,7 +47,7 @@ public:
         phys_addr -= offset_since_page_start;
         size += offset_since_page_start;
 
-        auto consecutive_entries_required = klib::round_up<size_t>(size, _4KB) / _4KB;
+        auto consecutive_entries_required = round_up<size_t>(size, _4KB) / _4KB;
         auto idx = try_find_potential_mapping_place(consecutive_entries_required);
         if (idx == LVL2_ENTRIES)
             panic("TemporarilyMappedPage: no place for mapping");
@@ -224,7 +224,7 @@ Error vm_map(struct AddressSpace& as, struct PhysicalPage* page, uintptr_t virt_
 
 Error vm_map_mmio(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t virt_addr, size_t size)
 {
-    auto pages_to_map = klib::round_up<size_t>(size, _4KB) / _4KB;
+    auto pages_to_map = round_up<size_t>(size, _4KB) / _4KB;
     for (size_t i = 0; i < pages_to_map; i++) {
         TRY(vm_map_page(as, phys_addr + i * _4KB, virt_addr + i * _4KB, PageAccessPermissions::PriviledgedOnly));
     }

@@ -42,8 +42,8 @@ Error try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSpace& 
             if (p_hdr->p_type != PT_LOAD)
                 continue;
             
-            auto start = klib::round_down<uintptr_t>(p_hdr->p_vaddr, 4 * _1KB);
-            auto end = klib::round_up<uintptr_t>(p_hdr->p_paddr + p_hdr->p_memsz, 4 * _1KB);         
+            auto start = round_down<uintptr_t>(p_hdr->p_vaddr, 4 * _1KB);
+            auto end = round_up<uintptr_t>(p_hdr->p_paddr + p_hdr->p_memsz, 4 * _1KB);         
             for (uintptr_t addr = start; addr < end; addr += 4 * _1KB) {
                 struct PhysicalPage* page;
                 // FIXME: Rollback if this fails

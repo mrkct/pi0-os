@@ -4,13 +4,13 @@
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
 #include <kernel/lib/string.h>
-#include <kernel/lib/libc/string.h>
 #include <kernel/lib/memory.h>
 #include <kernel/locking/reentrant.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/sizes.h>
 #include <kernel/task/scheduler.h>
 #include <kernel/task/elf_loader.h>
+
 
 namespace kernel {
 
@@ -119,7 +119,7 @@ static Error prepare_new_task(
 
     TRY(vm_create_address_space(task->address_space));
 
-    const size_t pages_to_map_for_the_stack = klib::round_up<size_t>(areas::user_stack.end - areas::user_stack.start, _4KB) / _4KB;
+    const size_t pages_to_map_for_the_stack = round_up<size_t>(areas::user_stack.end - areas::user_stack.start, _4KB) / _4KB;
     for (size_t i = 0; i < pages_to_map_for_the_stack; ++i) {
         struct PhysicalPage* task_stack_page;
         // FIXME: Rollback if this fails
@@ -147,7 +147,7 @@ static Error prepare_new_task(
         char **_argv = reinterpret_cast<char**>(sp);
 
         for (int i = 0; i < argc; i++) {
-            size_t len = klib::strlen(argv[i]) + 1;
+            size_t len = strlen(argv[i]) + 1;
             sp -= len;
             memcpy(sp, argv[i], len);
             _argv[i] = reinterpret_cast<char*>(sp);
@@ -159,7 +159,7 @@ static Error prepare_new_task(
         sp -= 3;
        
         // NOTE: Ensure the stack is always aligned to 8 bytes at the end!
-        sp = reinterpret_cast<uint8_t*>(klib::round_down<uint32_t>(reinterpret_cast<uint32_t>(sp), 8));
+        sp = reinterpret_cast<uint8_t*>(round_down<uint32_t>(reinterpret_cast<uint32_t>(sp), 8));
         
         sp -= sizeof(uint32_t);
         *reinterpret_cast<uint32_t*>(sp) = reinterpret_cast<uint32_t>(_argv);
@@ -179,7 +179,7 @@ static Error prepare_new_task(
         // User mode
         task->state.spsr = 0x10;
     }
-    klib::strncpy_safe(task->name, name, sizeof(task->name));
+    strncpy_safe(task->name, name, sizeof(task->name));
     task->pid = g_next_free_pid++;
     task->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
 
@@ -243,24 +243,21 @@ Error task_load_user_elf_from_path(
     char const* const argv[]
 )
 {
-    kassert(nullptr != fs_get_root());
+    api::Stat stat;
+    TRY(vfs_stat(pathname, stat));
 
-    Stat stat;
-    TRY(fs_stat(*fs_get_root(), pathname, stat));
-    
     uint8_t *elf;
     TRY(kmalloc(stat.size, elf));
-    
-    for (size_t i = 0; i < stat.size; i++)
-        elf[i] = 0;
 
-    File file;
-    
-    TRY(fs_open(*fs_get_root(), pathname, file));
-    size_t bytes_read;
-    TRY(fs_read(file, elf, 0, stat.size, bytes_read));
+    memset(elf, 0, stat.size);
+
+    FileCustody file;
+    MUST(vfs_open(pathname, api::OPEN_FLAG_READ, file));
+
+    uint32_t bytes_read;
+    MUST(vfs_read(file, elf, stat.size, bytes_read));
     kassert(bytes_read == stat.size);
-    TRY(fs_close(file));
+    MUST(vfs_close(file));
 
     auto result = task_load_user_elf(pid, pathname, argc, argv, elf, stat.size);
     MUST(kfree(elf));
@@ -279,51 +276,20 @@ static void idle_task()
 
 Error task_open_file(Task* task, char const* pathname, uint32_t, uint32_t& out_fd)
 {
-    if (fs_get_root() == nullptr)
-        return DeviceNotConnected;
-
-    File* file;
-    TRY(kmalloc(sizeof(File), file));
-    TRY(fs_open(*fs_get_root(), pathname, *file));
-
-    if (task->open_files.allocated == task->open_files.len) {
-        void* new_entries = task->open_files.entries;
-        TRY(krealloc(new_entries, task->open_files.allocated * 2));
-        task->open_files.entries = static_cast<decltype(task->open_files.entries)>(new_entries);
-        task->open_files.allocated *= 2;
-    }
-    out_fd = task->open_files.next_fd++;
-    task->open_files.entries[task->open_files.len++] = { out_fd, file };
-    file_inc_ref(*file);
-
-    return Success;
+    TODO();
+    return NotImplemented;
 }
 
 Error task_close_file(Task* task, uint32_t fd)
 {
-    for (size_t i = 0; i < task->open_files.len; i++) {
-        if (task->open_files.entries[i].fd == fd) {
-            file_dec_ref(*task->open_files.entries[i].file);
-            kfree(task->open_files.entries[i].file);
-            task->open_files.entries[i] = task->open_files.entries[--task->open_files.len];
-            return Success;
-        }
-    }
-
-    return BadParameters;
+    TODO();
+    return NotImplemented;
 }
 
-Error task_get_open_file(Task* task, uint32_t fd, File*& file)
+Error task_get_open_file(Task* task, uint32_t fd, FileCustody *&out_custody)
 {
-    for (size_t i = 0; i < task->open_files.len; i++) {
-        if (task->open_files.entries[i].fd == fd) {
-            file = task->open_files.entries[i].file;
-            file_inc_ref(*file);
-            return Success;
-        }
-    }
-
-    return NotFound;
+    TODO();
+    return NotImplemented;
 }
 
 Task *find_task_by_pid(PID pid)
@@ -479,7 +445,7 @@ void scheduler_step(SuspendedTaskState* suspended_state)
 {
     auto* first_task = g_running_tasks_queue.head;
     kassert(first_task != nullptr);
-    kassert(klib::strcmp(first_task->name, "idle") == 0);
+    kassert(strcmp(first_task->name, "idle") == 0);
 
     asm volatile(
         "mov r0, %[system_stack] \n"
