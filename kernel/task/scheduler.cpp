@@ -182,15 +182,7 @@ static Error prepare_new_task(
     strncpy_safe(task->name, name, sizeof(task->name));
     task->pid = g_next_free_pid++;
     task->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
-
-    task->open_files.allocated = 4;
-    TRY(kmalloc(sizeof(*task->open_files.entries) * task->open_files.allocated, task->open_files.entries));
-    task->open_files.len = 0;
-    // POSIX software reserves 0, 1, 2 for stdin, stdout, stderr.
-    // We're not POSIX, but we want to catch software that attempts to use those fds instead of
-    // using the proper API.
-    task->open_files.next_fd = 4;
-
+    memset(task->open_files, 0, sizeof(task->open_files));
     task->next_to_run = nullptr;
     pid = task->pid;
 
@@ -274,22 +266,36 @@ static void idle_task()
     }
 }
 
-Error task_open_file(Task* task, char const* pathname, uint32_t, uint32_t& out_fd)
+int32_t task_find_free_file_descriptor(Task *task)
 {
-    TODO();
-    return NotImplemented;
+    // stdin, stdout and stderr have special handling
+    for (size_t i = 3; i < array_size(task->open_files); i++) {
+        if (NULL == task->open_files[i].file)
+            return i;
+    }
+
+    return -1;
 }
 
-Error task_close_file(Task* task, uint32_t fd)
+Error task_get_file_by_descriptor(Task *task, int32_t fd, FileCustody *&custody)
 {
-    TODO();
-    return NotImplemented;
+    if (fd < 0 || fd >= (int32_t) array_size(task->open_files))
+        return NotFound;
+    
+    if (task->open_files[fd].file == NULL)
+        return NotFound;
+    
+    custody = &task->open_files[fd];
+
+    return Success;
 }
 
-Error task_get_open_file(Task* task, uint32_t fd, FileCustody *&out_custody)
+void task_drop_file_descriptor(Task *task, int32_t fd)
 {
-    TODO();
-    return NotImplemented;
+    if (fd < 0 || fd >= (int32_t) array_size(task->open_files))
+        return;
+    
+    task->open_files[fd] = {};
 }
 
 Task *find_task_by_pid(PID pid)
@@ -349,13 +355,9 @@ void change_task_state(Task* task, TaskState new_state)
     case TaskState::Suspended:
         g_suspended_tasks_queue.append(task);
         break;
-    case TaskState::Zombie: {
-        
-        
-
+    case TaskState::Zombie:
         task_free(task);
         break;
-    }
     }
 }
 
@@ -374,13 +376,7 @@ void scheduler_init()
         .name = { 'i', 'd', 'l', 'e', '\0' },
         .pid = g_next_free_pid++,
         .time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH,
-
-        // Should never open files the idle task
-        .open_files = {
-            .len = 0,
-            .allocated = 0,
-            .next_fd = 0,
-            .entries = nullptr },
+        .open_files = {},
         .next_to_run = nullptr,
         .on_task_exit_list = nullptr
     };

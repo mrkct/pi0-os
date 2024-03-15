@@ -8,6 +8,8 @@
 
 namespace kernel {
 
+static constexpr int MAX_OPEN_FILES = 32;
+
 enum class TaskState {
     Running,
     Suspended,
@@ -30,14 +32,7 @@ struct Task {
     char name[32];
     PID pid;
     uint32_t time_slice;
-    struct {
-        size_t len, allocated;
-        int next_fd;
-        struct {
-            uint32_t fd;
-            File* file;
-        }* entries;
-    } open_files;
+    FileCustody open_files[MAX_OPEN_FILES];
     Task* next_to_run;
 
     OnTaskExitHandlerListItem* on_task_exit_list;
@@ -69,11 +64,13 @@ void scheduler_step(SuspendedTaskState*);
 
 void change_task_state(Task*, TaskState);
 
-Error task_open_file(Task*, char const*, uint32_t flags, uint32_t&);
+int32_t task_find_free_file_descriptor(Task*);
 
-Error task_close_file(Task*, uint32_t);
+Error task_get_file_by_descriptor(Task*, int32_t fd, FileCustody*&);
 
-Error task_get_open_file(Task*, uint32_t, FileCustody*&);
+Error task_set_file_descriptor(Task*, int32_t fd, FileCustody);
+
+void task_drop_file_descriptor(Task *task, int32_t fd);
 
 Task* find_task_by_pid(PID);
 

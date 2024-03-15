@@ -123,13 +123,16 @@ static SyscallResult sys$open_file(uintptr_t pathname, uint32_t flags)
 {
     auto* task = scheduler_current_task();
 
+    auto fd = task_find_free_file_descriptor(task);
+    if (fd < 0)
+        return TooManyOpenFiles;
+
     char const* absolute_path = nullptr;
     TRY(absolute_pathname(pathname, absolute_path));
 
-    uint32_t fd;
-    TRY(task_open_file(task, absolute_path, flags, fd));
+    TRY(vfs_open(absolute_path, flags, task->open_files[fd]));
 
-    return { reinterpret_cast<uint32_t>(fd) };
+    return { (uint32_t) fd };
 }
 
 static SyscallResult sys$read_file(uint32_t fd, uintptr_t user_buf, uint32_t count)
@@ -137,7 +140,7 @@ static SyscallResult sys$read_file(uint32_t fd, uintptr_t user_buf, uint32_t cou
     auto* task = scheduler_current_task();
 
     FileCustody *custody;
-    TRY(task_get_open_file(task, fd, custody));
+    TRY(task_get_file_by_descriptor(task, fd, custody));
     TRY(vfs_read(*custody, reinterpret_cast<uint8_t*>(user_buf), count, count));
 
     return count;
@@ -148,8 +151,8 @@ static SyscallResult sys$write_file(uint32_t fd, uintptr_t user_buf, uint32_t co
     auto* task = scheduler_current_task();
 
     FileCustody *custody;
-    TRY(task_get_open_file(task, fd, custody));
-    TRY(vfs_write(*custody, reinterpret_cast<uint8_t const*>(user_buf), count, count));
+    TRY(task_get_file_by_descriptor(task, fd, custody));
+    TRY(vfs_write(*custody, reinterpret_cast<uint8_t*>(user_buf), count, count));
 
     return count;
 }
@@ -157,7 +160,11 @@ static SyscallResult sys$write_file(uint32_t fd, uintptr_t user_buf, uint32_t co
 static SyscallResult sys$close_file(uint32_t fd)
 {
     auto* task = scheduler_current_task();
-    TRY(task_close_file(task, fd));
+
+    FileCustody *custody;
+    TRY(task_get_file_by_descriptor(task, fd, custody));
+    TRY(vfs_close(*custody));
+    task_drop_file_descriptor(task, fd);
 
     return Success;
 }
@@ -178,10 +185,11 @@ static SyscallResult sys$seek_file(uint32_t fd, int32_t offset, uint32_t mode_u3
     auto* task = scheduler_current_task();
 
     FileCustody *custody;
-    TRY(task_get_open_file(task, fd, custody));
+    TRY(task_get_file_by_descriptor(task, fd, custody));
     TRY(vfs_seek(*custody, static_cast<api::FileSeekMode>(mode_u32), offset));
 
-    return custody->seek_position;
+    // FIXME: This cast limits seeking to 4GB files, not great
+    return (uint32_t) custody->seek_position;
 }
 
 static SyscallResult sys$blit_framebuffer(
