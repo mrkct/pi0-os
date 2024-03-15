@@ -1,4 +1,5 @@
 #include <kernel/lib/math.h>
+#include <kernel/lib/string.h>
 #include <kernel/lib/memory.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/kheap.h>
@@ -93,7 +94,7 @@ Error krealloc(void*& addr, size_t size)
     //        due to being a bump allocator we know that the memory is contiguous.
     //        We might be copying some bytes that we shouldn't, but we won't be reading
     //        outside the current brk
-    klib::kmemcpy(new_addr, addr, size);
+    memcpy(new_addr, addr, size);
     if (auto err = kfree(addr); !err.is_success()) {
         kfree(new_addr); // FIXME: How do we handle a double error?
         return err;
