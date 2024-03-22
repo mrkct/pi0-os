@@ -3,9 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "files.h"
-#include "input.h"
-#include "time.h"
+
 
 #define SYSCALL_VECTOR 0x10
 
@@ -21,6 +19,8 @@ typedef enum SyscallIdentifiers {
     SYS_CloseFile = 13,
     SYS_Stat = 14,
     SYS_Seek = 15,
+    SYS_CreatePipe = 16,
+    SYS_Dup2 = 17,
 
     SYS_MakeDirectory = 20,
     SYS_OpenDirectory = 21,
@@ -67,8 +67,7 @@ static inline uint32_t syscall(SyscallIdentifiers id, uint32_t* extra_return, ui
     return result;
 }
 
-typedef uint32_t PID;
-typedef struct ProcessInfo {
-    PID pid;
-    char name[32];
-} ProcessInfo;
+#include "files.h"
+#include "process.h"
+#include "input.h"
+#include "time.h"

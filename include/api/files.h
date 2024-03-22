@@ -22,7 +22,8 @@ typedef enum {
 typedef enum {
     RegularFile,
     Directory,
-    CharacterDevice
+    CharacterDevice,
+    Pipe
 } FileType;
 
 typedef struct {

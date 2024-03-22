@@ -1,9 +1,11 @@
+#include <stdint.h>
 #include <api/syscalls.h>
 #include <kernel/datetime.h>
 #include <kernel/error.h>
 #include <kernel/interrupt.h>
 #include <kernel/lib/math.h>
 #include <kernel/lib/string.h>
+#include <kernel/lib/memory.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/vm.h>
 #include <kernel/syscall/syscalls.h>
@@ -11,6 +13,7 @@
 #include <kernel/timer.h>
 #include <kernel/device/framebuffer.h>
 #include <kernel/device/keyboard.h>
+#include <kernel/vfs/pipe.h>
 
 
 namespace kernel {
@@ -72,7 +75,7 @@ static SyscallResult sys$exit(int error_code)
 
 static SyscallResult sys$get_process_info(uintptr_t user_buf)
 {
-    ProcessInfo info;
+    api::ProcessInfo info;
     info.pid = scheduler_current_task()->pid;
     strncpy_safe(info.name, scheduler_current_task()->name, sizeof(info.name));
 
@@ -161,10 +164,7 @@ static SyscallResult sys$close_file(uint32_t fd)
 {
     auto* task = scheduler_current_task();
 
-    FileCustody *custody;
-    TRY(task_get_file_by_descriptor(task, fd, custody));
-    TRY(vfs_close(*custody));
-    task_drop_file_descriptor(task, fd);
+    TRY(task_drop_file_descriptor(task, fd));
 
     return Success;
 }
@@ -190,6 +190,41 @@ static SyscallResult sys$seek_file(uint32_t fd, int32_t offset, uint32_t mode_u3
 
     // FIXME: This cast limits seeking to 4GB files, not great
     return (uint32_t) custody->seek_position;
+}
+
+static SyscallResult sys$create_pipe(uintptr_t user_fds)
+{
+    auto* task = scheduler_current_task();
+
+    int32_t fds[2];
+    TRY(task_reserve_n_file_descriptors(task, 2, fds));
+
+    FileCustody read_pipe, write_pipe;
+    TRY(create_pipe(read_pipe, write_pipe));
+
+    MUST(task_set_file_descriptor(task, fds[0], read_pipe));
+    MUST(task_set_file_descriptor(task, fds[1], write_pipe));
+
+    vm_copy_to_user(task->address_space, user_fds, fds, 2 * sizeof(fds[0]));
+
+    return Success;
+}
+
+static SyscallResult sys$dup2(int32_t fd, int32_t new_fd)
+{
+    auto* task = scheduler_current_task();
+
+    FileCustody *original;
+    TRY(task_get_file_by_descriptor(task, fd, original));
+
+    // Intentionally ignore error
+    task_drop_file_descriptor(task, new_fd);
+
+    FileCustody copy;
+    TRY(vfs_duplicate_custody(*original, copy));
+    task_set_file_descriptor(task, new_fd, copy);
+
+    return Success;
 }
 
 static SyscallResult sys$blit_framebuffer(
@@ -223,33 +258,60 @@ static SyscallResult sys$poll_input(uint32_t queue_id, uintptr_t user_buffer)
     return Success;
 }
 
-static SyscallResult sys$spawn_process(uintptr_t path, uint32_t argc, const char **argv)
+static SyscallResult sys$spawn_process(const char *path, uintptr_t user_cfg)
 {
-    // The args need to be copied in the new process's address space, therefore we
-    // cannot pass a direct pointer to the running process's one.
-    // we have to copy the entire array in kernel space, then that gets copied in
-    // the new process's AS and at last we free the array in kernel space
+    // Setting up a new process requires to pass data between the current
+    // process's address space and the new process one's, therefore we must do
+    // a deep-copy of the cfg to kernel space first
+    api::SpawnProcessConfig cfg;
+    memcpy(&cfg, reinterpret_cast<void*>(user_cfg), sizeof(api::SpawnProcessConfig));
 
-    // TODO: This "works", but has a million memory leaks in case of failures
+    // Deep copy args
+    const char *k_args[8];
+    if (cfg.args_len > array_size(k_args))
+        return OutOfMemory;
 
-    char **k_argv;
-    TRY(kmalloc(sizeof(char*) * argc, k_argv));
-    for (size_t i = 0; i < argc; i++) {
-        size_t len = strlen(argv[i]);
-        MUST(kmalloc(sizeof(char) * len + 1, k_argv[i]));
-        strncpy_safe(k_argv[i], argv[i], len + 1);
+    char args_storage[64 * 5];
+    char *storage = args_storage;
+    uint32_t copied = 0;
+    
+    for (uint32_t i = 0; i < cfg.args_len; i++) {
+        uint32_t available = array_size(args_storage) - copied;
+        if (available == 0)
+            return OutOfMemory;
+        
+        size_t len = strnlen(cfg.args[i], available - 1);
+        if (cfg.args[i][len] != '\0')
+            return OutOfMemory;
+        
+        k_args[i] = (const char*) storage;
+        memcpy(storage, cfg.args[i], len + 1);
+        storage += len + 1;
     }
 
-    PID pid;
-    TRY(task_load_user_elf_from_path(
-        pid, 
-        reinterpret_cast<const char*>(path), 
-        (int) argc, 
-        k_argv));
+    // Actually create the process
+    api::PID pid;
+    TRY(task_load_user_elf_from_path(pid, path, cfg.args_len, k_args));
 
-    for (size_t i = 0; i < argc; i++)
-        kfree(k_argv[i]);
-    kfree(k_argv);
+    auto *current_task = scheduler_current_task();
+    auto *new_task = find_task_by_pid(pid);
+    kassert(new_task != NULL);
+
+    // Copy file descriptors
+    for (uint32_t i = 0; i < cfg.descriptors_len; i++) {
+        if (cfg.descriptors[i] == -1)
+            continue;
+        
+        FileCustody *to_duplicate;
+        MUST(task_get_file_by_descriptor(current_task, cfg.descriptors[i], to_duplicate));
+
+        // Intentionally ignore error here
+        task_drop_file_descriptor(new_task, i);
+
+        FileCustody new_custody;
+        MUST(vfs_duplicate_custody(*to_duplicate, new_custody));
+        MUST(task_set_file_descriptor(new_task, i, new_custody));
+    }
 
     return pid;
 }
@@ -264,7 +326,7 @@ static SyscallResult sys$await_process(int32_t pid)
     
     change_task_state(this_task, TaskState::Suspended);
     task_add_on_exit_handler(task, [](void *_pid) {
-            Task *task = find_task_by_pid(reinterpret_cast<PID>(_pid));
+            Task *task = find_task_by_pid(reinterpret_cast<api::PID>(_pid));
 
             // User might have manually killed the process while it was waiting
             if (task != nullptr)
@@ -314,6 +376,12 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
     case SyscallIdentifiers::SYS_Stat:
         result = sys$stat(static_cast<uintptr_t>(r0), static_cast<uintptr_t>(r1));
         break;
+    case SyscallIdentifiers::SYS_CreatePipe:
+        result = sys$create_pipe(static_cast<uintptr_t>(r0));
+        break;
+    case SyscallIdentifiers::SYS_Dup2:
+        result = sys$dup2(static_cast<int32_t>(r0), static_cast<int32_t>(r1));
+        break;
     case SyscallIdentifiers::SYS_MakeDirectory:
         break;
     case SyscallIdentifiers::SYS_OpenDirectory:
@@ -330,7 +398,7 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         result = sys$poll_input(static_cast<uint32_t>(r0), static_cast<uintptr_t>(r1));
         break;
     case SyscallIdentifiers::SYS_SpawnProcess:
-        result = sys$spawn_process(static_cast<uintptr_t>(r0), r1, reinterpret_cast<const char**>(r2));
+        result = sys$spawn_process(reinterpret_cast<const char*>(r0), r1);
         break;
     case SyscallIdentifiers::SYS_AwaitProcess:
         result = sys$await_process(static_cast<int32_t>(r0));

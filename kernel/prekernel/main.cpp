@@ -113,11 +113,11 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     timer_init();
     scheduler_init();
 
-    PID pid;
+    api::PID pid;
     // MUST(task_create_kernel_thread(pid, "A", 0, {}, task_A));
 
-    const char *args[] = {"/bina/shell"};
-    MUST(task_load_user_elf_from_path(pid, "/bina/shell", 1, args));
+    const char *args[] = {"/bina/term"};
+    MUST(task_load_user_elf_from_path(pid, "/bina/term", 1, args));
 
     // FIXME: There's a very hard to find bug where having this
     // task run can cause A to crash. Will investigate later

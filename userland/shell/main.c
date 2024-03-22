@@ -1,14 +1,44 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <api/syscalls.h>
-#include "libterm.h"
 #include "libsstring.h"
 
 #define MAX_ARGS 16
 
+static char *read_line(const char *prompt);
 static size_t tokenize(char *line);
 static size_t argv_from_tokenized_line(const char *tokenized_line,
     size_t tokens, const char *argv[], size_t max_args);
+
+static char *read_line(const char *prompt)
+{
+    printf("%s", prompt);
+
+    char *line = malloc(8);
+    size_t length = 0, allocated = 8;
+    
+    do {
+        int c = getchar();
+        if (c > 0)
+            putchar(c);
+
+        bool is_eol = c == '\n' || c == '\r';
+        if (c < 0 || (is_eol && length == 0))
+            continue;
+        if (is_eol && length > 0)
+            break;
+
+        if (length == allocated - 1) {
+            allocated += 8;
+            line = realloc(line, allocated);
+        }
+        line[length++] = (char) c;
+        line[length] = '\0';
+    } while (true);
+
+    return line;
+}
 
 static size_t tokenize(char *line)
 {
@@ -46,18 +76,6 @@ static size_t argv_from_tokenized_line(const char *tokenized_line,
     return argc;
 }
 
-static bool sys_spawn_process(const char *path, size_t argc, const char *argv[], pid_t *pid)
-{
-    int rc = syscall(SYS_SpawnProcess, (uint32_t*) pid, (uint32_t) path, argc, (uint32_t) argv, 0, 0);
-    return rc == 0;
-}
-
-static bool sys_await_process(pid_t pid)
-{
-    int rc = syscall(SYS_AwaitProcess, NULL, (uint32_t) pid, 0, 0, 0, 0);
-    return rc == 0;
-}
-
 static int run_builtin_command(const char *command, size_t argc, const char *argv[])
 {
     (void) argc;
@@ -73,11 +91,20 @@ static int run_builtin_command(const char *command, size_t argc, const char *arg
 
 static bool run_program(size_t argc, const char *argv[])
 {
-    pid_t pid;
-    if (sys_spawn_process(argv[0], argc, argv, &pid) != 0)
+    PID pid;
+    int32_t fds[] = {0, 1, 2}; // Inherit stdin, stdout and stderr
+    SpawnProcessConfig cfg = {
+        .args = argv,
+        .args_len = argc,
+        .descriptors = fds,
+        .descriptors_len = 3,
+        .flags = 0
+    };
+
+    if (spawn_process(argv[0], &cfg, &pid) != 0)
         return false;
-    
-    sys_await_process(pid);
+
+    await_process(pid);
 
     return true;
 }
@@ -89,10 +116,10 @@ int main(int argc, char **argv)
 
     char *line = NULL;
     const char *command_argv[MAX_ARGS];
+
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
     
-
-    terminal_init();
-
     while (1) {
         line = read_line("$: ");
         size_t tokens = tokenize(line);

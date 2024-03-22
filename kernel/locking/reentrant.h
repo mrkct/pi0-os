@@ -7,7 +7,7 @@ namespace kernel {
 
 struct ReentrantSpinlock {
     Spinlock internal_spinlock;
-    PID owner;
+    api::PID owner;
     size_t count;
 };
 

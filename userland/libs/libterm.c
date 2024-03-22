@@ -176,36 +176,8 @@ void terminal_init(void)
     term_redraw_all();
     term_refresh();
 
-    // s_stdout_print_func = term_stdout_stderr_override;
-    // s_stderr_print_func = term_stdout_stderr_override;
+    s_stdout_print_func = term_stdout_stderr_override;
+    s_stderr_print_func = term_stdout_stderr_override;
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
-}
-
-char *read_line(const char *prompt)
-{
-    printf("%s", prompt);
-
-    char *line = malloc(8);
-    size_t length = 0, allocated = 8;
-    
-    do {
-        KeyEvent event = wait_for_key_event();
-        if (event.press_state == false)
-            continue;
-        
-        if (length > 0 && (event.character == '\n' || event.character == '\r'))
-            break;
-
-        if (length == allocated - 1) {
-            allocated += 8;
-            line = realloc(line, allocated);
-        }
-        line[length++] = event.character;
-        line[length] = '\0';
-        printf("%c", event.character);
-    } while (true);
-    putchar('\n');
-
-    return line;
 }

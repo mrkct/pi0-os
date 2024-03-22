@@ -35,7 +35,7 @@ void* _sbrk(int incr)
 {
     uint8_t *brk = s_brk;
     if (s_brk + incr > s_heap + sizeof(s_heap)) {
-        write(2, OUT_OF_MEMORY_ERROR_MSG, sizeof(OUT_OF_MEMORY_ERROR_MSG));
+        write(STDERR_FILENO, OUT_OF_MEMORY_ERROR_MSG, sizeof(OUT_OF_MEMORY_ERROR_MSG));
         exit(-1);
         return NULL;
     }
@@ -54,9 +54,7 @@ int _fstat(int file, struct stat* st)
 
 int _isatty(int file)
 {
-    (void)file;
-
-    return 1;
+    return file < STDERR_FILENO;
 }
 
 int _lseek(int file, int ptr, int dir)
@@ -104,25 +102,17 @@ int _open(char const* pathname, int flags, int mode)
     if ((flags & ~(O_RDONLY | O_RDWR | O_WRONLY | O_APPEND)) != 0)
         return -1;
 
-    uint32_t fd;
-    int rc = syscall(
-        SYS_OpenFile,
-        (uint32_t*)&fd,
-        (uint32_t) pathname,
-        strlen(pathname),
-        MODE_READ | MODE_WRITE,
-        0, 0
-    );
-
+    int fd;
+    int rc = syscall(SYS_OpenFile, (uint32_t*)&fd, (uint32_t) pathname, 0, 0, 0, 0);
     if (rc > 0 && (flags & O_APPEND))
-        _lseek(rc, 0, 2);
-    
-    return (int) fd;
+        _lseek(fd, 0, SEEK_END);
+
+    return fd;
 }
 
 int _close(int file)
 {
-    if (file <= 2)
+    if (file < 0)
         return -1;
 
     return syscall(SYS_CloseFile, NULL, (uint32_t) file, 0, 0, 0, 0);
@@ -130,27 +120,35 @@ int _close(int file)
 
 int _write(int file, char* ptr, int len)
 {
-    if (file == 1) {
-        return s_stdout_print_func ? s_stdout_print_func(ptr, len) : -1;
-    } else if (file == 2) {
-        return s_stderr_print_func ? s_stderr_print_func(ptr, len) : -1;
-    } else if (file == 0) {
+    if (file < 0)
         return -1;
-    }
 
-    return -1;
+    uint32_t bytes_written;
+    int rc = syscall(SYS_WriteFile, &bytes_written, (uint32_t) file, (uint32_t) ptr, (uint32_t) len, 0, 0);
+    if (rc < 0)
+        return rc;
+    return (int) bytes_written;
 }
 
 int _read(int file, char* ptr, int len)
 {
-    return syscall(
-        SYS_ReadFile,
-        NULL,
-        (uint32_t) file,
-        (uint32_t) ptr,
-        len,
-        0, 0
-    );
+    if (file < 0)
+        return -1;
+    
+    uint32_t bytes_read;
+    int rc;
+
+    if (file == STDIN_FILENO) {
+        do {
+            rc = syscall(SYS_ReadFile, &bytes_read, (uint32_t) file, (uint32_t) ptr, len, 0, 0);
+        } while(bytes_read == 0 && rc >= 0);
+    } else {
+        rc = syscall(SYS_ReadFile, &bytes_read, (uint32_t) file, (uint32_t) ptr, len, 0, 0);
+    }
+
+    if (rc < 0)
+        return rc;
+    return (int) bytes_read;
 }
 
 int mkdir(char const* pathname, mode_t mode)

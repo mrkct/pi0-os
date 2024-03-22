@@ -8,7 +8,7 @@
 
 namespace kernel {
 
-static constexpr int MAX_OPEN_FILES = 32;
+static constexpr int MAX_OPEN_FILES_PER_TASK = 32;
 
 enum class TaskState {
     Running,
@@ -30,9 +30,9 @@ struct Task {
     AddressSpace address_space;
     SuspendedTaskState state;
     char name[32];
-    PID pid;
+    api::PID pid;
     uint32_t time_slice;
-    FileCustody open_files[MAX_OPEN_FILES];
+    FileCustody open_files[MAX_OPEN_FILES_PER_TASK];
     Task* next_to_run;
 
     OnTaskExitHandlerListItem* on_task_exit_list;
@@ -44,10 +44,10 @@ void scheduler_init();
 
 Task* scheduler_current_task();
 
-Error task_create_kernel_thread(PID&, char const* name, int argc, char const* argv[], void (*entry)());
+Error task_create_kernel_thread(api::PID&, char const* name, int argc, char const* argv[], void (*entry)());
 
 Error task_load_user_elf(
-    PID&,
+    api::PID&,
     char const* name,
     int argc,
     char const* argv[],
@@ -55,7 +55,7 @@ Error task_load_user_elf(
     size_t elf_binary_size);
 
 Error task_load_user_elf_from_path(
-    PID&,
+    api::PID&,
     char const* pathname,
     int argc,
     char const* const argv[]);
@@ -68,11 +68,15 @@ int32_t task_find_free_file_descriptor(Task*);
 
 Error task_get_file_by_descriptor(Task*, int32_t fd, FileCustody*&);
 
+Error task_reserve_n_file_descriptors(Task*, uint32_t n, int32_t out_fds[]);
+
 Error task_set_file_descriptor(Task*, int32_t fd, FileCustody);
 
-void task_drop_file_descriptor(Task *task, int32_t fd);
+Error task_drop_file_descriptor(Task *task, int32_t fd);
 
-Task* find_task_by_pid(PID);
+void task_inherit_file_descriptors(Task *parent, Task *child);
+
+Task* find_task_by_pid(api::PID);
 
 Error task_add_on_exit_handler(Task*, OnTaskExitHandler handler, void* arg);
 

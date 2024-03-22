@@ -69,6 +69,7 @@ SOURCES=\
 	kernel/vfs/fat32/fat32.cpp \
 	kernel/vfs/sysfs/sysfs.cpp \
 	kernel/vfs/path.cpp \
+	kernel/vfs/pipe.cpp \
 	kernel/vfs/vfs.cpp \
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))

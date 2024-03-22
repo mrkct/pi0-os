@@ -74,10 +74,10 @@ struct Queue {
         return nullptr;
     }
 
-    Task *find_by_pid(PID pid)
+    Task *find_by_pid(api::PID pid)
     {
         Task *current = head;
-        while (current != tail) {
+        while (current != nullptr) {
             if (current->pid == pid)
                 return current;
             
@@ -92,7 +92,7 @@ static void task_free(Task* task);
 void scheduler_step(SuspendedTaskState*);
 
 constexpr size_t IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH = 1;
-static PID g_next_free_pid = 0;
+static api::PID g_next_free_pid = 0;
 static Queue g_running_tasks_queue;
 static Queue g_suspended_tasks_queue;
 
@@ -105,7 +105,7 @@ static Queue g_suspended_tasks_queue;
  * @return Error 
  */
 static Error prepare_new_task(
-    PID& pid,
+    api::PID& pid,
     Task*& out_task,
     char const* name,
     int argc,
@@ -186,11 +186,12 @@ static Error prepare_new_task(
     task->next_to_run = nullptr;
     pid = task->pid;
 
+    vfs_get_default_stdin_stdout_stderr(task->open_files[0], task->open_files[1], task->open_files[2]);
     return Success;
 }
 
 Error task_create_kernel_thread(
-    PID& pid,
+    api::PID& pid,
     char const* name,
     int argc,
     const char *argv[],
@@ -208,7 +209,7 @@ Error task_create_kernel_thread(
 }
 
 Error task_load_user_elf(
-    PID& pid,
+    api::PID& pid,
     const char *name,
     int argc,
     char const* const argv[],
@@ -229,7 +230,7 @@ Error task_load_user_elf(
 }
 
 Error task_load_user_elf_from_path(
-    PID& pid,
+    api::PID& pid,
     const char *pathname,
     int argc,
     char const* const argv[]
@@ -290,15 +291,60 @@ Error task_get_file_by_descriptor(Task *task, int32_t fd, FileCustody *&custody)
     return Success;
 }
 
-void task_drop_file_descriptor(Task *task, int32_t fd)
+Error task_reserve_n_file_descriptors(Task *task, uint32_t n, int32_t out_fds[])
 {
-    if (fd < 0 || fd >= (int32_t) array_size(task->open_files))
-        return;
+    kassert(n == 2);
+
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < array_size(task->open_files) && found < n; i++) {
+        if (task->open_files[i].file)
+            continue;
+        
+        out_fds[found] = (int32_t) i;
+        found++;
+    }
+
+    if (found != n)
+        return TooManyOpenFiles;
     
-    task->open_files[fd] = {};
+    return Success;
 }
 
-Task *find_task_by_pid(PID pid)
+Error task_set_file_descriptor(Task *task, int32_t fd, FileCustody custody)
+{
+    if (fd < 0 || fd >= (int32_t) array_size(task->open_files))
+        return BadParameters;
+
+    FileCustody *c;
+    if (task_get_file_by_descriptor(task, fd, c).is_success())
+        return AlreadyInUse;
+
+    task->open_files[fd] = custody;
+    return Success;
+}
+
+void task_inherit_file_descriptors(Task *parent, Task *child)
+{
+    for (uint32_t fd = 0; fd < array_size(parent->open_files); fd++) {
+        if (parent->open_files[fd].file == NULL)
+            continue;
+        
+        kassert(child->open_files[fd].file == NULL);
+        vfs_duplicate_custody(parent->open_files[fd], child->open_files[fd]);
+    }
+}
+
+Error task_drop_file_descriptor(Task *task, int32_t fd)
+{
+    if (fd < 0 || fd >= (int32_t) array_size(task->open_files) || task->open_files[fd].file == NULL)
+        return BadParameters;
+    
+    TRY(vfs_close(task->open_files[fd]));
+    task->open_files[fd] = {};
+    return Success;
+}
+
+Task *find_task_by_pid(api::PID pid)
 {
     Task *t = g_running_tasks_queue.find_by_pid(pid);
     if (t != nullptr)

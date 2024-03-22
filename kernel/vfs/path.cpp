@@ -33,7 +33,7 @@ bool path_compare(Path a, Path b, bool case_sensitive)
         return false;
 
     const auto &pathcmp = [](Path a, Path b, bool (*cmp)(char, char)) {
-        int i;
+        uint32_t i;
         for (i = 0; i < a.len && i < b.len; i++) {
             if (!cmp(a.str[i], b.str[i]))
                 return false;
