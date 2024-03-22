@@ -10,6 +10,8 @@ extern "C" void* memcpy(void* dest, void const* src, size_t n);
 
 extern "C" char *strcpy(char *dst, const char *src);
 
+extern "C" size_t strnlen(const char *s, size_t maxlen);
+
 constexpr char *constexpr_strcpy(char *dst, const char *src)
 {
     char *ret_dst = dst;
