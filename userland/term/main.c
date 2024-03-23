@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <api/syscalls.h>
+#include "gfx_terminal.h"
 
 
 #define STDIN_FILENO    0
@@ -27,8 +28,7 @@ int main(int argc, char **argv)
     (void) argc;
     (void) argv;
 
-    setvbuf(stdout, NULL, _IONBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
+    gfx_terminal_init();
 
     int32_t stdin_fds[2];
     int32_t stdout_fds[2];
@@ -57,13 +57,13 @@ int main(int argc, char **argv)
         size = read(stdout_fds[READ_END], buf, sizeof(buf) - 1);
         if (size > 0) {
             buf[size] = '\0';
-            printf("%s", buf);
+            gfx_terminal_print(buf);
         }
         
         size = read(stderr_fds[READ_END], buf, sizeof(buf) - 1);
         if (size > 0) {
             buf[size] = '\0';
-            printf("%s", buf);
+            gfx_terminal_print(buf);
         }
 
         size = 0;

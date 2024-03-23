@@ -10,7 +10,7 @@ sudo cp -r base/* mp/
 
 make -C libs libapp.a
 
-TO_INSTALL="clock crash echo hello shell term"
+TO_INSTALL="clock crash echo hello shell term yes"
 for software in $TO_INSTALL; do
     echo "Installing $software..."
     sudo MOUNT_POINT=$(pwd)/mp make -C $software install
