@@ -119,6 +119,7 @@ void gfx_terminal_init(void)
     g_terminal.data = malloc(g_terminal.w * g_terminal.h);
     memset(g_terminal.data, ' ', g_terminal.w * g_terminal.h);
 
+    draw_filled_rect(&g_terminal.window, 0, 0, g_terminal.window.width, g_terminal.window.height, COL_BACKGROUND);
     redraw_all();
     refresh_window(&g_terminal.window);
 }
