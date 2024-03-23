@@ -48,7 +48,7 @@ static void software_interrupt_handler(SuspendedTaskState* suspended_state)
 
 static void data_abort_handler(SuspendedTaskState* state)
 {
-    state->task_lr -= 8;
+    state->lr -= 8;
 
     uintptr_t faulting_addr = read_fault_address_register();
     auto result = vm_try_fix_page_fault(faulting_addr);
@@ -65,7 +65,7 @@ static void data_abort_handler(SuspendedTaskState* state)
             get_running_task_name(),
             dfsr_status_to_string(fault_status),
             faulting_addr,
-            state->task_lr,
+            state->lr,
             FORMAT_ARGS_TASK_STATE(state)
         );
         change_task_state(scheduler_current_task(), TaskState::Zombie);
@@ -84,7 +84,7 @@ static void data_abort_handler(SuspendedTaskState* state)
         get_running_task_name(),
         dfsr_status_to_string(fault_status),
         faulting_addr,
-        state->task_lr,
+        state->lr,
         FORMAT_ARGS_TASK_STATE(state)
     );
 }
@@ -98,7 +98,6 @@ static void undefined_instruction_handler(SuspendedTaskState *suspended_state)
 {
     panic("unhandled UNDEFINED_INSTRUCTION");
 }
-
 
 static void irq_handler(SuspendedTaskState* suspended_state)
 {

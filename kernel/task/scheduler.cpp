@@ -38,6 +38,7 @@ struct Queue {
 
     Task* pop()
     {
+        sanity_check();
         if (head == nullptr)
             return nullptr;
 
@@ -45,18 +46,24 @@ struct Queue {
         head = head->next_to_run;
         if (head == nullptr)
             tail = nullptr;
+        sanity_check();
         return task;
     }
 
     Task* remove(Task* task)
     {
-        if (head == nullptr)
+        sanity_check();
+        if (head == nullptr) {
+            sanity_check();
             return nullptr;
+        }
 
         if (head == task) {
             head = head->next_to_run;
             if (head == nullptr)
                 tail = nullptr;
+            
+            sanity_check();
             return task;
         }
 
@@ -66,11 +73,14 @@ struct Queue {
                 current->next_to_run = current->next_to_run->next_to_run;
                 if (current->next_to_run == nullptr)
                     tail = current;
+                
+                sanity_check();
                 return task;
             }
             current = current->next_to_run;
         }
 
+        sanity_check();
         return nullptr;
     }
 
@@ -85,6 +95,20 @@ struct Queue {
         }
 
         return nullptr;
+    }
+
+    void sanity_check()
+    {
+        kassert((head == nullptr && tail == nullptr) || (head != nullptr && tail != nullptr));
+        if (head == nullptr)
+            return;
+        
+        Task *last = head;
+        while (last->next_to_run) {
+            last = last->next_to_run;
+        }
+        kassert(last != nullptr);
+        kassert(last == tail);
     }
 };
 
@@ -451,6 +475,7 @@ void scheduler_step(SuspendedTaskState* suspended_state)
     auto* current = g_running_tasks_queue.head;
     kassert(current != nullptr);
     auto* next = current->next_to_run;
+    kassert(next != nullptr);
 
     if (current->task_state == TaskState::Running) {
         current->time_slice--;
