@@ -2,14 +2,11 @@
 #include <string.h>
 #include <api/syscalls.h>
 #include "gfx_terminal.h"
-#include "libgfx.h"
 
 
 const int GFX_CHAR_WIDTH = 8;
 const int GFX_CHAR_HEIGHT = 12;
 const int TAB_SIZE = 4;
-const uint32_t COL_BACKGROUND = COL_BLUE;
-const uint32_t COL_FOREGROUND = COL_WHITE;
 
 struct {
     char *data;
@@ -42,7 +39,7 @@ static void redraw_all(void)
     }
 }
 
-static void _term_putchar(char c)
+static void _term_putchar(char c, uint32_t background_color, uint32_t foreground_color)
 {
     switch (c) {
     case '\r':
@@ -63,13 +60,13 @@ static void _term_putchar(char c)
             g_terminal.cursor.x,
             g_terminal.cursor.y,
             ' ',
-            COL_BACKGROUND,
-            COL_FOREGROUND);
+            background_color,
+            foreground_color);
         break;
     case '\t': {
         int spaces = g_terminal.cursor.x % TAB_SIZE == 0 ? TAB_SIZE : TAB_SIZE - (g_terminal.cursor.x % 4);
         for (int i = 0; i < spaces; i++)
-            _term_putchar(' ');
+            _term_putchar(' ', foreground_color, background_color);
         return;
     }
     default:
@@ -79,8 +76,8 @@ static void _term_putchar(char c)
             g_terminal.cursor.x,
             g_terminal.cursor.y,
             c,
-            COL_BACKGROUND,
-            COL_FOREGROUND);
+            background_color,
+            foreground_color);
         g_terminal.cursor.x++;
         break;
     }
@@ -100,10 +97,11 @@ static void _term_putchar(char c)
     }
 }
 
-void gfx_terminal_print(const char *s)
+void gfx_terminal_print(const char *s, uint32_t background_color, uint32_t foreground_color)
 {
+    printf("%s", s);
     while (*s) {
-        _term_putchar(*s);
+        _term_putchar(*s, background_color, foreground_color);
         s++;
     }
     refresh_window(&g_terminal.window);

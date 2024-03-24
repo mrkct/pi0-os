@@ -57,13 +57,13 @@ int main(int argc, char **argv)
         size = read(stdout_fds[READ_END], buf, sizeof(buf) - 1);
         if (size > 0) {
             buf[size] = '\0';
-            gfx_terminal_print(buf);
+            gfx_terminal_print(buf, COL_BLUE, COL_WHITE);
         }
         
         size = read(stderr_fds[READ_END], buf, sizeof(buf) - 1);
         if (size > 0) {
             buf[size] = '\0';
-            gfx_terminal_print(buf);
+            gfx_terminal_print(buf, COL_BLACK, COL_RED);
         }
 
         size = 0;
