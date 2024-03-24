@@ -4,6 +4,8 @@
 #include "gfx_terminal.h"
 
 
+const int LEFT_PADDING = 4;
+const int TOP_PADDING = 6;
 const int GFX_CHAR_WIDTH = 8;
 const int GFX_CHAR_HEIGHT = 12;
 const int TAB_SIZE = 4;
@@ -20,9 +22,23 @@ struct {
 
 static void gfx_put_char(Window *w, int x, int y, char c, uint32_t background_color, uint32_t foreground_color)
 {
-    draw_filled_rect(w, x * GFX_CHAR_WIDTH, y * GFX_CHAR_HEIGHT, GFX_CHAR_WIDTH, GFX_CHAR_HEIGHT, background_color);
+    draw_filled_rect(
+        w,
+        LEFT_PADDING + x * GFX_CHAR_WIDTH,
+        TOP_PADDING + y * GFX_CHAR_HEIGHT,
+        GFX_CHAR_WIDTH,
+        GFX_CHAR_HEIGHT,
+        background_color);
+
     char text[2] = { c, '\0' };
-    draw_text(w, get_default_font(), text, x * GFX_CHAR_WIDTH, y * GFX_CHAR_HEIGHT, foreground_color);
+
+    draw_text(
+        w,
+        get_default_font(),
+        text,
+        LEFT_PADDING + x * GFX_CHAR_WIDTH,
+        TOP_PADDING + y * GFX_CHAR_HEIGHT,
+        foreground_color);
 }
 
 static void redraw_all(void)
@@ -111,8 +127,8 @@ void gfx_terminal_init(void)
     g_terminal.window = open_window("Terminal", 640, 480, false);
     g_terminal.cursor.x = 0;
     g_terminal.cursor.y = 0;
-    g_terminal.w = g_terminal.window.width / GFX_CHAR_WIDTH;
-    g_terminal.h = g_terminal.window.height / GFX_CHAR_HEIGHT;
+    g_terminal.w = (g_terminal.window.width - 2*LEFT_PADDING) / GFX_CHAR_WIDTH;
+    g_terminal.h = (g_terminal.window.height - 2*TOP_PADDING) / GFX_CHAR_HEIGHT;
     g_terminal.data = malloc(g_terminal.w * g_terminal.h);
     memset(g_terminal.data, ' ', g_terminal.w * g_terminal.h);
 
