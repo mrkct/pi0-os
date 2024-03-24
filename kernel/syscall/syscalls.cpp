@@ -96,14 +96,22 @@ static SyscallResult sys$get_datetime(uintptr_t user_buf)
 static SyscallResult sys$sleep(uint32_t ms)
 {
     auto* task = scheduler_current_task();
-    // kprintf("Suspending task %s\n", task->name);
+
+    struct {
+        api::PID pid;
+    } *cb_data;
+    TRY(kmalloc(sizeof(*cb_data), cb_data));
+
     change_task_state(task, TaskState::Suspended);
     timer_exec_after(
-        ms, [](void* task) {
-            // kprintf("Waking up task %s\n", static_cast<Task*>(task)->name);
-            change_task_state(static_cast<Task*>(task), TaskState::Running);
-        },
-        task);
+        ms, [](void * _data) {
+            auto data = static_cast<decltype(cb_data)>(_data);
+            auto pid = data->pid;
+            Task *task = find_task_by_pid(pid);
+            if (task != nullptr && task->task_state == TaskState::Suspended)
+                change_task_state(task, TaskState::Running);
+            kfree(data);
+        }, cb_data);
 
     return Success;
 }
@@ -133,7 +141,7 @@ static SyscallResult sys$open_file(uintptr_t pathname, uint32_t flags)
     char const* absolute_path = nullptr;
     TRY(absolute_pathname(pathname, absolute_path));
 
-    TRY(vfs_open(absolute_path, flags, task->open_files[fd]));
+    TRY(vfs_open(absolute_path, flags, task->open_files[fd].custody));
 
     return { (uint32_t) fd };
 }
@@ -223,6 +231,34 @@ static SyscallResult sys$dup2(int32_t fd, int32_t new_fd)
     FileCustody copy;
     TRY(vfs_duplicate_custody(*original, copy));
     task_set_file_descriptor(task, new_fd, copy);
+
+    return Success;
+}
+
+static SyscallResult sys$select(int32_t *fds, int32_t len)
+{
+    auto *task = scheduler_current_task();
+
+    bool data_is_available = false;
+    for (int32_t i = 0; i < len; i++) {
+        FileCustody *custody;
+        TRY(task_get_file_by_descriptor(task, fds[i], custody));
+        
+        if (vfs_can_read_data(*custody)) {
+            data_is_available = true;
+            break;
+        }
+    }
+
+    if (data_is_available)
+        return Success;
+    
+    change_task_state(task, TaskState::Suspended);
+    for (int32_t i = 0; i < len; i++) {
+        FileCustody *custody;
+        TRY(task_get_file_by_descriptor(task, fds[i], custody));
+        task_wakeup_on_fd_update(task, fds[i]);
+    }
 
     return Success;
 }
@@ -363,6 +399,9 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         break;
     case SyscallIdentifiers::SYS_Dup2:
         result = sys$dup2(static_cast<int32_t>(r0), static_cast<int32_t>(r1));
+        break;
+    case SyscallIdentifiers::SYS_Select:
+        result = sys$select(reinterpret_cast<int32_t*>(r0), static_cast<int32_t>(r1));
         break;
     case SyscallIdentifiers::SYS_MakeDirectory:
         break;

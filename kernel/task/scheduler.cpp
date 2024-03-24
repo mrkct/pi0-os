@@ -210,7 +210,11 @@ static Error prepare_new_task(
     task->next_to_run = nullptr;
     pid = task->pid;
 
-    vfs_get_default_stdin_stdout_stderr(task->open_files[0], task->open_files[1], task->open_files[2]);
+    vfs_get_default_stdin_stdout_stderr(
+        task->open_files[0].custody,
+        task->open_files[1].custody,
+        task->open_files[2].custody
+    );
     return Success;
 }
 
@@ -295,24 +299,45 @@ int32_t task_find_free_file_descriptor(Task *task)
 {
     // stdin, stdout and stderr have special handling
     for (size_t i = 3; i < array_size(task->open_files); i++) {
-        if (NULL == task->open_files[i].file)
+        if (NULL == task->open_files[i].custody.file)
             return i;
     }
 
     return -1;
 }
 
-Error task_get_file_by_descriptor(Task *task, int32_t fd, FileCustody *&custody)
+static Error task_get_file_by_descriptor(Task *task, int32_t fd, TaskFileCustody *&custody)
 {
     if (fd < 0 || fd >= (int32_t) array_size(task->open_files))
         return NotFound;
     
-    if (task->open_files[fd].file == NULL)
+    if (task->open_files[fd].custody.file == NULL)
         return NotFound;
     
     custody = &task->open_files[fd];
 
     return Success;
+}
+
+Error task_get_file_by_descriptor(Task *task, int32_t fd, FileCustody *&custody)
+{
+    TaskFileCustody *c;
+    TRY(task_get_file_by_descriptor(task, fd, c));
+    custody = &c->custody;
+
+    return Success;
+}
+
+bool task_get_custody_by_file(Task *task, File *file, TaskFileCustody* &custody)
+{
+    for (size_t i = 0; i < array_size(task->open_files); i++) {
+        if (task->open_files[i].custody.file == file) {
+            custody = &task->open_files[i];
+            return true;
+        }
+    }
+
+    return false;
 }
 
 Error task_reserve_n_file_descriptors(Task *task, uint32_t n, int32_t out_fds[])
@@ -321,7 +346,7 @@ Error task_reserve_n_file_descriptors(Task *task, uint32_t n, int32_t out_fds[])
 
     uint32_t found = 0;
     for (uint32_t i = 0; i < array_size(task->open_files) && found < n; i++) {
-        if (task->open_files[i].file)
+        if (task->open_files[i].custody.file)
             continue;
         
         out_fds[found] = (int32_t) i;
@@ -343,27 +368,53 @@ Error task_set_file_descriptor(Task *task, int32_t fd, FileCustody custody)
     if (task_get_file_by_descriptor(task, fd, c).is_success())
         return AlreadyInUse;
 
-    task->open_files[fd] = custody;
+    task->open_files[fd].custody = custody;
     return Success;
 }
 
 void task_inherit_file_descriptors(Task *parent, Task *child)
 {
     for (uint32_t fd = 0; fd < array_size(parent->open_files); fd++) {
-        if (parent->open_files[fd].file == NULL)
+        if (parent->open_files[fd].custody.file == NULL)
             continue;
         
-        kassert(child->open_files[fd].file == NULL);
-        vfs_duplicate_custody(parent->open_files[fd], child->open_files[fd]);
+        kassert(child->open_files[fd].custody.file == NULL);
+        vfs_duplicate_custody(parent->open_files[fd].custody, child->open_files[fd].custody);
+    }
+}
+
+Error task_wakeup_on_fd_update(Task *task, int32_t fd)
+{
+    TaskFileCustody *custody;
+    TRY(task_get_file_by_descriptor(task, fd, custody));
+    custody->wakeup_on_update = true;
+
+    return Success;
+}
+
+void scheduler_notify_file_update(File *file)
+{
+    Task *task = g_suspended_tasks_queue.head;
+    while (task) {
+        // We need to read this because we might remove
+        // the task from its current list if it needs to be woken up
+        Task *next = task->next_to_run;
+
+        TaskFileCustody *custody;
+        if (task_get_custody_by_file(task, file, custody) && custody->wakeup_on_update) {
+            change_task_state(task, TaskState::Running);
+        }
+
+        task = next;
     }
 }
 
 Error task_drop_file_descriptor(Task *task, int32_t fd)
 {
-    if (fd < 0 || fd >= (int32_t) array_size(task->open_files) || task->open_files[fd].file == NULL)
+    if (fd < 0 || fd >= (int32_t) array_size(task->open_files) || task->open_files[fd].custody.file == NULL)
         return BadParameters;
     
-    TRY(vfs_close(task->open_files[fd]));
+    TRY(vfs_close(task->open_files[fd].custody));
     task->open_files[fd] = {};
     return Success;
 }

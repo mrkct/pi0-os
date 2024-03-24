@@ -21,6 +21,7 @@ typedef enum SyscallIdentifiers {
     SYS_Seek = 15,
     SYS_CreatePipe = 16,
     SYS_Dup2 = 17,
+    SYS_Select = 18,
 
     SYS_MakeDirectory = 20,
     SYS_OpenDirectory = 21,

@@ -24,6 +24,11 @@ struct OnTaskExitHandlerListItem {
     struct OnTaskExitHandlerListItem* next;
 };
 
+struct TaskFileCustody {
+    FileCustody custody;
+    bool wakeup_on_update;
+};
+
 struct Task {
     int exit_code;
     TaskState task_state;
@@ -32,7 +37,7 @@ struct Task {
     char name[32];
     api::PID pid;
     uint32_t time_slice;
-    FileCustody open_files[MAX_OPEN_FILES_PER_TASK];
+    TaskFileCustody open_files[MAX_OPEN_FILES_PER_TASK];
     Task* next_to_run;
 
     OnTaskExitHandlerListItem* on_task_exit_list;
@@ -76,8 +81,12 @@ Error task_drop_file_descriptor(Task *task, int32_t fd);
 
 void task_inherit_file_descriptors(Task *parent, Task *child);
 
+Error task_wakeup_on_fd_update(Task *task, int32_t fd);
+
 Task* find_task_by_pid(api::PID);
 
 Error task_add_on_exit_handler(Task*, OnTaskExitHandler handler, void* arg);
+
+void scheduler_notify_file_update(File *file);
 
 }

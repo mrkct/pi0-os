@@ -245,6 +245,12 @@ Error vfs_stat(const char *path, api::Stat &stat)
     return Success;
 }
 
+bool vfs_can_read_data(FileCustody&)
+{
+    // TODO: Implement this
+    return true;
+}
+
 Error vfs_duplicate_custody(FileCustody &original, FileCustody &out_copy)
 {
     original.file->refcount++;

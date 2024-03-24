@@ -30,6 +30,8 @@ Error vfs_close(FileCustody&);
 
 Error vfs_stat(const char *path, api::Stat&);
 
+bool vfs_can_read_data(FileCustody &custody);
+
 Error vfs_duplicate_custody(FileCustody&, FileCustody&);
 
 Error vfs_init();
