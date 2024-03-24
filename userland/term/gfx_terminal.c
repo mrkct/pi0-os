@@ -99,7 +99,6 @@ static void _term_putchar(char c, uint32_t background_color, uint32_t foreground
 
 void gfx_terminal_print(const char *s, uint32_t background_color, uint32_t foreground_color)
 {
-    printf("%s", s);
     while (*s) {
         _term_putchar(*s, background_color, foreground_color);
         s++;

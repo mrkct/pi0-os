@@ -20,10 +20,12 @@ static char *read_line(const char *prompt)
     
     do {
         int c = getchar();
-        if (c > 0)
-            putchar(c);
+        if (c < 0 || c == '\r')
+            continue;
 
-        bool is_eol = c == '\n' || c == '\r';
+        putchar(c);
+
+        bool is_eol = c == '\n';
         if (c < 0 || (is_eol && length == 0))
             continue;
         if (is_eol && length > 0)
@@ -89,7 +91,7 @@ static int run_builtin_command(const char *command, size_t argc, const char *arg
     return -1;
 }
 
-static bool run_program(size_t argc, const char *argv[])
+static int run_program(size_t argc, const char *argv[])
 {
     PID pid;
     int32_t fds[] = {0, 1, 2}; // Inherit stdin, stdout and stderr
@@ -102,11 +104,11 @@ static bool run_program(size_t argc, const char *argv[])
     };
 
     if (spawn_process(argv[0], &cfg, &pid) != 0)
-        return false;
+        return -1;
 
     await_process(pid);
 
-    return true;
+    return 0;
 }
 
 int main(int argc, char **argv)
