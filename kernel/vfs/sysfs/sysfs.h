@@ -5,6 +5,6 @@
 
 namespace kernel {
 
-Error sysfs_init(Filesystem&);
+Error sysfs_init(Filesystem*&);
 
 }

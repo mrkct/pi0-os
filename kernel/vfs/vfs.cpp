@@ -109,6 +109,7 @@ static Error traverse_to_direntry(Path path, DirectoryEntry &out_entry)
         if (path_startswith(path, s_vfs.mountpoints[i].path)) {
             fs_relative_path = path_from_string(path.str + s_vfs.mountpoints[i].path.len);
             filesystem = s_vfs.mountpoints[i].filesystem;
+            break;
         }
     }
 

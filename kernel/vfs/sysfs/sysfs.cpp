@@ -2,13 +2,15 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/lib/math.h>
 #include <kernel/lib/string.h>
+#include <kernel/lib/memory.h>
 #include <kernel/device/systimer.h>
 #include <kernel/vfs/sysfs/sysfs.h>
+#include <kernel/device/keyboard.h>
 
 
 namespace kernel {
 
-enum class SysfsFileId { FsRoot, MachineId, CurrentTime };
+enum class SysfsFileId { FsRoot, MachineId, CurrentTime, Keyboard };
 
 struct SysfsDirectoryEntryContext {
     SysfsFileId file_id;
@@ -18,14 +20,29 @@ struct SysfsOpenFileContext {
     SysfsFileId file_id;
 };
 
-static constexpr DirectoryEntry make_dirent(
+
+
+static DirectoryEntry make_dirent(SysfsFileId file_id, const char *name, api::FileType filetype);
+static Error get_root_directory(Filesystem&, DirectoryEntry &out_entry);
+static Error open(DirectoryEntry &entry, File &out_file);
+
+static Filesystem sysfs = {
+    .is_case_sensitive = true,
+    .opaque = NULL,
+    .root_directory = get_root_directory,
+    .open = open
+};
+
+static DirectoryEntry ROOT_DIRECTORY_ENTRIES[4];
+
+static DirectoryEntry make_dirent(
     SysfsFileId file_id,
     const char *name,
     api::FileType filetype
 )
 {
     DirectoryEntry entry = {};
-    entry.fs = NULL;
+    entry.fs = &sysfs;
     constexpr_strcpy(entry.name, name);
     entry.filetype = filetype;
     entry.size = 0;
@@ -35,13 +52,6 @@ static constexpr DirectoryEntry make_dirent(
 
     return entry;
 }
-
-static DirectoryEntry ROOT_DIRECTORY_ENTRIES[] = {
-    make_dirent(SysfsFileId::FsRoot, "", api::Directory),
-    make_dirent(SysfsFileId::MachineId, "id", api::CharacterDevice),
-    make_dirent(SysfsFileId::CurrentTime, "time", api::CharacterDevice)
-};
-
 
 static Error get_root_directory(Filesystem&, DirectoryEntry &out_entry)
 {
@@ -80,6 +90,7 @@ static Error open(DirectoryEntry &entry, File &out_file)
             size = end_offset - start_offset;
 
             memcpy(buffer, &ROOT_DIRECTORY_ENTRIES[offset / sizeof(DirectoryEntry)], size);
+            bytes_read = size;
             return Success;
         };
         break;
@@ -95,6 +106,7 @@ static Error open(DirectoryEntry &entry, File &out_file)
             auto to_copy = min<uint32_t>(size, strlen(machine_id));
             memcpy(buffer, machine_id, to_copy - 1);
             buffer[to_copy] = '\0';
+            bytes_read = to_copy;
             return Success;
         };
         break;
@@ -112,7 +124,22 @@ static Error open(DirectoryEntry &entry, File &out_file)
             return Success;
         };
         break;
-    
+
+    case SysfsFileId::Keyboard:
+        out_file.read = [](File&, uint64_t, uint8_t *buffer, uint32_t size, uint32_t &bytes_read) {
+            if (size < sizeof(api::KeyEvent)) {
+                bytes_read = 0;
+                return Success;
+            }
+            size = sizeof(api::KeyEvent);
+            
+            bytes_read = 0;
+            if (read_keyevent(*reinterpret_cast<api::KeyEvent*>(buffer)))
+                bytes_read = sizeof(api::KeyEvent);
+            return Success;
+        };
+        break;
+
     default:
         return NotSupported;
     }
@@ -120,14 +147,14 @@ static Error open(DirectoryEntry &entry, File &out_file)
     return Success;
 }
 
-Error sysfs_init(Filesystem &fs)
+Error sysfs_init(Filesystem* &out_fs)
 {
-    fs = Filesystem {
-        .is_case_sensitive = true,
-        .opaque = NULL,
-        .root_directory = get_root_directory,
-        .open = open
-    };
+    ROOT_DIRECTORY_ENTRIES[0] = make_dirent(SysfsFileId::FsRoot, "", api::Directory);
+    ROOT_DIRECTORY_ENTRIES[1] = make_dirent(SysfsFileId::MachineId, "id", api::CharacterDevice);
+    ROOT_DIRECTORY_ENTRIES[2] = make_dirent(SysfsFileId::CurrentTime, "time", api::CharacterDevice);
+    ROOT_DIRECTORY_ENTRIES[3] = make_dirent(SysfsFileId::Keyboard, "kbd", api::CharacterDevice);
+
+    out_fs = &sysfs;
     return Success;
 };
 

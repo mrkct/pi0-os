@@ -101,9 +101,9 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     MUST(fat32_create(fat32_fs, fs_storage));
     vfs_mount("", &fat32_fs);
 
-    static Filesystem sysfs;
+    Filesystem *sysfs;
     MUST(sysfs_init(sysfs));
-    vfs_mount("/sys", &sysfs);
+    vfs_mount("/sys", sysfs);
 
     datetime_init();
     syscall_init();

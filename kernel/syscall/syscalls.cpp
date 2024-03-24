@@ -96,11 +96,11 @@ static SyscallResult sys$get_datetime(uintptr_t user_buf)
 static SyscallResult sys$sleep(uint32_t ms)
 {
     auto* task = scheduler_current_task();
-    kprintf("Suspending task %s\n", task->name);
+    // kprintf("Suspending task %s\n", task->name);
     change_task_state(task, TaskState::Suspended);
     timer_exec_after(
         ms, [](void* task) {
-            kprintf("Waking up task %s\n", static_cast<Task*>(task)->name);
+            // kprintf("Waking up task %s\n", static_cast<Task*>(task)->name);
             change_task_state(static_cast<Task*>(task), TaskState::Running);
         },
         task);
@@ -240,24 +240,6 @@ static SyscallResult sys$blit_framebuffer(
     return Success;
 }
 
-static SyscallResult sys$poll_input(uint32_t queue_id, uintptr_t user_buffer)
-{
-    switch (queue_id) {
-    case 0: {
-        KeyEvent event;
-        if (!g_keyboard_events.pop(event))
-            return EndOfData;
-        
-        TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buffer, &event, sizeof(event)));
-        break;
-    }
-    default:
-        return NotFound;
-    }
-
-    return Success;
-}
-
 static SyscallResult sys$spawn_process(const char *path, uintptr_t user_cfg)
 {
     // Setting up a new process requires to pass data between the current
@@ -393,9 +375,6 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         break;
     case SyscallIdentifiers::SYS_Sleep:
         result = sys$sleep(r0);
-        break;
-    case SyscallIdentifiers::SYS_PollInput:
-        result = sys$poll_input(static_cast<uint32_t>(r0), static_cast<uintptr_t>(r1));
         break;
     case SyscallIdentifiers::SYS_SpawnProcess:
         result = sys$spawn_process(reinterpret_cast<const char*>(r0), r1);

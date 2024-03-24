@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <api/syscalls.h>
 #include "gfx_terminal.h"
@@ -28,7 +29,11 @@ int main(int argc, char **argv)
     (void) argc;
     (void) argv;
 
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
     gfx_terminal_init();
+
+    int32_t kbd_fd = open("/sys/kbd", 0, O_RDONLY);
 
     int32_t stdin_fds[2];
     int32_t stdout_fds[2];
@@ -68,7 +73,7 @@ int main(int argc, char **argv)
 
         size = 0;
         KeyEvent event;
-        while(0 == poll_keyboard_event(&event) && size < (int) (sizeof(buf) - 1)) {
+        while(sizeof(event) == read(kbd_fd, &event, sizeof(event))) {
             if (event.press_state == false)
                 continue;
             
