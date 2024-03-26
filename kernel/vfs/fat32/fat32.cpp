@@ -70,16 +70,16 @@ static Error next_cluster(Fat32Context& ctx, uint32_t cluster, uint32_t& next_cl
     return Success;
 }
 
-static Error step_cluster_chain(Fat32Context &ctx, uint32_t first_cluster, uint32_t steps, uint32_t& cluster)
+static Error step_cluster_chain(Fat32Context &ctx, uint32_t first_cluster, uint32_t steps, uint32_t& out_cluster)
 {
     uint32_t current = first_cluster;
     for (uint32_t i = 0; i < steps; i++) {
         TRY(next_cluster(ctx, current, current));
-        if (!fat32::is_valid_cluster(cluster))
+        if (!fat32::is_valid_cluster(current))
             break;
     }
 
-    cluster = current;
+    out_cluster = current;
     return Success;
 }
 
