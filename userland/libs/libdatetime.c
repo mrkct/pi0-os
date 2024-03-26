@@ -2,7 +2,7 @@
 #include "libdatetime.h"
 
 
-void sleep(int ms)
+void os_sleep(int ms)
 {
     syscall(SYS_Sleep, NULL, ms, 0, 0, 0, 0);
 }

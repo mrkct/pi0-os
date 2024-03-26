@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     printf("Current time: %d:%d:%d\n", datetime.hour, datetime.minute, datetime.second);
     while (true) {
         draw_clock(&window, &datetime);
-        sleep(1000);
+        os_sleep(1000);
         datetime = datetime_add(datetime, 0, 0, 1);
     }
 

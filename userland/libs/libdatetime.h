@@ -2,7 +2,7 @@
 
 #include <api/syscalls.h>
 
-void sleep(int ms);
+void os_sleep(int ms);
 
 int get_datetime(DateTime*);
 

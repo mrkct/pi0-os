@@ -21,7 +21,7 @@ void _exit(int status)
     while(1);
 }
 
-static uint8_t s_heap[16 * 1024 * 1024];
+static uint8_t s_heap[64 * 1024 * 1024];
 static uint8_t *s_brk = s_heap;
 int(*s_stdout_print_func)(char const *, int) = sys_debuglog;
 int(*s_stderr_print_func)(char const *, int) = sys_debuglog;
@@ -59,11 +59,12 @@ int _isatty(int file)
 
 int _lseek(int file, int ptr, int dir)
 {
-    (void)file;
-    (void)ptr;
-    (void)dir;
-
-    return 0;
+    uint32_t seek;
+    int rc = syscall(SYS_Seek, &seek, (uint32_t) file, (uint32_t) ptr, (uint32_t) dir, 0, 0);
+    if (rc < 0)
+        return -1;
+    
+    return (int) seek;
 }
 
 int _link(char const* oldpath, char const* newpath)
@@ -98,9 +99,6 @@ int _getpid(void)
 int _open(char const* pathname, int flags, int mode)
 {
     (void) mode;
-
-    if ((flags & ~(O_RDONLY | O_RDWR | O_WRONLY | O_APPEND)) != 0)
-        return -1;
 
     int fd;
     int rc = syscall(SYS_OpenFile, (uint32_t*)&fd, (uint32_t) pathname, 0, 0, 0, 0);
