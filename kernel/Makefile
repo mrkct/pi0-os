@@ -67,6 +67,7 @@ SOURCES=\
 	kernel/task/scheduler.cpp \
 	kernel/timer.cpp \
 	kernel/vfs/fat32/fat32.cpp \
+	kernel/vfs/filesystem.cpp \
 	kernel/vfs/sysfs/sysfs.cpp \
 	kernel/vfs/path.cpp \
 	kernel/vfs/pipe.cpp \

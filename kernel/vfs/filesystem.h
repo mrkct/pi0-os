@@ -37,6 +37,8 @@ struct File {
     Error (*close)(File&);
 };
 
+Error normal_checked_seek(File &, uint64_t current, api::FileSeekMode, int32_t off, uint64_t &);
+
 struct DirectoryEntry {
     Filesystem *fs;
     char name[64];

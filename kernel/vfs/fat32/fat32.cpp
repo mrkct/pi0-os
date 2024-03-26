@@ -307,7 +307,7 @@ static Error open_regular_file_entry(DirectoryEntry& entry, File &out_file)
 
         .read = regular_file_read,
         .write = NULL,
-        .seek = NULL,
+        .seek = normal_checked_seek,
         .close = [](auto &file) { return kfree(file.opaque); }
     };
 
@@ -338,7 +338,7 @@ static Error open_directory_entry(DirectoryEntry& entry, File &out_file)
 
         .read = directory_file_read,
         .write = NULL,
-        .seek = NULL,
+        .seek = normal_checked_seek,
         .close = [](auto &file) { return kfree(file.opaque); }
     };
 
