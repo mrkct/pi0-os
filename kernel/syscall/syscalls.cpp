@@ -101,6 +101,7 @@ static SyscallResult sys$sleep(uint32_t ms)
         api::PID pid;
     } *cb_data;
     TRY(kmalloc(sizeof(*cb_data), cb_data));
+    cb_data->pid = task->pid;
 
     change_task_state(task, TaskState::Suspended);
     timer_exec_after(
