@@ -119,6 +119,17 @@ constexpr size_t IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH = 1;
 static api::PID g_next_free_pid = 0;
 static Queue g_running_tasks_queue;
 static Queue g_suspended_tasks_queue;
+static Task *g_running_task = nullptr;
+
+static Task *g_idle_task;
+static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
+
+static void idle_task()
+{
+    while (1) {
+        asm volatile("wfi");
+    }
+}
 
 /**
  * @brief Prepares a new task by setting everything except loading the program in the address space
@@ -286,14 +297,7 @@ Error task_load_user_elf_from_path(
     return result;
 }
 
-static __attribute__((aligned(8))) uint8_t g_idle_task_stack[4 * _1KB];
 
-static void idle_task()
-{
-    while (1) {
-        syscall(SyscallIdentifiers::SYS_Yield, nullptr, 0, 0, 0, 0, 0);
-    }
-}
 
 int32_t task_find_free_file_descriptor(Task *task)
 {
@@ -449,7 +453,11 @@ void change_task_state(Task* task, TaskState new_state)
 
     auto previous_state = task->task_state;
     task->task_state = new_state;
-    if (g_running_tasks_queue.head == task) {
+    kprintf("[SCHED]: Moving task %s into state %s\n", task->name,
+        new_state == TaskState::Running ? "RUNNING" :
+        new_state == TaskState::Suspended ? "SUSPENDED": "ZOMBIE");
+
+    if (scheduler_current_task() == task) {
         // It's going to be moved to the correct queue by scheduler_step
         return;
     }
@@ -484,9 +492,8 @@ void change_task_state(Task* task, TaskState new_state)
 
 void scheduler_init()
 {
-    Task* task;
-    MUST(kmalloc(sizeof(Task), task));
-    *task = Task {
+    MUST(kmalloc(sizeof(Task), g_idle_task));
+    *g_idle_task = Task {
         .exit_code = 0,
         .task_state = TaskState::Running,
 
@@ -501,9 +508,9 @@ void scheduler_init()
         .next_to_run = nullptr,
         .on_task_exit_list = nullptr
     };
-    task->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
-    task->state.lr = reinterpret_cast<uint32_t>(idle_task);
-    g_running_tasks_queue.append(task);
+    g_idle_task->state.task_sp = reinterpret_cast<uint32_t>(g_idle_task_stack + sizeof(g_idle_task_stack) - 8);
+    g_idle_task->state.lr = reinterpret_cast<uint32_t>(idle_task);
+    g_running_task = g_idle_task;
 }
 
 static void task_free(Task* task)
@@ -519,49 +526,52 @@ static void task_free(Task* task)
     kfree(task);
 }
 
-Task* scheduler_current_task() { return g_running_tasks_queue.head; }
+Task* scheduler_current_task()
+{
+    // kassert(g_running_task != nullptr);
+    return g_running_task;
+}
 
 void scheduler_step(SuspendedTaskState* suspended_state)
 {
-    auto* current = g_running_tasks_queue.head;
+    bool old_needs_to_be_freed = false;
+
+    auto* current = g_running_task;
     kassert(current != nullptr);
-    auto* next = current->next_to_run;
-    kassert(next != nullptr);
-
-    if (current->task_state == TaskState::Running) {
-        current->time_slice--;
-        if (current->time_slice > 0)
-            return;
-
-        if (next == nullptr) {
-            current->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
-            return;
+    current->state = *suspended_state;
+    if (current != g_idle_task) {
+        switch (current->task_state) {
+        case TaskState::Running:
+            g_running_tasks_queue.append(current);
+            break;
+        case TaskState::Suspended:
+            g_suspended_tasks_queue.append(current);
+            break;
+        case TaskState::Zombie:
+            old_needs_to_be_freed = true;
+            break;
         }
     }
 
-    g_running_tasks_queue.pop();
-    current->state = *suspended_state;
+    auto *next = g_running_tasks_queue.pop();
+    if (next == nullptr)
+        next = g_idle_task;
+    
+    if (current == next)
+        return;
+
+    kprintf("[SCHED]: Switching from %s to %s\n", current->name, next->name);
+    g_running_task = next;
     *suspended_state = next->state;
-
     vm_switch_address_space(next->address_space);
-    next->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
 
-    switch (current->task_state) {
-    case TaskState::Running:
-        g_running_tasks_queue.append(current);
-        break;
-    case TaskState::Suspended:
-        g_suspended_tasks_queue.append(current);
-        break;
-    case TaskState::Zombie:
+    if (old_needs_to_be_freed)
         task_free(current);
-        break;
-    }
 }
 
 [[noreturn]] void scheduler_begin()
 {
-    auto* first_task = g_running_tasks_queue.head;
+    auto* first_task = g_running_task;
     kassert(first_task != nullptr);
     kassert(strcmp(first_task->name, "idle") == 0);
 
