@@ -62,8 +62,16 @@ static Error next_cluster(Fat32Context& ctx, uint32_t cluster, uint32_t& next_cl
     auto fat_sector = bpb.BPB_RsvdSecCnt + (fat_offset / SECTOR_SIZE);
     auto fat_sector_offset = fat_offset % SECTOR_SIZE;
 
-    uint32_t table_sector[SECTOR_SIZE / sizeof(uint32_t)];
-    TRY(READ_SECTOR(ctx, fat_sector, reinterpret_cast<uint8_t*>(&table_sector)));
+    /**
+     * This is some very basic caching mechanism, otherwise to step a
+     * cluster chain we end up re-reading the same sector many times.
+     */
+    static uint32_t table_sector[SECTOR_SIZE / sizeof(uint32_t)];
+    static uint32_t last_cached_sector = ~0;
+    if (fat_sector != last_cached_sector) {
+        TRY(READ_SECTOR(ctx, fat_sector, reinterpret_cast<uint8_t*>(&table_sector)));
+        last_cached_sector = fat_sector;
+    }
 
     next_cluster = table_sector[fat_sector_offset / sizeof(uint32_t)] & 0x0fffffff;
 
