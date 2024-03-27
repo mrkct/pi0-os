@@ -17,6 +17,18 @@ extern "C" void* memcpy(void* dest, void const* src, size_t n)
     return dest;
 }
 
+extern "C" int memcmp(const void *s1, const void *s2, size_t n)
+{
+    const int8_t *a = (int8_t const*) s1;
+    const int8_t *b = (int8_t const*) s2;
+    for (size_t i = 0; i < n; i++) {
+        if (a[i] != b[i])
+            return a[i] - b[i];
+    }
+    
+    return 0;
+}
+
 extern "C" char *strcpy(char *dst, const char *src)
 {
     char *ret_dst = dst;

@@ -8,6 +8,8 @@ extern "C" void* memset(void* s, int c, size_t n);
 
 extern "C" void* memcpy(void* dest, void const* src, size_t n);
 
+extern "C" int memcmp(const void *s1, const void *s2, size_t n);
+
 extern "C" char *strcpy(char *dst, const char *src);
 
 extern "C" size_t strnlen(const char *s, size_t maxlen);

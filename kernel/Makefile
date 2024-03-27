@@ -36,7 +36,6 @@ endif
 
 LIBS_SOURCES=\
 	kernel/lib/string.cpp \
-	kernel/lib/memory.cpp \
 
 SOURCES=\
 	$(LIBS_SOURCES) \
