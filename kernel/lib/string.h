@@ -27,8 +27,8 @@ constexpr char *constexpr_strcpy(char *dst, const char *src)
     return ret_dst;
 }
 
-char* strncpy_safe(char* dest, char const* src, size_t n);
+extern "C" char* strncpy_safe(char* dest, char const* src, size_t n);
 
-int strcmp(char const* s1, char const* s2);
+extern "C" int strcmp(char const* s1, char const* s2);
 
-size_t strlen(char const* s);
+extern "C" size_t strlen(char const* s);

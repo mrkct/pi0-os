@@ -1,5 +1,9 @@
 #include <kernel/lib/string.h>
 
+
+#define UNALIGNED(s) (((uintptr_t) (s)) & 3)
+
+
 extern "C" void* memset(void* s, int c, size_t n)
 {
     unsigned char* p = (unsigned char*)s;
@@ -8,12 +12,35 @@ extern "C" void* memset(void* s, int c, size_t n)
     return s;
 }
 
-extern "C" void* memcpy(void* dest, void const* src, size_t n)
+extern "C" void* memcpy(void* dest, void const* source, size_t n)
 {
-    unsigned char* d = (unsigned char*)dest;
-    unsigned char const* s = (unsigned char const*)src;
+    uint8_t *src = (uint8_t*) source;
+    uint8_t *dst = (uint8_t*) dest;
+
+    if (n >= 4 && !(UNALIGNED(dst) || UNALIGNED(src))) {
+        uint32_t *aligned_dst = (uint32_t*) dst;
+        uint32_t *aligned_src = (uint32_t*) src;
+
+        while (n >= 16) {
+            *aligned_dst++ = *aligned_src++;
+            *aligned_dst++ = *aligned_src++;
+            *aligned_dst++ = *aligned_src++;
+            *aligned_dst++ = *aligned_src++;
+            n -= 16;
+        }
+        
+        while (n >= 4) {
+            *aligned_dst++ = *aligned_src++;
+            n -= 4;
+        }
+
+        dst = (uint8_t*) aligned_dst;
+        src = (uint8_t*) aligned_src;
+    }
+    
     while (n--)
-        *d++ = *s++;
+        *dst++ = *src++;
+
     return dest;
 }
 
@@ -42,7 +69,7 @@ extern "C" char *strcpy(char *dst, const char *src)
     return ret_dst;
 }
 
-char* strncpy_safe(char* dest, char const* src, size_t n)
+extern "C" char* strncpy_safe(char* dest, char const* src, size_t n)
 {
     if (n == 0)
         return dest;
@@ -56,7 +83,7 @@ char* strncpy_safe(char* dest, char const* src, size_t n)
     return dest;
 }
 
-int strcmp(char const* s1, char const* s2)
+extern "C" int strcmp(char const* s1, char const* s2)
 {
     while (*s1 && *s2 && *s1 == *s2) {
         s1++;
@@ -66,7 +93,7 @@ int strcmp(char const* s1, char const* s2)
     return *s1 - *s2;
 }
 
-size_t strlen(char const* s)
+extern "C" size_t strlen(char const* s)
 {
     size_t len = 0;
     while (*s++)
@@ -75,7 +102,7 @@ size_t strlen(char const* s)
     return len;
 }
 
-size_t strnlen(const char *s, size_t maxlen)
+extern "C" size_t strnlen(const char *s, size_t maxlen)
 {
     size_t len = 0;
     while (*s++ && len < maxlen)
