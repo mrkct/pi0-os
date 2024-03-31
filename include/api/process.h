@@ -45,6 +45,11 @@ static inline int create_pipe(int32_t out_fds[2])
     return syscall(SYS_CreatePipe, NULL, (uint32_t) out_fds, 0, 0, 0, 0);
 }
 
+static inline int sys_yield(void)
+{
+    return syscall(SYS_Yield, NULL, 0, 0, 0, 0, 0);
+}
+
 #ifdef __cplusplus
 }
 #endif
