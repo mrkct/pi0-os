@@ -17,6 +17,7 @@ struct {
         int x, y;
     } cursor;
 
+    bool framebuffer_updated;
     Window window;
 } g_terminal;
 
@@ -119,7 +120,14 @@ void gfx_terminal_print(const char *s, uint32_t background_color, uint32_t foreg
         _term_putchar(*s, background_color, foreground_color);
         s++;
     }
-    refresh_window(&g_terminal.window);
+    g_terminal.framebuffer_updated = true;
+}
+
+void gfx_update_window(void)
+{
+    if (g_terminal.framebuffer_updated)
+        refresh_window(&g_terminal.window);
+    g_terminal.framebuffer_updated = false;
 }
 
 void gfx_terminal_init(void)
@@ -131,8 +139,9 @@ void gfx_terminal_init(void)
     g_terminal.h = (g_terminal.window.height - 2*TOP_PADDING) / GFX_CHAR_HEIGHT;
     g_terminal.data = malloc(g_terminal.w * g_terminal.h);
     memset(g_terminal.data, ' ', g_terminal.w * g_terminal.h);
+    g_terminal.framebuffer_updated = true;
 
     draw_filled_rect(&g_terminal.window, 0, 0, g_terminal.window.width, g_terminal.window.height, COL_BACKGROUND);
     redraw_all();
-    refresh_window(&g_terminal.window);
+    gfx_update_window();
 }

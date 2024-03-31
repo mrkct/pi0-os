@@ -10,3 +10,5 @@
 void gfx_terminal_init(void);
 
 void gfx_terminal_print(const char *s, uint32_t background_color, uint32_t foreground_color);
+
+void gfx_update_window(void);

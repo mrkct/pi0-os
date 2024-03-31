@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     EXIT_ON_FAIL(spawn_process("/bina/shell", &cfg, &shell_pid));
 
     while (1) {
-        char buf[65];
+        char buf[257];
         ssize_t size;
 
         size = read(stdout_fds[READ_END], buf, sizeof(buf) - 1);
@@ -83,6 +83,8 @@ int main(int argc, char **argv)
             buf[size] = '\0';
             write(stdin_fds[WRITE_END], buf, size);
         }
+
+        gfx_update_window();
     }
 
     return 0;
