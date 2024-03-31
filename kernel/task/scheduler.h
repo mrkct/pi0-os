@@ -55,7 +55,7 @@ Error task_load_user_elf(
     api::PID&,
     char const* name,
     int argc,
-    char const* argv[],
+    char const* const argv[],
     uint8_t const* elf_binary,
     size_t elf_binary_size);
 
