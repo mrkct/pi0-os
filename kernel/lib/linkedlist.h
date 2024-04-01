@@ -83,6 +83,8 @@ struct LinkedList {
     {
         node->prev = nullptr;
         node->next = head;
+        if (head)
+            head->prev = node;
         head = node;
         if (tail == nullptr)
             tail = head;
