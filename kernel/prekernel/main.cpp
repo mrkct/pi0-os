@@ -11,12 +11,14 @@
 #include <kernel/vfs/sysfs/sysfs.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
+#include <kernel/lib/memory.h>
 #include <kernel/lib/string.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
 #include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
+#include <kernel/windowmanager/windowmanager.h>
 #include <kernel/timer.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -112,22 +114,24 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
 
     timer_init();
     scheduler_init();
+    
+    {
+        char const* const args[] = {"winman"};
+        api::PID pid;
+        MUST(task_create_kernel_thread(pid, "winman", array_size(args), args, wm_task_entry));
+    }
+    
+    {
+        char const * const args[] = {"/bina/term"};
+        api::PID pid;
+        MUST(task_load_user_elf_from_path(pid, args[0], array_size(args), args));
+    }
 
-    api::PID pid;
-    // MUST(task_create_kernel_thread(pid, "A", 0, {}, task_A));
-
-    const char *args[] = {"/bina/term"};
-    MUST(task_load_user_elf_from_path(pid, "/bina/term", 1, args));
-
-    // FIXME: There's a very hard to find bug where having this
-    // task run can cause A to crash. Will investigate later
-    // MUST(task_create_kernel_thread(B, "B", task_A));
-
-    timer_exec_after(
-        1000, [](void* id) {
-            kprintf("Timer %d expired!\n", reinterpret_cast<uint32_t>(id));
-        },
-        (void*)0x1);
+    {
+        char const* const args[] = {"/bina/doom", "-iwad", "/doom1.wad"};
+        api::PID pid;
+        MUST(task_load_user_elf_from_path(pid, args[0], array_size(args), args));
+    }
 
     scheduler_begin();
 

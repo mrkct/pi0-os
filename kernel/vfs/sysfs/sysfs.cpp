@@ -5,7 +5,8 @@
 #include <kernel/lib/memory.h>
 #include <kernel/device/systimer.h>
 #include <kernel/vfs/sysfs/sysfs.h>
-#include <kernel/device/keyboard.h>
+#include <kernel/task/scheduler.h>
+#include <kernel/windowmanager/windowmanager.h>
 
 
 namespace kernel {
@@ -132,9 +133,9 @@ static Error open(DirectoryEntry &entry, File &out_file)
                 return Success;
             }
             size = sizeof(api::KeyEvent);
-            
+
             bytes_read = 0;
-            if (read_keyevent(*reinterpret_cast<api::KeyEvent*>(buffer)))
+            if (wm_read_keyevent(scheduler_current_task()->pid, *reinterpret_cast<api::KeyEvent*>(buffer)))
                 bytes_read = sizeof(api::KeyEvent);
             return Success;
         };

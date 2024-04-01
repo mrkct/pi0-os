@@ -5,7 +5,7 @@
 
 namespace kernel {
 
-klib::CircularQueue<api::KeyEvent, 32> g_keyboard_events;
+static void (*g_cb)(api::KeyEvent const&) = nullptr;
 
 static void notify_keyboard_event(uint8_t data);
 
@@ -34,9 +34,12 @@ static void notify_keyboard_event(uint8_t data)
         .keycode = char_to_keycode(data),
         .press_state = true
     };
-    g_keyboard_events.push(event);
+    if (g_cb)
+        g_cb(event);
+
     event.press_state = false;
-    g_keyboard_events.push(event);
+    if (g_cb)
+        g_cb(event);
 
     // When using QEMU, the terminal only sends '\r' on ENTER
     if (data == '\r') {
@@ -44,9 +47,9 @@ static void notify_keyboard_event(uint8_t data)
     }
 }
 
-bool read_keyevent(api::KeyEvent &out_event)
+void set_keyboard_event_listener(void (*cb)(api::KeyEvent const&))
 {
-    return g_keyboard_events.pop(out_event);
+    g_cb = cb;
 }
 
 }

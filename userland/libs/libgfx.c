@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <api/syscalls.h>
 #include "libgfx.h"
 
@@ -51,20 +52,18 @@ Window open_window(const char *title, int width, int height, bool show_titlebar)
     if (show_titlebar)
         draw_titlebar(&window);
     
+    int rc = sys_create_window(width, height);
+    if (rc != 0) {
+        fprintf(stderr, "Failed to create window. Rc: %d\r\n", rc);
+        exit(-1);
+    }
+    
     return window;
 }
 
-void refresh_window(Window *window)
+int refresh_window(Window *window)
 {
-    syscall(
-        SYS_BlitFramebuffer, 
-        NULL,
-        (uint32_t) window->framebuffer,
-        (uint32_t) window->x,
-        (uint32_t) window->y,
-        (uint32_t) window->width,
-        (uint32_t) window->height + window->y_offset
-    );
+    return sys_refresh_window(window->framebuffer);
 }
 
 static void _draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color)

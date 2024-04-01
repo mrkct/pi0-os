@@ -14,6 +14,6 @@ uint32_t char_to_keycode(unsigned char);
 
 void init_user_keyboard(KeyboardSource);
 
-bool read_keyevent(api::KeyEvent&);
+void set_keyboard_event_listener(void (*cb)(api::KeyEvent const&));
 
 }

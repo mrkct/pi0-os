@@ -13,6 +13,7 @@
 #include <kernel/timer.h>
 #include <kernel/device/framebuffer.h>
 #include <kernel/device/keyboard.h>
+#include <kernel/windowmanager/windowmanager.h>
 #include <kernel/vfs/pipe.h>
 
 
@@ -264,17 +265,16 @@ static SyscallResult sys$select(int32_t *fds, int32_t len)
     return Success;
 }
 
-static SyscallResult sys$blit_framebuffer(
-    uintptr_t user_framebuffer,
-    int32_t x, int32_t y,
-    uint32_t width, uint32_t height
-)
+static SyscallResult sys$create_window(uint32_t width, uint32_t height)
 {
-    // NOTE: We can convert the user's pointer to a direct one without calling vm_copy_from_user
-    //       because we're sure the current address space is the same as the users
-    blit_to_main_framebuffer(reinterpret_cast<uint32_t*>(user_framebuffer), x, y, width, height);
+    auto *task = scheduler_current_task();
+    return wm_create_window(task->pid, width, height);
+}
 
-    return Success;
+static SyscallResult sys$update_window(uint32_t *framebuffer)
+{
+    auto *task = scheduler_current_task();
+    return wm_update_window(task->pid, framebuffer);
 }
 
 static SyscallResult sys$spawn_process(const char *path, uintptr_t user_cfg)
@@ -428,8 +428,11 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         break;
     case SyscallIdentifiers::SYS_SetBrk:
         break;
-    case SyscallIdentifiers::SYS_BlitFramebuffer:
-        result = sys$blit_framebuffer(static_cast<uintptr_t>(r0), static_cast<intptr_t>(r1), static_cast<int32_t>(r2), r3, r4);
+    case SyscallIdentifiers::SYS_CreateWindow:
+        result = sys$create_window(r0, r1);
+        break;
+    case SyscallIdentifiers::SYS_UpdateWindow:
+        result = sys$update_window(reinterpret_cast<uint32_t*>(r0));
         break;
     default:
         result = InvalidSystemCall;

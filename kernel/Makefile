@@ -71,6 +71,7 @@ SOURCES=\
 	kernel/vfs/path.cpp \
 	kernel/vfs/pipe.cpp \
 	kernel/vfs/vfs.cpp \
+	kernel/windowmanager/main.cpp \
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))

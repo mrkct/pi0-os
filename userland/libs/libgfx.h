@@ -37,7 +37,7 @@ typedef struct PSFFont {
 
 Window open_window(char const* title, int width, int height, bool show_titlebar);
 
-void refresh_window(Window*);
+int refresh_window(Window*);
 
 void draw_filled_rect(Window* window, int x, int y, int w, int h, uint32_t color);
 

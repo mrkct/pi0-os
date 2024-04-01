@@ -39,7 +39,8 @@ typedef enum SyscallIdentifiers {
     SYS_GetBrk = 60,
     SYS_SetBrk = 61,
 
-    SYS_BlitFramebuffer = 80,
+    SYS_CreateWindow = 80,
+    SYS_UpdateWindow = 81,
 } SyscallIdentifiers;
 
 
@@ -70,3 +71,4 @@ static inline uint32_t syscall(SyscallIdentifiers id, uint32_t* extra_return, ui
 #include "process.h"
 #include "input.h"
 #include "time.h"
+#include "windows.h"
