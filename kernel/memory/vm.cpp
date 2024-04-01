@@ -171,21 +171,29 @@ static Error vm_map_page(FirstLevelEntry* root_table, uintptr_t phys_addr, uintp
 
     bool lvl2_table_was_just_allocated = false;
     if (lvl1_entry.raw == 0) {
-        struct PhysicalPage* lvl2_table_page;
-        MUST(physical_page_alloc(PageOrder::_1KB, lvl2_table_page));
+        if (areas::higher_half.contains(virt_addr)) {
+            // This case might happen in the following sequence
+            // - This address space is created
+            // - While this AS is not loaded, a memory allocation happens which causes a new lvl1 table to be allocated
+            // - This AS gets loaded, and a new memory allocation requires to map a new page
+            lvl1_entry.raw = _kernel_translation_table[lvl1_index(virt_addr)].raw;
+        }
 
-        lvl1_entry.coarse = CoarsePageTableEntry::make_entry(page2addr(lvl2_table_page));
+        if (lvl1_entry.raw == 0) {
+            struct PhysicalPage* lvl2_table_page;
+            MUST(physical_page_alloc(PageOrder::_1KB, lvl2_table_page));
+            lvl1_entry.coarse = CoarsePageTableEntry::make_entry(page2addr(lvl2_table_page));
+            lvl2_table_was_just_allocated = true;
+        }
 
         // The kernel area must be mapped the same way in all address spaces.
         // We can afford to have different address spaces not mapped the same way since
         // we can fix them in the page fault handler anyway, but we must always have the
         // kernel_translation_table be the final source of truth for the kernel area.
-        if (areas::higher_half.contains(virt_addr) && root_table != _kernel_translation_table) {
+        if (areas::higher_half.contains(virt_addr) && root_table != _kernel_translation_table && lvl2_table_was_just_allocated) {
             kassert(_kernel_translation_table[lvl1_index(virt_addr)].raw == 0);
             _kernel_translation_table[lvl1_index(virt_addr)].coarse = lvl1_entry.coarse;
         }
-
-        lvl2_table_was_just_allocated = true;
     }
 
     TemporarilyMappedRange lvl2_table { lvl1_entry.coarse.base_address(), LVL2_TABLE_SIZE };
