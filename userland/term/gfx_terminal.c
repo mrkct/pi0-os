@@ -132,7 +132,7 @@ void gfx_update_window(void)
 
 void gfx_terminal_init(void)
 {
-    g_terminal.window = open_window("Terminal", 640, 480, false);
+    g_terminal.window = open_window("Terminal", 640, 480, true);
     g_terminal.cursor.x = 0;
     g_terminal.cursor.y = 0;
     g_terminal.w = (g_terminal.window.width - 2*LEFT_PADDING) / GFX_CHAR_WIDTH;

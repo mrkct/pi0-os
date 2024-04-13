@@ -9,8 +9,8 @@
 
 
 #define TITLEBAR_HEIGHT             24
-#define TITLEBAR_BORDER_COLOR       0xff300f0e
-#define TITLEBAR_BACKGROUND_COLOR   0xff521910
+#define TITLEBAR_BORDER_COLOR       0xff333333
+#define TITLEBAR_BACKGROUND_COLOR   0xff888888
 #define TITLEBAR_TEXT_COLOR         COL_WHITE
 
 extern const uint8_t _resource_default_psf_font[];
@@ -229,12 +229,9 @@ static void _draw_char(Window *window, Font *font, char c, int x, int y, uint32_
 
     uint8_t const* start_of_glyph = &font->data[sizeof(font->header) + font->header.bytes_per_glyph * c];
 
-    size_t glyph_width = x + 8 < window->width ? 8 : window->width - x;
-    size_t glyph_height = y + font->header.height < window->height ? font->header.height : window->height - y;
-
-    for (size_t glyph_y = 0; glyph_y < glyph_height; glyph_y++) {
+    for (size_t glyph_y = 0; glyph_y < font->header.height; glyph_y++) {
         uint8_t glyph_row = start_of_glyph[glyph_y];
-        for (size_t glyph_x = 0; glyph_x < glyph_width; glyph_x++) {
+        for (size_t glyph_x = 0; glyph_x < 8; glyph_x++) {
             if (glyph_row & (1 << (7 - glyph_x)))
                 set_pixel(window, x + glyph_x, y + glyph_y, color);
         }
