@@ -11,6 +11,12 @@
 #include <kernel/task/scheduler.h>
 #include <kernel/task/elf_loader.h>
 
+// #define SCHEDULER_LOG_ENABLED 
+#ifdef SCHEDULER_LOG_ENABLED
+#define LOG(fmt, ...) kprintf(fmt, __VA_ARGS__)
+#else
+#define LOG(fmt, ...) (fmt, __VA_ARGS__)
+#endif
 
 namespace kernel {
 
@@ -26,6 +32,7 @@ struct Queue {
 
     void append(Task* task)
     {
+        sanity_check();
         task->next_to_run = nullptr;
         if (head == nullptr) {
             head = task;
@@ -34,6 +41,7 @@ struct Queue {
             tail->next_to_run = task;
             tail = task;
         }
+        sanity_check();
     }
 
     Task* pop()
@@ -233,7 +241,7 @@ Error task_create_kernel_thread(
     api::PID& pid,
     char const* name,
     int argc,
-    const char *argv[],
+    char const* const argv[],
     void (*entry)())
 {
     Task *task;
@@ -296,8 +304,6 @@ Error task_load_user_elf_from_path(
 
     return result;
 }
-
-
 
 int32_t task_find_free_file_descriptor(Task *task)
 {
@@ -453,7 +459,7 @@ void change_task_state(Task* task, TaskState new_state)
 
     auto previous_state = task->task_state;
     task->task_state = new_state;
-    kprintf("[SCHED]: Moving task %s into state %s\n", task->name,
+    LOG("[SCHED]: Moving task %s into state %s\n", task->name,
         new_state == TaskState::Running ? "RUNNING" :
         new_state == TaskState::Suspended ? "SUSPENDED": "ZOMBIE");
 
@@ -526,11 +532,7 @@ static void task_free(Task* task)
     kfree(task);
 }
 
-Task* scheduler_current_task()
-{
-    // kassert(g_running_task != nullptr);
-    return g_running_task;
-}
+Task* scheduler_current_task() { return g_running_task; }
 
 void scheduler_step(SuspendedTaskState* suspended_state)
 {
@@ -560,7 +562,7 @@ void scheduler_step(SuspendedTaskState* suspended_state)
     if (current == next)
         return;
 
-    kprintf("[SCHED]: Switching from %s to %s\n", current->name, next->name);
+    LOG("[SCHED]: Switching from %s to %s\n", current->name, next->name);
     g_running_task = next;
     *suspended_state = next->state;
     vm_switch_address_space(next->address_space);

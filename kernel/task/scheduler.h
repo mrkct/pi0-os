@@ -49,7 +49,7 @@ void scheduler_init();
 
 Task* scheduler_current_task();
 
-Error task_create_kernel_thread(api::PID&, char const* name, int argc, char const* argv[], void (*entry)());
+Error task_create_kernel_thread(api::PID&, char const* name, int argc, char const* const argv[], void (*entry)());
 
 Error task_load_user_elf(
     api::PID&,
