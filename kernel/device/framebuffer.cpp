@@ -29,7 +29,7 @@ void blit_to_main_framebuffer(uint32_t *data, int32_t x, int32_t y, uint32_t wid
         return;
 
     uint32_t *src = &data[source_y1 * height + source_x1];
-    uint32_t *dst = (uint32_t*)&(((uint8_t*)g_main_framebuffer.address)[target_y1 * g_main_framebuffer.pitch + target_x1]);
+    uint32_t *dst = (uint32_t*)&(((uint8_t*)g_main_framebuffer.address)[target_y1 * g_main_framebuffer.pitch + target_x1*sizeof(uint32_t)]);
 
     auto lines_to_copy = target_y2 - target_y1;
     auto bytes_in_a_line = (target_x2 - target_x1) * sizeof(uint32_t);

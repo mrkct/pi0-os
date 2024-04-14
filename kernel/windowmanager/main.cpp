@@ -103,7 +103,7 @@ Error wm_create_window(api::PID task, uint32_t width, uint32_t height)
     // TODO: A smarter algorithm for the initial positioning of a window
     static uint32_t positions[2*4] = {
         120, 120,
-        1280 - 120 - 640, 120,
+        1280 - 640 - 120, 120,
         120, 360,
         1280 - 120 - 640, 120
     };
