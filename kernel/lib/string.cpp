@@ -110,3 +110,8 @@ extern "C" size_t strnlen(const char *s, size_t maxlen)
 
     return len;
 }
+
+extern "C" char tolower(char c)
+{
+    return 'A' <= c && c <= 'Z' ? 'a' + (c - 'A') : c;
+}

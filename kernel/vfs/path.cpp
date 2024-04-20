@@ -1,9 +1,6 @@
 #include "path.h"
 
-static char to_lower(char c)
-{
-    return 'A' <= c && c <= 'Z' ? 'a' + (c - 'A') : c;
-}
+
 
 static const char *strrchr(Path path, char c)
 {
@@ -44,7 +41,7 @@ bool path_compare(Path a, Path b, bool case_sensitive)
     if (case_sensitive) {
         return pathcmp(a, b, [](char a, char b) { return a == b; });
     } else {
-        return pathcmp(a, b, [](char a, char b) { return to_lower(a) == to_lower(b); });
+        return pathcmp(a, b, [](char a, char b) { return tolower(a) == tolower(b); });
     }
 }
 
