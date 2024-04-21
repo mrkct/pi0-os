@@ -1,7 +1,7 @@
 #include <api/process.h>
 #include <kernel/lib/string.h>
 #include <kernel/task/scheduler.h>
-#include <kernel/device/keyboard.h>
+#include <kernel/input/keyboard.h>
 #include <kernel/device/framebuffer.h>
 #include <kernel/lib/circular_queue.h>
 #include <kernel/lib/linkedlist.h>

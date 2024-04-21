@@ -3,7 +3,9 @@
 #include <kernel/device/sd.h>
 #include <kernel/device/systimer.h>
 #include <kernel/device/videocore.h>
-#include <kernel/device/keyboard.h>
+#include <kernel/input/keyboard.h>
+#include <kernel/input/miniuart_keyboard.h>
+#include <kernel/input/virtinput_keyboard.h>
 #include <kernel/device/ramdisk.h>
 #include <kernel/device/gpio.h>
 #include <kernel/vfs/vfs.h>
@@ -99,40 +101,56 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
         kprintf("sdhc card initialized\n");
     }
 
+    kprintf("Initializing FAT32 filesystem\n");
     static Filesystem fat32_fs;
     MUST(fat32_create(fat32_fs, fs_storage));
     vfs_mount("", &fat32_fs);
 
+    kprintf("Initializing sysfs\n");
     Filesystem *sysfs;
     MUST(sysfs_init(sysfs));
     vfs_mount("/sys", sysfs);
 
+    kprintf("Trying to figure out the current time...\n");
     datetime_init();
-    syscall_init();
-    systimer_init();
-    init_user_keyboard(KeyboardSource::MiniUart);
+    DateTime dt;
+    datetime_read(dt);
+    kprintf("Current time: %d-%d-%d %d:%d:%d\n", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 
+    kprintf("Initializing syscalls\n");
+    syscall_init();
+
+    kprintf("Initializing systimer\n");
+    systimer_init();
+
+    kprintf("Figuring out available input devices\n");
+    aux_init();
+    if (!virtinput_keyboard_init().is_success()) {
+        kprintf("No virtinput keyboard found, using miniuart keyboard instead\n");
+        miniuart_keyboard_init();
+    }
+
+    kprintf("Initializing timer subsystem\n");
     timer_init();
+
+    kprintf("Initializing scheduler\n");
     scheduler_init();
     
     {
         char const* const args[] = {"winman"};
         api::PID pid;
+        kprintf("Loading task %s\n", args[0]);
         MUST(task_create_kernel_thread(pid, "winman", array_size(args), args, wm_task_entry));
     }
     
     {
         char const * const args[] = {"/bina/term"};
         api::PID pid;
+        kprintf("Loading task %s\n", args[0]);
         MUST(task_load_user_elf_from_path(pid, args[0], array_size(args), args));
     }
 
-    {
-        char const* const args[] = {"/bina/doom", "-iwad", "/doom1.wad"};
-        api::PID pid;
-        MUST(task_load_user_elf_from_path(pid, args[0], array_size(args), args));
-    }
-
+    kprintf("Starting scheduler\n");
     scheduler_begin();
 
     panic("Should not reach here");

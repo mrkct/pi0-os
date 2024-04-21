@@ -12,7 +12,7 @@
 #include <kernel/task/scheduler.h>
 #include <kernel/timer.h>
 #include <kernel/device/framebuffer.h>
-#include <kernel/device/keyboard.h>
+#include <kernel/input/keyboard.h>
 #include <kernel/windowmanager/windowmanager.h>
 #include <kernel/vfs/pipe.h>
 

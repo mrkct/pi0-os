@@ -52,8 +52,10 @@ static void data_abort_handler(SuspendedTaskState* state)
 
     uintptr_t faulting_addr = read_fault_address_register();
     auto result = vm_try_fix_page_fault(faulting_addr);
-    if (result == PageFaultHandlerResult::Fixed)
+    if (result == PageFaultHandlerResult::Fixed) {
+        kprintf("[NOTE]: Data abort while accessing %p, but fixed :)\n", faulting_addr);
         return;
+    }
     
     if (result == PageFaultHandlerResult::ProcessFatal) {
         uint32_t dfsr = read_dfsr();

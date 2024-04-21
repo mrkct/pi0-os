@@ -1,7 +1,6 @@
 #include <kernel/device/gpio.h>
 #include <kernel/device/io.h>
 #include <kernel/interrupt.h>
-#include <kernel/device/keyboard.h>
 #include <kernel/device/uart.h>
 
 namespace kernel {

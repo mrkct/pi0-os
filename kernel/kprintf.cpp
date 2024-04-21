@@ -1,4 +1,4 @@
-#include <kernel/device/miniuart.h>
+#include <kernel/device/aux.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
 #include <kernel/locking/reentrant.h>

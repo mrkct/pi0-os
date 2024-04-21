@@ -42,13 +42,15 @@ SOURCES=\
 	kernel/datetime.cpp \
 	kernel/device/gpio.cpp \
 	kernel/device/framebuffer.cpp \
-	kernel/device/keyboard.cpp \
-	kernel/device/miniuart.cpp \
+	kernel/device/aux.cpp \
 	kernel/device/ramdisk.cpp \
 	kernel/device/sd.cpp \
 	kernel/device/systimer.cpp \
 	kernel/device/uart.cpp \
 	kernel/device/videocore.cpp \
+	kernel/input/keyboard.cpp \
+	kernel/input/miniuart_keyboard.cpp \
+	kernel/input/virtinput_keyboard.cpp \
 	kernel/interrupt.cpp \
 	kernel/kprintf.cpp \
 	kernel/locking/reentrant.cpp \
