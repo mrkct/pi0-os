@@ -59,22 +59,20 @@ int main(int argc, char **argv)
         char buf[257];
         ssize_t size;
 
-        size = read(stdout_fds[READ_END], buf, sizeof(buf) - 1);
-        if (size > 0) {
-            buf[size] = '\0';
-            gfx_terminal_print(buf, COL_BLUE, COL_WHITE);
-        }
-        
-        size = read(stderr_fds[READ_END], buf, sizeof(buf) - 1);
-        if (size > 0) {
+        while (0 != (size = read(stderr_fds[READ_END], buf, sizeof(buf) - 1))) {
             buf[size] = '\0';
             gfx_terminal_print(buf, COL_BLACK, COL_RED);
+        }
+
+        while (0 != (size = read(stdout_fds[READ_END], buf, sizeof(buf) - 1))) {
+            buf[size] = '\0';
+            gfx_terminal_print(buf, COL_BLUE, COL_WHITE);
         }
 
         size = 0;
         KeyEvent event;
         while(sizeof(event) == read(kbd_fd, &event, sizeof(event))) {
-            if (event.press_state == false)
+            if (event.pressed == false || event.character == '\0')
                 continue;
             
             buf[size++] = event.character;
