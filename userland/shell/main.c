@@ -120,7 +120,6 @@ int main(int argc, char **argv)
     const char *command_argv[MAX_ARGS];
 
     setvbuf(stdout, NULL, _IONBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
     
     while (1) {
         line = read_line("$: ");
