@@ -6,9 +6,27 @@
 
 extern "C" void* memset(void* s, int c, size_t n)
 {
-    unsigned char* p = (unsigned char*)s;
-    while (n--)
-        *p++ = (unsigned char)c;
+    uint8_t *p = (uint8_t*)s;
+    while (n && UNALIGNED(p)) {
+        *p++ = (uint8_t)c;
+        n--;
+    }
+
+    if (n >= 4) {
+        uint32_t c32 = c | (c << 8) | (c << 16) | (c << 24);
+        uint32_t *p32 = (uint32_t*)p;
+        while (n >= 4) {
+            *p32++ = c32;
+            n -= 4;
+        }
+        p = (uint8_t*)p32;
+    }
+
+    while (n) {
+        *p++ = (uint8_t)c;
+        n--;
+    }
+
     return s;
 }
 
