@@ -202,6 +202,29 @@ static SyscallResult sys$seek_file(uint32_t fd, int32_t offset, uint32_t mode_u3
     return (uint32_t) custody->seek_position;
 }
 
+static SyscallResult sys$read_dir_entry(int32_t fd, api::DirectoryEntry *buffer, uint32_t len)
+{
+    auto* task = scheduler_current_task();
+    FileCustody *custody;
+    TRY(task_get_file_by_descriptor(task, fd, custody));
+
+    uint32_t read_entries = 0;
+    for (read_entries = 0; read_entries < len; read_entries++) {
+        uint32_t bytes_read = 0;
+        DirectoryEntry e;
+        auto err = vfs_read(*custody, reinterpret_cast<uint8_t*>(&e), sizeof(e), bytes_read);
+        if (!err.is_success() || bytes_read != sizeof(e))
+            break;
+        
+        strcpy(buffer->name, e.name);
+        buffer->filetype = e.filetype;
+        buffer->size = e.size;
+        buffer++;
+    }
+
+    return read_entries;
+}
+
 static SyscallResult sys$create_pipe(uintptr_t user_fds)
 {
     auto* task = scheduler_current_task();
@@ -406,9 +429,8 @@ void dispatch_syscall(uint32_t& r7, uint32_t& r0, uint32_t& r1, uint32_t& r2, ui
         break;
     case SyscallIdentifiers::SYS_MakeDirectory:
         break;
-    case SyscallIdentifiers::SYS_OpenDirectory:
-        break;
-    case SyscallIdentifiers::SYS_ReadDirectory:
+    case SyscallIdentifiers::SYS_ReadDirEntry:
+        result = sys$read_dir_entry(static_cast<int32_t>(r0), reinterpret_cast<api::DirectoryEntry*>(r1), static_cast<size_t>(r2));
         break;
     case SyscallIdentifiers::SYS_GetDateTime:
         result = sys$get_datetime(static_cast<uintptr_t>(r0));

@@ -24,8 +24,7 @@ typedef enum SyscallIdentifiers {
     SYS_Select = 18,
 
     SYS_MakeDirectory = 20,
-    SYS_OpenDirectory = 21,
-    SYS_ReadDirectory = 22,
+    SYS_ReadDirEntry = 21,
 
     SYS_GetDateTime = 30,
     SYS_Sleep = 31,

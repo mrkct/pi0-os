@@ -65,7 +65,7 @@ static Error remove_from_open_files_list(File *file)
 
 static Error traverse_to_direntry(Filesystem &filesystem, Path path, DirectoryEntry &out_entry)
 {
-    if (path.len == 0) {
+    if (path.len == 0 || (path.len == 1 && path.str[0] == '/')) {
         TRY(filesystem.root_directory(filesystem, out_entry));
         return Success;
     }

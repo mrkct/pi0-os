@@ -2,6 +2,7 @@
 #define API_FILES_H
 
 #include <stdint.h>
+#include "syscalls.h"
 
 #ifdef __cplusplus
 namespace api {
@@ -36,6 +37,17 @@ typedef struct {
     FileType filetype;
     uint64_t size;
 } DirectoryEntry;
+
+static inline int sys_read_direntry(int fd, DirectoryEntry *out_direntry, size_t count)
+{
+    uint32_t entries_read;
+    int rc = syscall(SYS_ReadDirEntry, &entries_read, fd, (uint32_t) out_direntry, count, 0, 0);
+    if (rc != 0) {
+        return -rc;
+    }
+    
+    return entries_read;
+}
 
 #ifdef __cplusplus
 }
