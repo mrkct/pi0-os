@@ -56,12 +56,16 @@ struct LinkedList {
             head = node->next;
             if (head == nullptr)
                 tail = nullptr;
+            else
+                head->prev = nullptr;
             return;
         } else if (node->next == nullptr) {
             tail = node->prev;
+            tail->next = nullptr;
             return;
         } else {
             node->prev->next = node->next;
+            node->next->prev = node->prev;
         }
     }
 
