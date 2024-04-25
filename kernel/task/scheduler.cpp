@@ -431,6 +431,9 @@ Error task_drop_file_descriptor(Task *task, int32_t fd)
 
 Task *find_task_by_pid(api::PID pid)
 {
+    if (g_running_task->pid == pid)
+        return g_running_task;
+
     Task *t = g_running_tasks_queue.find_by_pid(pid);
     if (t != nullptr)
         return t;
