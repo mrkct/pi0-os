@@ -16,11 +16,13 @@ struct Window {
     uint32_t x, y, width, height;
     uint32_t *framebuffer;
 
+    bool was_updated = false;
     CircularQueue<api::KeyEvent, 32> keyevents;
 };
 
 static LinkedList<Window> g_open_windows;
 static bool g_screen_requires_update = true;
+static bool g_screen_requires_full_redraw = false;
 
 
 static void draw_background()
@@ -61,24 +63,40 @@ void wm_task_entry()
 
     draw_background();
     while (true) {
+        interrupt_disable();
         g_open_windows.foreach([](ListNode<Window> *window) {
             if (find_task_by_pid(window->value.owner) == nullptr) {
+                kprintf("[WM]: Removing window %d\n", window->value.owner);
                 g_open_windows.remove(window);
                 kfree(window);
                 g_screen_requires_update = true;
+                g_screen_requires_full_redraw = true;
             }
         });
-        
-        interrupt_disable();
 
         if (g_screen_requires_update) {
-            g_open_windows.foreach_reverse([](ListNode<Window> *window) {
-                blit_to_main_framebuffer(
-                    window->value.framebuffer,
-                    window->value.x,
-                    window->value.y,
-                    window->value.width,
-                    window->value.height);
+            // We don't need to redraw a window if all the ones below it also weren't updated
+            bool has_refreshed_windows_below = false;
+            if (g_screen_requires_full_redraw) {
+                g_screen_requires_full_redraw = false;
+                has_refreshed_windows_below = true;
+                draw_background();
+            }
+
+            g_open_windows.foreach_reverse([&](ListNode<Window> *window) {
+                if (window->value.was_updated) {
+                    window->value.was_updated = false;
+                    has_refreshed_windows_below = true;
+                }
+
+                if (has_refreshed_windows_below) {
+                    blit_to_main_framebuffer(
+                        window->value.framebuffer,
+                        window->value.x,
+                        window->value.y,
+                        window->value.width,
+                        window->value.height);
+                }
             });
             g_screen_requires_update = false;
         }
@@ -110,6 +128,7 @@ Error wm_create_window(api::PID task, uint32_t width, uint32_t height)
     static uint32_t next_pos = 0;
     window.x = positions[next_pos];
     window.y = positions[next_pos+1];
+    window.was_updated = true;
     next_pos = (next_pos + 2) % sizeof(positions);
 
     window.width = width;
@@ -133,10 +152,13 @@ Error wm_create_window(api::PID task, uint32_t width, uint32_t height)
 Error wm_update_window(api::PID pid, uint32_t *framebuffer)
 {
     Window *w = find_window(pid);
-    if (w == nullptr)
+    if (w == nullptr) {
+        kprintf("[WM]: Received request to update window %d, but it does not exist\n", pid);
         return NotFound;
+    }
     
     memcpy(w->framebuffer, framebuffer, w->width * w->height * sizeof(uint32_t));
+    w->was_updated = true;
     g_screen_requires_update = true;
     return Success;
 }
