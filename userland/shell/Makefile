@@ -1,6 +1,6 @@
 include ../toolchain.mk 
 
-OBJECTS = main.c.o
+OBJECTS = main.c.o utils/cat.c.o utils/echo.c.o utils/ls.c.o
 
 .PHONY: clean install
 

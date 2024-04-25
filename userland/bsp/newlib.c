@@ -61,7 +61,7 @@ int _lseek(int file, int ptr, int dir)
 {
     uint32_t seek;
     int rc = syscall(SYS_Seek, &seek, (uint32_t) file, (uint32_t) ptr, (uint32_t) dir, 0, 0);
-    if (rc < 0)
+    if (rc != 0)
         return -1;
     
     return (int) seek;
@@ -102,10 +102,10 @@ int _open(char const* pathname, int flags, int mode)
 
     int fd;
     int rc = syscall(SYS_OpenFile, (uint32_t*)&fd, (uint32_t) pathname, 0, 0, 0, 0);
-    if (rc > 0 && (flags & O_APPEND))
+    if (rc != 0 && (flags & O_APPEND))
         _lseek(fd, 0, SEEK_END);
 
-    return fd;
+    return rc == 0 ? fd : -1;
 }
 
 int _close(int file)
@@ -123,8 +123,8 @@ int _write(int file, char* ptr, int len)
 
     uint32_t bytes_written;
     int rc = syscall(SYS_WriteFile, &bytes_written, (uint32_t) file, (uint32_t) ptr, (uint32_t) len, 0, 0);
-    if (rc < 0)
-        return rc;
+    if (rc != 0)
+        return -rc;
     return (int) bytes_written;
 }
 
@@ -139,13 +139,13 @@ int _read(int file, char* ptr, int len)
     if (file == STDIN_FILENO) {
         do {
             rc = syscall(SYS_ReadFile, &bytes_read, (uint32_t) file, (uint32_t) ptr, len, 0, 0);
-        } while(bytes_read == 0 && rc >= 0);
+        } while(bytes_read == 0 && rc == 0);
     } else {
         rc = syscall(SYS_ReadFile, &bytes_read, (uint32_t) file, (uint32_t) ptr, len, 0, 0);
     }
 
-    if (rc < 0)
-        return rc;
+    if (rc != 0)
+        return -rc;
     return (int) bytes_read;
 }
 

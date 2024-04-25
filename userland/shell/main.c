@@ -6,6 +6,20 @@
 
 #define MAX_ARGS 16
 
+extern int exit_main(int argc, const char *argv[]);
+extern int echo_main(int argc, const char *argv[]);
+extern int ls_main(int argc, const char *argv[]);
+extern int cat_main(int argc, const char *argv[]);
+extern int cd_main(int argc, const char *argv[]);
+extern int pwd_main(int argc, const char *argv[]);
+extern int mkdir_main(int argc, const char *argv[]);
+
+static struct { const char *name; int (*main)(int argc, const char *argv[]); } builtins[] = {
+    { "echo", echo_main },
+    { "ls", ls_main },
+    { "cat", cat_main },
+};
+
 static char *read_line(const char *prompt);
 static size_t tokenize(char *line);
 static size_t argv_from_tokenized_line(const char *tokenized_line,
@@ -83,9 +97,11 @@ static int run_builtin_command(const char *command, size_t argc, const char *arg
     (void) argc;
     (void) argv;
 
-    if (strcmp(command, "help") == 0) {
-        printf("There is no help\r\n");
-        return 0;
+    for (size_t i = 0; i < sizeof(builtins) / sizeof(builtins[0]); i++) {
+        if (strcmp(builtins[i].name, command) == 0) {
+            builtins[i].main(argc, argv);
+            return 0;
+        }
     }
 
     return -1;
