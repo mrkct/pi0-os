@@ -125,6 +125,7 @@ uint32_t char_to_keycode(unsigned char c)
     case '/': return api::KEYCODE_SLASH;
     case '`': return api::KEYCODE_GRAVE_ACCENT;
     case ' ': return api::KEYCODE_SPC;
+    case '\r': return api::KEYCODE_RET;
     default: return 0;
     }
 }
