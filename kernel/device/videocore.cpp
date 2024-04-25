@@ -203,7 +203,7 @@ Error allocate_videocore_framebuffer(struct Framebuffer& fb)
         message.tags.set_pixel_order_tag.tag_id = 0x00048006;
         message.tags.set_pixel_order_tag.buffer_size = 4;
         message.tags.set_pixel_order_tag.request_response_codes_and_data_size = 0;
-        message.tags.set_pixel_order_tag.pixel_order = 1; // RGB
+        message.tags.set_pixel_order_tag.pixel_order = 0; // RGB
     }
     {
         message.tags.get_pitch_tag.tag_id = 0x00040008;
