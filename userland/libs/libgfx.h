@@ -5,9 +5,9 @@
 
 enum {
     COL_BLACK = 0xff000000,
-    COL_RED = 0xff0000ff,
+    COL_RED = 0xffff0000,
     COL_GREEN = 0xff00ff00,
-    COL_BLUE = 0xffff0000,
+    COL_BLUE = 0xff0000ff,
     COL_WHITE = 0xffffffff
 };
 
