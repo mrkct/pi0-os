@@ -92,7 +92,6 @@ struct Error {
     do {                                              \
         auto __result = (expr);                       \
         if (!__result.is_success()) {                 \
-            kprintf("Expression %s failed\n", #expr); \
             return __result;                          \
         }                                             \
     } while (0)
