@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <kernel/device/aux.h>
 #include <kernel/kprintf.h>
 #include <kernel/lib/math.h>
@@ -180,7 +181,7 @@ size_t kprintf(char const* format, ...)
     va_list args;
     va_start(args, format);
     char buffer[1024];
-    size_t written = ksnprintf(buffer, sizeof(buffer), format, args);
+    size_t written = vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
     take(g_kprintf_lock);

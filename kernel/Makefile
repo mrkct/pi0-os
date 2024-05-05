@@ -3,7 +3,7 @@ SOURCES_ROOT=../
 CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
 
-CXXFLAGS=-fpic -ffreestanding -nostdlib -lgcc
+CXXFLAGS=-fpic -ffreestanding -nostdlib -lgcc -lc -lg -lgcc -lm
 CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT) -I../include
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
@@ -34,11 +34,7 @@ else
 QEMU_SD_FLAGS:=
 endif
 
-LIBS_SOURCES=\
-	kernel/lib/string.cpp \
-
 SOURCES=\
-	$(LIBS_SOURCES) \
 	kernel/datetime.cpp \
 	kernel/device/gpio.cpp \
 	kernel/device/framebuffer.cpp \
@@ -59,6 +55,7 @@ SOURCES=\
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \
+	kernel/newlib.cpp \
 	kernel/prekernel/early.cpp \
 	kernel/prekernel/main.cpp \
 	kernel/prekernel/start.S \

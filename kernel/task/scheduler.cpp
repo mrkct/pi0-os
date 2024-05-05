@@ -1,13 +1,9 @@
+#include <kernel/base.h>
 #include <api/syscalls.h>
 #include <kernel/device/systimer.h>
 #include <kernel/interrupt.h>
 #include <kernel/kprintf.h>
-#include <kernel/lib/math.h>
-#include <kernel/lib/string.h>
-#include <kernel/lib/memory.h>
 #include <kernel/locking/reentrant.h>
-#include <kernel/memory/kheap.h>
-#include <kernel/sizes.h>
 #include <kernel/task/scheduler.h>
 #include <kernel/task/elf_loader.h>
 
@@ -222,7 +218,9 @@ static Error prepare_new_task(
         // User mode
         task->state.spsr = 0x10;
     }
-    strncpy_safe(task->name, name, sizeof(task->name));
+    
+    strncpy(task->name, name, sizeof(task->name));
+    task->name[sizeof(task->name) - 1] = '\0';
     task->pid = g_next_free_pid++;
     task->time_slice = IRQS_PER_TASK_BEFORE_CONTEXT_SWITCH;
     memset(task->open_files, 0, sizeof(task->open_files));

@@ -1,8 +1,4 @@
-#include <kernel/lib/string.h>
-#include <kernel/memory/kheap.h>
-#include <kernel/lib/math.h>
-#include <kernel/lib/string.h>
-#include <kernel/lib/memory.h>
+#include <kernel/base.h>
 #include <kernel/device/systimer.h>
 #include <kernel/vfs/sysfs/sysfs.h>
 #include <kernel/task/scheduler.h>
@@ -44,7 +40,9 @@ static DirectoryEntry make_dirent(
 {
     DirectoryEntry entry = {};
     entry.fs = &sysfs;
-    constexpr_strcpy(entry.name, name);
+    strncpy(entry.name, name, sizeof(entry.name));
+    entry.name[sizeof(entry.name) - 1] = '\0';
+
     entry.filetype = filetype;
     entry.size = 0;
 

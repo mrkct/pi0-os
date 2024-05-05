@@ -36,6 +36,6 @@ Error vfs_duplicate_custody(FileCustody&, FileCustody&);
 
 Error vfs_init();
 
-void vfs_get_default_stdin_stdout_stderr(FileCustody &stdin, FileCustody &stdout, FileCustody &stderr);
+void vfs_get_default_stdin_stdout_stderr(FileCustody &fc_stdin, FileCustody &fc_stdout, FileCustody &fc_stderr);
 
 }

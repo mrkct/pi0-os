@@ -1,8 +1,6 @@
+#include <kernel/base.h>
 #include <kernel/input/keyboard.h>
 #include <api/input.h>
-#include <kernel/lib/string.h>
-#include <kernel/lib/math.h>
-#include <kernel/lib/memory.h>
 
 
 namespace kernel {

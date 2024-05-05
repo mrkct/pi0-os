@@ -1,3 +1,4 @@
+#include <kernel/base.h>
 #include <api/syscalls.h>
 #include <kernel/datetime.h>
 #include <kernel/device/sd.h>
@@ -12,18 +13,12 @@
 #include <kernel/vfs/fat32/fat32.h>
 #include <kernel/vfs/sysfs/sysfs.h>
 #include <kernel/interrupt.h>
-#include <kernel/kprintf.h>
-#include <kernel/lib/memory.h>
-#include <kernel/lib/string.h>
-#include <kernel/memory/kheap.h>
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
 #include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
 #include <kernel/windowmanager/windowmanager.h>
 #include <kernel/timer.h>
-#include <stddef.h>
-#include <stdint.h>
 
 
 extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
@@ -41,7 +36,6 @@ extern "C" void kernel_main(uint32_t, uint32_t, uint32_t)
     kprintf("hex test. value: %x\n", 0xabcd1234);
     kprintf("pointer: %p\n", (void*)0x5678);
     kprintf("string: %s\n", "Hello, world!");
-    kprintf("binary: %b\n", 0b1101010);
 
     uint32_t board_revision, firmware_revision;
     MUST(get_board_revision(board_revision));

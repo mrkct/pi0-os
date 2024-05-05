@@ -1,5 +1,5 @@
+#include <kernel/base.h>
 #include <api/process.h>
-#include <kernel/lib/string.h>
 #include <kernel/task/scheduler.h>
 #include <kernel/input/keyboard.h>
 #include <kernel/device/framebuffer.h>

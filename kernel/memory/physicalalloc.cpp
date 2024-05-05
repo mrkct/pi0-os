@@ -1,10 +1,7 @@
-#include <kernel/kprintf.h>
-#include <kernel/lib/string.h>
-#include <kernel/lib/math.h>
+#include <kernel/base.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
-#include <kernel/panic.h>
 
 namespace kernel {
 

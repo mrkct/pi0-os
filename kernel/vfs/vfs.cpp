@@ -258,7 +258,7 @@ Error vfs_duplicate_custody(FileCustody &original, FileCustody &out_copy)
     return Success;
 }
 
-void vfs_get_default_stdin_stdout_stderr(FileCustody &stdin, FileCustody &stdout, FileCustody &stderr)
+void vfs_get_default_stdin_stdout_stderr(FileCustody &fc_stdin, FileCustody &fc_stdout, FileCustody &fc_stderr)
 {
     static File empty_file = File {
         .fs = NULL,
@@ -294,17 +294,17 @@ void vfs_get_default_stdin_stdout_stderr(FileCustody &stdin, FileCustody &stdout
         .close = [](File&) { return Success; }
     };
 
-    stdin = FileCustody {
+    fc_stdin = FileCustody {
         .file = &empty_file,
         .flags = 0,
         .seek_position = 0
     };
-    stdout = FileCustody {
+    fc_stdout = FileCustody {
         .file = &kprintf_file,
         .flags = 0,
         .seek_position = 0
     };
-    stderr = FileCustody {
+    fc_stderr = FileCustody {
         .file = &kprintf_file,
         .flags = 0,
         .seek_position = 0

@@ -1,6 +1,5 @@
-#include <kernel/kprintf.h>
+#include <kernel/base.h>
 #include <kernel/device/ramdisk.h>
-#include <kernel/lib/string.h>
 
 
 namespace kernel {

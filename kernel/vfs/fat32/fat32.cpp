@@ -1,7 +1,4 @@
-#include <kernel/lib/string.h>
-#include <kernel/lib/math.h>
-#include <kernel/memory/kheap.h>
-
+#include <kernel/base.h>
 #include <kernel/vfs/fat32/fat32.h>
 #include <kernel/vfs/fat32/fat32_structures.h>
 #include <kernel/vfs/vfs.h>

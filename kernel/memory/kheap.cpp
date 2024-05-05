@@ -1,8 +1,6 @@
-#include <kernel/lib/math.h>
-#include <kernel/lib/string.h>
-#include <kernel/lib/memory.h>
+#include <kernel/base.h>
+#include <stdlib.h>
 #include <kernel/memory/areas.h>
-#include <kernel/memory/kheap.h>
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
 
@@ -60,6 +58,17 @@ static Error sbrk(size_t size, uintptr_t& address)
     return Success;
 }
 
+extern "C" void* _sbrk(int incr)
+{
+    uintptr_t addr;
+    auto err = sbrk(incr, addr);
+    if (!err.is_success()) {
+        return nullptr;
+    }
+
+    return reinterpret_cast<void*>(addr);
+}
+
 Error kheap_init()
 {
     struct PhysicalPage* first_page;
@@ -72,34 +81,26 @@ Error kheap_init()
 
 Error _kmalloc(size_t size, uintptr_t& address)
 {
-    size = round_up<size_t>(size, 8);
+    void *addr = malloc(size);
+    if (addr == nullptr)
+        return OutOfMemory;
 
-    TRY(sbrk(size, address));
-
+    address = reinterpret_cast<uintptr_t>(addr);
     return Success;
 }
 
-Error _kfree(uintptr_t)
+Error _kfree(uintptr_t address)
 {
+    free(reinterpret_cast<void*>(address));
     return Success;
 }
 
 Error krealloc(void*& addr, size_t size)
 {
-    void* new_addr;
-    TRY(kmalloc(size, new_addr));
-    // FIXME: This is not the correct way of doing this, but in this dumb implementation
-    //        we don't keep the size of the allocated memory anywhere so we don't know
-    //        how much to copy. Anyway we know that we can copy at most 'size' bytes, and
-    //        due to being a bump allocator we know that the memory is contiguous.
-    //        We might be copying some bytes that we shouldn't, but we won't be reading
-    //        outside the current brk
-    memcpy(new_addr, addr, size);
-    if (auto err = kfree(addr); !err.is_success()) {
-        kfree(new_addr); // FIXME: How do we handle a double error?
-        return err;
-    }
-    addr = new_addr;
+    void *a = realloc(addr, size);
+    if (a == nullptr)
+        return OutOfMemory;
+    addr = a;
     return Success;
 }
 

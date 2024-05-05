@@ -1,12 +1,7 @@
-#include <stdint.h>
+#include <kernel/base.h>
 #include <api/syscalls.h>
 #include <kernel/datetime.h>
-#include <kernel/error.h>
 #include <kernel/interrupt.h>
-#include <kernel/lib/math.h>
-#include <kernel/lib/string.h>
-#include <kernel/lib/memory.h>
-#include <kernel/memory/kheap.h>
 #include <kernel/memory/vm.h>
 #include <kernel/syscall/syscalls.h>
 #include <kernel/task/scheduler.h>
@@ -78,7 +73,8 @@ static SyscallResult sys$get_process_info(uintptr_t user_buf)
 {
     api::ProcessInfo info;
     info.pid = scheduler_current_task()->pid;
-    strncpy_safe(info.name, scheduler_current_task()->name, sizeof(info.name));
+    strncpy(info.name, scheduler_current_task()->name, sizeof(info.name));
+    info.name[sizeof(info.name) - 1] = '\0';
 
     TRY(vm_copy_to_user(scheduler_current_task()->address_space, user_buf, &info, sizeof(info)));
 

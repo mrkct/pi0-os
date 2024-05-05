@@ -1,6 +1,5 @@
+#include <kernel/base.h>
 #include <kernel/device/framebuffer.h>
-#include <kernel/lib/math.h>
-#include <kernel/lib/string.h>
 
 
 namespace kernel {

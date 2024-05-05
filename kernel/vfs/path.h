@@ -1,7 +1,6 @@
 #pragma once
 
-#include <kernel/lib/string.h>
-
+#include <kernel/base.h>
 
 struct Path {
     const char *str;

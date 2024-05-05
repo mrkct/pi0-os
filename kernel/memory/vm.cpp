@@ -1,7 +1,6 @@
-#include <kernel/lib/string.h>
-#include <kernel/lib/math.h>
+#include <kernel/base.h>
 #include <kernel/memory/vm.h>
-#include <kernel/sizes.h>
+
 
 namespace kernel {
 
