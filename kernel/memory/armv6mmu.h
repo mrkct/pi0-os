@@ -146,6 +146,10 @@ union FirstLevelEntry {
     uint32_t raw;
     CoarsePageTableEntry coarse;
     SectionEntry section;
+
+    bool is_section() const { return section.identifier == SECTION_ENTRY_ID; }
+    bool is_coarse_page() const { return coarse.identifier == COARSE_PAGE_TABLE_ENTRY_ID; }
+    bool is_empty() const { return raw == 0; }
 };
 static_assert(sizeof(FirstLevelEntry) == 4, "FirstLevelEntry is not 32 bits");
 

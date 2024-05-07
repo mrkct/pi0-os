@@ -529,7 +529,7 @@ static void task_free(Task* task)
         item = item->next;
     }
 
-    // TODO: Free the address space
+    vm_free(task->address_space);
     kfree(task);
 }
 

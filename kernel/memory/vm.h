@@ -38,6 +38,8 @@ Error vm_memset(struct AddressSpace&, uintptr_t dest, uint8_t val, size_t size);
 
 void vm_switch_address_space(struct AddressSpace&);
 
+void vm_free(struct AddressSpace&);
+
 template<typename Callback>
 auto vm_using_address_space(struct AddressSpace& as, Callback c)
 {

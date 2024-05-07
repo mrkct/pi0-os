@@ -7,7 +7,7 @@
 namespace kernel {
 
 struct PhysicalPage {
-    uint32_t ref_count;
+    int32_t ref_count;
     struct PhysicalPage* next;
 };
 
@@ -42,5 +42,7 @@ Error physical_page_allocator_set_memory_range_as_reserved(uintptr_t start, uint
 Error physical_page_alloc(PageOrder, PhysicalPage*&);
 
 Error physical_page_free(PhysicalPage*, PageOrder);
+
+void physical_page_print_statistics();
 
 }

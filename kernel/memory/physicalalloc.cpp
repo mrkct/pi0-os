@@ -5,9 +5,6 @@
 
 namespace kernel {
 
-static constexpr size_t _16KB = 16 * _1KB;
-static constexpr size_t _4KB = 4 * _1KB;
-
 extern "C" uint8_t __higher_half_start[];
 extern "C" uint8_t __kernel_end[];
 
@@ -50,7 +47,14 @@ static PageOrder smaller_order(PageOrder order)
 
     kassert_not_reached();
 }
-struct PhysicalPage* addr2page(uintptr_t addr) { return &g_pages.data[addr / _1KB]; }
+
+struct PhysicalPage* addr2page(uintptr_t addr)
+{
+    auto idx = addr / _1KB;
+    kassert(idx < g_pages.len);
+    return &g_pages.data[idx];
+}
+
 uintptr_t page2addr(struct PhysicalPage* page) { return (page - g_pages.data) * _1KB; }
 static size_t page2array_index(struct PhysicalPage* page) { return page - g_pages.data; }
 
@@ -154,8 +158,9 @@ static Error _physical_page_alloc(PageOrder order, PhysicalPage*& out_page)
 {
     switch (order) {
     case PageOrder::_16KB:
-        if (g_free_pages_lists[static_cast<size_t>(PageOrder::_16KB)] == nullptr)
+        if (g_free_pages_lists[static_cast<size_t>(PageOrder::_16KB)] == nullptr) {
             return OutOfMemory;
+        }
 
         break;
     case PageOrder::_4KB:
@@ -207,7 +212,15 @@ static Error _physical_page_free(PhysicalPage* page, PageOrder order)
     bool all_buddies_free = true;
     for (auto i = 0; i < 4; i++) {
         auto* this_buddy = &g_pages.data[first_buddy_index_in_array + i * distance_between_buddies];
-        if (this_buddy->ref_count != 0) {
+        kassert(this_buddy->ref_count >= 0);
+        
+        /**
+         * Note that to check if a page is free we cannot rely on the ref_count, because
+         * for example if we are freeing a 4KB page then the ref_count of the page struct
+         * at its index might be 0, but that's because the full page has been split in 4 smaller
+         * ones and one of them is still in use.
+         */
+        if (this_buddy->next == nullptr) {
             all_buddies_free = false;
             break;
         }
@@ -217,8 +230,14 @@ static Error _physical_page_free(PhysicalPage* page, PageOrder order)
         append_page_to_free_pages_list(page, order);
     } else {
         for (int i = 0; i < 4; i++) {
+            auto page_idx = first_buddy_index_in_array + i * distance_between_buddies;
+
+            // Skip because the page we're freeing now was not yet placed in any free list
+            if (page_idx == page_index_in_array)
+                continue;
+            
             // FIXME: It's inefficient to iterate over the list all over
-            remove_page_from_free_pages_list(&g_pages.data[first_buddy_index_in_array + i * distance_between_buddies], order);
+            remove_page_from_free_pages_list(&g_pages.data[page_idx], order);
         }
         struct PhysicalPage* bigger_page = &g_pages.data[first_buddy_index_in_array];
         _physical_page_free(bigger_page, bigger_order(order));
@@ -229,7 +248,7 @@ static Error _physical_page_free(PhysicalPage* page, PageOrder order)
 
 Error physical_page_free(PhysicalPage* page, PageOrder order)
 {
-    kassert(page->ref_count >= 1);
+    kassert(page->ref_count > 0);
     page->ref_count--;
 
     if (page->ref_count == 0) {
@@ -237,6 +256,24 @@ Error physical_page_free(PhysicalPage* page, PageOrder order)
     }
 
     return Success;
+}
+
+void physical_page_print_statistics()
+{
+    const auto& count_items = [](auto& list) {
+        size_t count = 0;
+        for (auto* page = list; page != nullptr; page = page->next)
+            count++;
+        return count;
+    };
+
+    kprintf("Physical memory allocator statistics:\n");
+    kprintf("  Total 1KB pages: %d\n", g_pages.len);
+    kprintf("  Total 4KB pages: %d\n", g_pages.len / 16);
+    kprintf("  Total 16KB pages: %d\n", g_pages.len / 64);
+    kprintf("  Free 1KB pages: %d\n", count_items(g_free_pages_lists[static_cast<size_t>(PageOrder::_1KB)]));
+    kprintf("  Free 4KB pages: %d\n", count_items(g_free_pages_lists[static_cast<size_t>(PageOrder::_4KB)]));
+    kprintf("  Free 16KB pages: %d\n", count_items(g_free_pages_lists[static_cast<size_t>(PageOrder::_16KB)]));
 }
 
 }

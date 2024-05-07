@@ -225,7 +225,6 @@ static Error vm_map_page(struct AddressSpace& as, uintptr_t phys_addr, uintptr_t
 Error vm_map(struct AddressSpace& as, struct PhysicalPage* page, uintptr_t virt_addr, PageAccessPermissions permissions)
 {
     TRY(vm_map_page(as, page2addr(page), virt_addr, permissions));
-    page->ref_count++;
     return Success;
 }
 
@@ -303,7 +302,6 @@ Error vm_unmap(struct AddressSpace& as, uintptr_t virt_addr, struct PhysicalPage
 
     TRY(vm_unmap_page(as, virt_addr, previously_mapped_physical_address));
     previously_mapped_page = addr2page(previously_mapped_physical_address);
-    previously_mapped_page->ref_count--;
 
     return Success;
 }
@@ -342,6 +340,35 @@ Error vm_memset(struct AddressSpace& as, uintptr_t dest, uint8_t val, size_t siz
     TODO();
 
     return Success;
+}
+
+void vm_free(struct AddressSpace &as)
+{
+    TemporarilyMappedRange lvl1_table { page2addr(as.ttbr0_page), LVL1_TABLE_SIZE };
+    
+    const auto KERNEL_START = areas::higher_half.start;
+    for (size_t i = 0; i < lvl1_index(KERNEL_START); i++) {
+        auto &entry = lvl1_table.as_ptr<FirstLevelEntry*>()[i]; 
+        if (entry.is_empty() || entry.is_section())
+            continue;
+         
+        struct PhysicalPage* p = addr2page(entry.coarse.base_address());
+        TemporarilyMappedRange lvl2_table { entry.coarse.base_address(), LVL2_TABLE_SIZE };
+        for (size_t j = 0; j < LVL2_ENTRIES; j++) {
+            auto &lvl2_entry = lvl2_table.as_ptr<SecondLevelEntry*>()[j];
+            if (lvl2_entry.raw == 0)
+                continue;
+            
+            struct PhysicalPage* p = addr2page(lvl2_entry.small_page.base_address());
+            MUST(physical_page_free(p, PageOrder::_4KB));
+        }
+
+        memset(lvl2_table.as_ptr<SecondLevelEntry*>(), 0, LVL2_TABLE_SIZE);
+        MUST(physical_page_free(p, PageOrder::_1KB));
+    }
+
+    memset(lvl1_table.as_ptr<FirstLevelEntry*>(), 0, LVL1_TABLE_SIZE);
+    MUST(physical_page_free(as.ttbr0_page, PageOrder::_16KB));
 }
 
 PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr)
