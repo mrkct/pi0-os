@@ -3,7 +3,7 @@ SOURCES_ROOT=../
 CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
 
-CXXFLAGS=-fpic -ffreestanding -nostdlib -lgcc -lc -lg -lgcc -lm
+CXXFLAGS=-fpic -nostdlib -lgcc -lc -lg -lgcc -lm
 CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT) -I../include
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
