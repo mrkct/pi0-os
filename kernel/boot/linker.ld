@@ -3,7 +3,7 @@ ENTRY(_start)
 
 SECTIONS
 {
-    . = 0x8000;
+    . = LOAD_ADDRESS;
 
     .text :
     {

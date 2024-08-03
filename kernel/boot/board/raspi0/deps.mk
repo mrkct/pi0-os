@@ -1,2 +1,1 @@
-BOARD_SOURCES=board.cpp
-EXTRA_FLAGS=-DCONFIG_ARMV6 -DCONFIG_BOARD_RASPI0 -mcpu=arm1176jzf-s
+export BOARD_SOURCES := board.cpp

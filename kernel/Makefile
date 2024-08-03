@@ -8,30 +8,10 @@ CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT) -I../include
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
-BOARD:=raspi0
-ifeq ($(BOARD), raspi0)
+ifeq ($(ARCH), ARMV6)
 	CXXFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
 else
-	CXXFLAGS+=-mcpu=cortex-a7 -DBOARD_RASPI2
-endif
-
-ifdef RAMDISK
-	CXXFLAGS+=-DRAMDISK_FILE=$(RAMDISK)
-endif
-
-QEMU:=qemu-system-arm
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel boot/boot.elf
-QEMU_REPLAY_FILENAME:=replay.bin
-QEMU_RECORD_FLAGS:=\
-	-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
-	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
-QEMU_REPLAY_FLAGS:=\
-	-icount shift=auto,rr=replay,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
-	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
-ifdef SD_IMAGE
-QEMU_SD_FLAGS+=-sd $(SD_IMAGE)
-else
-QEMU_SD_FLAGS:=
+	CXXFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
 endif
 
 ARCH_SOURCES=\
@@ -55,24 +35,7 @@ all: boot/boot.elf
 
 boot/boot.elf: kernel.elf
 	$(OBJCOPY) kernel.elf -O binary kernel.bin
-	$(MAKE) -C boot
-
-snapshot-drive.qcow2:
-	qemu-img create -f qcow2 snapshot-drive.qcow2 4G
-
-qemu: all
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS)
-
-qemu-record: all snapshot-drive.qcow2
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS)
-
-qemu-gdb: all
-	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS) -s -S
-
-qemu-gdb-replay: all snapshot-drive.qcow2
-	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
+	$(MAKE) -e -C boot
 
 kernel.elf: $(OBJS)
 	$(CXX) -T linker.ld -o kernel.elf $(OBJS) $(CXXFLAGS) -lgcc
@@ -88,4 +51,5 @@ kernel.elf: $(OBJS)
 clean:
 	$(RM) -f $(OBJS) $(DEPENDS)
 	$(RM) -f kernel.elf
-	$(RM) -f kernel7.img
+	$(RM) -f kernel.bin
+	$(MAKE) -e -C boot clean

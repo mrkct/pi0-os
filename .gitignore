@@ -2,6 +2,7 @@ kernel.elf
 kernel.bin
 boot.elf
 boot.bin
+linker.preprocessed.ld
 disks/*
 *.img
 replay.bin
