@@ -2,7 +2,7 @@
 
 #include <kernel/error.h>
 #include <kernel/memory/areas.h>
-#include <kernel/memory/armv6mmu.h>
+#include <kernel/arch/arm/armv6mmu.h>
 #include <kernel/interrupt.h>
 #include <kernel/memory/physicalalloc.h>
 

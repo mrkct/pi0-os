@@ -10,7 +10,7 @@ CXXFLAGS+=-Wall -Wextra -g
 
 BOARD:=raspi0
 ifeq ($(BOARD), raspi0)
-	CXXFLAGS+=-mcpu=arm1176jzf-s
+	CXXFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
 else
 	CXXFLAGS+=-mcpu=cortex-a7 -DBOARD_RASPI2
 endif
@@ -20,7 +20,7 @@ ifdef RAMDISK
 endif
 
 QEMU:=qemu-system-arm
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel Kernel
+QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel boot/boot.elf
 QEMU_REPLAY_FILENAME:=replay.bin
 QEMU_RECORD_FLAGS:=\
 	-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
@@ -34,43 +34,13 @@ else
 QEMU_SD_FLAGS:=
 endif
 
+ARCH_SOURCES=\
+	kernel/arch/arm/start.S \
+	kernel/arch/arm/armv6mmu.cpp
+
 SOURCES=\
-	kernel/datetime.cpp \
-	kernel/device/gpio.cpp \
-	kernel/device/framebuffer.cpp \
-	kernel/device/aux.cpp \
-	kernel/device/ramdisk.cpp \
-	kernel/device/sd.cpp \
-	kernel/device/systimer.cpp \
-	kernel/device/uart.cpp \
-	kernel/device/videocore.cpp \
-	kernel/input/keyboard.cpp \
-	kernel/input/miniuart_keyboard.cpp \
-	kernel/input/virtinput_keyboard.cpp \
-	kernel/interrupt.cpp \
-	kernel/kprintf.cpp \
-	kernel/locking/reentrant.cpp \
-	kernel/locking/spinlock.cpp \
-	kernel/memory/armv6mmu.cpp \
-	kernel/memory/kheap.cpp \
-	kernel/memory/physicalalloc.cpp \
-	kernel/memory/vm.cpp \
-	kernel/newlib.cpp \
-	kernel/prekernel/early.cpp \
-	kernel/prekernel/main.cpp \
-	kernel/prekernel/start.S \
-	kernel/prekernel/vector_table.S \
-	kernel/syscall/syscalls.cpp \
-	kernel/task/elf_loader.cpp \
-	kernel/task/scheduler.cpp \
-	kernel/timer.cpp \
-	kernel/vfs/fat32/fat32.cpp \
-	kernel/vfs/filesystem.cpp \
-	kernel/vfs/sysfs/sysfs.cpp \
-	kernel/vfs/path.cpp \
-	kernel/vfs/pipe.cpp \
-	kernel/vfs/vfs.cpp \
-	kernel/windowmanager/main.cpp \
+	$(ARCH_SOURCES) \
+	kernel/main.cpp \
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))
@@ -81,33 +51,31 @@ OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 
 .PHONY: all clean qemu qemu-gdb 
 
-all: Kernel
+all: boot/boot.elf
+
+boot/boot.elf: kernel.elf
+	$(OBJCOPY) kernel.elf -O binary kernel.bin
+	$(MAKE) -C boot
 
 snapshot-drive.qcow2:
 	qemu-img create -f qcow2 snapshot-drive.qcow2 4G
 
-qemu: Kernel
+qemu: all
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS)
 
-qemu-record: Kernel snapshot-drive.qcow2
+qemu-record: all snapshot-drive.qcow2
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS)
 
-qemu-gdb: Kernel
+qemu-gdb: all
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS) -s -S
 
-qemu-gdb-replay: Kernel snapshot-drive.qcow2
+qemu-gdb-replay: all snapshot-drive.qcow2
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
 	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
 
-kernel.img: Kernel
-	$(OBJCOPY) Kernel -O binary _kernel.img
-	# Note that the RPi loads the binary at 0x8000,
-	# so we need to trim the first 0x8000 bytes from the binary
-	dd if=_kernel.img of=kernel.img bs=1024 skip=32
-
-Kernel: $(OBJS)
-	$(CXX) -T linker.ld -o Kernel $(OBJS) $(CXXFLAGS) -lgcc
+kernel.elf: $(OBJS)
+	$(CXX) -T linker.ld -o kernel.elf $(OBJS) $(CXXFLAGS) -lgcc
 
 -include $(DEPENDS)
 
@@ -119,5 +87,5 @@ Kernel: $(OBJS)
 
 clean:
 	$(RM) -f $(OBJS) $(DEPENDS)
-	$(RM) -f Kernel
+	$(RM) -f kernel.elf
 	$(RM) -f kernel7.img

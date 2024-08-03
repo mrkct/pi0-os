@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace kernel {
 
 static constexpr size_t lvl1_index(uintptr_t virt) { return virt >> 20; }
 static constexpr size_t lvl2_index(uintptr_t virt) { return (virt >> 12) & 0xff; }
@@ -158,5 +157,3 @@ union SecondLevelEntry {
     SmallPageEntry small_page;
 };
 static_assert(sizeof(SecondLevelEntry) == 4, "SecondLevelEntry is not 32 bits");
-
-}

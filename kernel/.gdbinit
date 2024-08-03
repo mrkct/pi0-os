@@ -1,2 +1,3 @@
 target remote localhost:1234
-file Kernel
+file kernel.elf
+add-symbol-file boot/boot.elf

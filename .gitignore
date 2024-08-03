@@ -1,4 +1,7 @@
-Kernel
+kernel.elf
+kernel.bin
+boot.elf
+boot.bin
 disks/*
 *.img
 replay.bin

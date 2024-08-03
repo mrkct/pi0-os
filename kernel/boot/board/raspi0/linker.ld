@@ -3,21 +3,17 @@ ENTRY(_start)
 
 SECTIONS
 {
-    . = 0xc0000000;
+    . = 0x8000;
 
     .text :
     {
-        __text_start = .;
         KEEP(*(.text.entry))
         KEEP(*(.text))
-        __text_end = .;
     }
 
     .rodata :
     {
-        __rodata_start = .;
         KEEP(*(.rodata))
-        __rodata_end = .;
     }
 
     .data :
@@ -34,4 +30,14 @@ SECTIONS
         . = ALIGN(64);
         __bss_end = .;
     }
+
+    
+    .bundle :
+    {
+        . = ALIGN(4K);
+        __bundle_start = .;
+        KEEP(*(.bundle))
+        __bundle_end = .;
+    }
+    
 }
