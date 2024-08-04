@@ -35,9 +35,13 @@ SECTIONS
     .bundle :
     {
         . = ALIGN(4K);
-        __bundle_start = .;
-        KEEP(*(.bundle))
-        __bundle_end = .;
+        __bundle_kernel_start = .;
+        KEEP(*(.bundle.kernel))
+        __bundle_kernel_end = .;
+        
+        . = ALIGN(4K);
+        __bundle_dtb_start = .;
+        KEEP(*(.bundle.dtb));
+        __bundle_dtb_end = .;
     }
-    
 }

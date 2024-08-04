@@ -30,7 +30,7 @@ all: boot.elf
 
 boot.elf: $(OBJS) ../kernel.elf
 	$(RM) kernel.S.o
-	$(CXX) -c $(CXXFLAGS) -o bundle.cpp.o bundle.cpp
+	$(CXX) -c $(CXXFLAGS) -o bundle.cpp.o bundle.cpp -DCONFIG_BUNDLED_DTB=$(CONFIG_BUNDLED_DTB)
 	$(RM) linker.preprocessed.ld
 	$(CXX) -E -P -x c -o linker.preprocessed.ld linker.ld -DLOAD_ADDRESS=$(LOAD_ADDRESS)
 	$(CXX) -T linker.preprocessed.ld -o boot.elf $(OBJS) -DLOAD_ADDRESS=$(LOAD_ADDRESS) $(CXXFLAGS) -lgcc

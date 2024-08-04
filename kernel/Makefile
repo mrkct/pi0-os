@@ -31,9 +31,9 @@ OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 
 .PHONY: all clean qemu qemu-gdb 
 
-all: boot/boot.elf
+all: kernel.elf bootloader 
 
-boot/boot.elf: kernel.elf
+bootloader: kernel.elf
 	$(OBJCOPY) kernel.elf -O binary kernel.bin
 	$(MAKE) -e -C boot
 

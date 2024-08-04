@@ -6,8 +6,10 @@
 #include "misc.h"
 
 
-extern "C" uint8_t __bundle_start[];
-extern "C" uint8_t __bundle_end[];
+extern "C" uint8_t __bundle_kernel_start[];
+extern "C" uint8_t __bundle_kernel_end[];
+extern "C" uint8_t __bundle_dtb_start[];
+extern "C" uint8_t __bundle_dtb_end[];
 
 #define CONFIG_KERNEL_VIRT_START_ADDRESS        (0xc0000000)
 #define CONFIG_PHYSICAL_MEMORY_HOLE_ADDRESS     (0xe0000000)
@@ -31,8 +33,8 @@ extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t load_address)
     
     {
         uintptr_t next_virt = CONFIG_KERNEL_VIRT_START_ADDRESS;
-        uintptr_t next_phys = (uintptr_t) __bundle_start;
-        size_t size = round_up<size_t>((uintptr_t) &__bundle_end - (uintptr_t) &__bundle_start, _1MB);
+        uintptr_t next_phys = (uintptr_t) __bundle_kernel_start;
+        size_t size = round_up<size_t>((uintptr_t) &__bundle_kernel_end - (uintptr_t) &__bundle_kernel_start, _1MB);
         size_t mapped = 0;
 
         while (mapped < size) {
@@ -83,18 +85,20 @@ extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t load_address)
     /* Setup a larger stack for the kernel, and copy the kernel arguments into it */
     uintptr_t kernel_stack = (uintptr_t) bootmem_alloc(CONFIG_KERNEL_STACK_SIZE, _4KB);
     kernel_stack += CONFIG_KERNEL_STACK_SIZE - 16;
-    
+
+#define REMAP_TO_PHYS_MEMORY_HOLE(addr) ((addr) - ram.start + CONFIG_PHYSICAL_MEMORY_HOLE_ADDRESS)
+
     BootParams boot_params {
         .ram_start = ram.start,
         .ram_size = ram.size,
     
-        .bootmem_start = bootmem.start,
+        .bootmem_start = REMAP_TO_PHYS_MEMORY_HOLE(bootmem.start),
         .bootmem_size = bootmem_allocated(),
     
-        .device_tree_start = 0,
-        .device_tree_size = 0,
+        .device_tree_start = REMAP_TO_PHYS_MEMORY_HOLE((uintptr_t) __bundle_dtb_start),
+        .device_tree_size = (uintptr_t) (__bundle_dtb_end - __bundle_dtb_start),
 
-        .initrd_start = 0,
+        .initrd_start = REMAP_TO_PHYS_MEMORY_HOLE(0),
         .initrd_size = 0,
     };
     kernel_stack -= sizeof(BootParams);

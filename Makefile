@@ -1,6 +1,11 @@
+ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+
 export BOARD ?= raspi0
 include board/$(BOARD)/config.mk
 
+ifdef CONFIG_BUNDLED_DTB
+	export CONFIG_BUNDLED_DTB := $(ROOT_DIR)/board/$(BOARD)/$(CONFIG_BUNDLED_DTB)
+endif
 
 QEMU:=qemu-system-arm
 QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel kernel/boot/boot.elf
