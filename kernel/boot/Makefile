@@ -16,6 +16,10 @@ else
 	CXXFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
 endif
 
+ifdef CONFIG_BUNDLED_DTB
+	CONFIG_BUNDLED_DTB := -DCONFIG_BUNDLED_DTB=$(CONFIG_BUNDLED_DTB)
+endif
+
 BOARD_SOURCES:=$(addprefix board/$(BOARD)/, $(BOARD_SOURCES))
 SOURCES=$(BOARD_SOURCES) start.S bundle.cpp boot.cpp misc.cpp
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
@@ -30,7 +34,7 @@ all: boot.elf
 
 boot.elf: $(OBJS) ../kernel.elf
 	$(RM) kernel.S.o
-	$(CXX) -c $(CXXFLAGS) -o bundle.cpp.o bundle.cpp -DCONFIG_BUNDLED_DTB=$(CONFIG_BUNDLED_DTB)
+	$(CXX) -c $(CXXFLAGS) -o bundle.cpp.o bundle.cpp $(CONFIG_BUNDLED_DTB)
 	$(RM) linker.preprocessed.ld
 	$(CXX) -E -P -x c -o linker.preprocessed.ld linker.ld -DLOAD_ADDRESS=$(LOAD_ADDRESS)
 	$(CXX) -T linker.preprocessed.ld -o boot.elf $(OBJS) -DLOAD_ADDRESS=$(LOAD_ADDRESS) $(CXXFLAGS) -lgcc

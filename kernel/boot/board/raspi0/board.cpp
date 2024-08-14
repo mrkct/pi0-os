@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <kernel/sizes.h>
 #include <kernel/boot/board/board.h>
+#include <kernel/boot/misc.h>
 
 
 /**
@@ -44,92 +45,64 @@ static constexpr uintptr_t AUX_MU_CNTL_REG = AUX_BASE + 0x60;
 static constexpr uintptr_t AUX_MU_STAT_REG = AUX_BASE + 0x64;
 static constexpr uintptr_t AUX_MU_BAUD_REG = AUX_BASE + 0x68;
 
-static inline void delay(uint32_t ticks)
-{
-    while (ticks--);
-}
-
-static inline void boot_memory_barrier()
-{
-    asm volatile(
-        "mcr p15, 0, r3, c7, c5, 0  \n" // Invalidate instruction cache
-        "mcr p15, 0, r3, c7, c5, 6  \n" // Invalidate BTB
-        "mcr p15, 0, r3, c7, c10, 4 \n" // Drain write buffer
-        "mcr p15, 0, r3, c7, c5, 4  \n" // Prefetch flush
-        :
-        :
-        : "r3");
-}
-
-static inline void boot_iowrite32(uintptr_t reg, uint32_t data)
-{
-    boot_memory_barrier();
-    *reinterpret_cast<uint32_t volatile*>(reg) = data;
-}
-
-static inline uint32_t boot_ioread32(uintptr_t reg)
-{
-    boot_memory_barrier();
-    return *reinterpret_cast<uint32_t volatile*>(reg);
-}
 
 void board_early_putchar(char c)
 {
     static constexpr uint32_t TRANSMITTER_EMPTY = 1 << 5;
-    while (!(boot_ioread32(AUX_MU_LSR_REG) & TRANSMITTER_EMPTY))
+    while (!(ioread32(AUX_MU_LSR_REG) & TRANSMITTER_EMPTY))
 	    ;
 	
-    boot_iowrite32(AUX_MU_IO_REG, c);
+    iowrite32(AUX_MU_IO_REG, c);
 }
 
 void board_early_console_init()
 {
     static constexpr uint32_t MINI_UART_ENABLED = 1;
-    boot_iowrite32(AUX_ENABLES, MINI_UART_ENABLED);
+    iowrite32(AUX_ENABLES, MINI_UART_ENABLED);
 
-    boot_iowrite32(AUX_MU_IER_REG, 0);
+    iowrite32(AUX_MU_IER_REG, 0);
 
     // Disable TX and RX while setting up the UART
-    boot_iowrite32(AUX_MU_CNTL_REG, 0);
+    iowrite32(AUX_MU_CNTL_REG, 0);
     
     // WARNING: Check the errata for this register
     static constexpr uint32_t EIGHT_BIT_DATA_SIZE = 0b11;
-    boot_iowrite32(AUX_MU_LCR_REG, EIGHT_BIT_DATA_SIZE);
+    iowrite32(AUX_MU_LCR_REG, EIGHT_BIT_DATA_SIZE);
 
     static constexpr uint32_t RTS_HIGH = 0;
-    boot_iowrite32(AUX_MU_MCR_REG, RTS_HIGH);
+    iowrite32(AUX_MU_MCR_REG, RTS_HIGH);
 
-    boot_iowrite32(AUX_MU_IER_REG, 0);
+    iowrite32(AUX_MU_IER_REG, 0);
 
     static constexpr uint32_t CLEAR_FIFOS = 0xc6;
-    boot_iowrite32(AUX_MU_IIR_REG, CLEAR_FIFOS);
+    iowrite32(AUX_MU_IIR_REG, CLEAR_FIFOS);
     
     static constexpr uint32_t divisor = 250000000 / (8 * 115200) - 1;
-    boot_iowrite32(AUX_MU_BAUD_REG, divisor);
+    iowrite32(AUX_MU_BAUD_REG, divisor);
 
     // Set pins 14-15 as Alternate Function 5 (TX1, RX1)
     static constexpr auto PIN_FUNCTIONS = static_cast<uint32_t>(0b010010) << 12;
-    boot_iowrite32(GPFSEL1, PIN_FUNCTIONS);
+    iowrite32(GPFSEL1, PIN_FUNCTIONS);
 
     // Disable pull-ups for pins 14-15
     {
-        boot_iowrite32(GPPUD, 0);
+        iowrite32(GPPUD, 0);
         delay(150);
-        boot_iowrite32(GPPUDCLK0, 1 << 14);
+        iowrite32(GPPUDCLK0, 1 << 14);
         delay(150);
-        boot_iowrite32(GPPUDCLK0, 0);
+        iowrite32(GPPUDCLK0, 0);
 
-        boot_iowrite32(GPPUD, 0);
+        iowrite32(GPPUD, 0);
         delay(150);
-        boot_iowrite32(GPPUDCLK0, 1 << 15);
+        iowrite32(GPPUDCLK0, 1 << 15);
         delay(150);
-        boot_iowrite32(GPPUDCLK0, 0);
+        iowrite32(GPPUDCLK0, 0);
     }
 
     // Enable receiving and transmitting.
     static constexpr uint32_t TX_ENABLE = 1 << 1;
     static constexpr uint32_t RX_ENABLE = 1 << 0;
-    boot_iowrite32(AUX_MU_CNTL_REG, TX_ENABLE | RX_ENABLE);
+    iowrite32(AUX_MU_CNTL_REG, TX_ENABLE | RX_ENABLE);
 }
 
 

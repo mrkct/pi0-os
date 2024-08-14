@@ -8,7 +8,7 @@ ifdef CONFIG_BUNDLED_DTB
 endif
 
 QEMU:=qemu-system-arm
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel kernel/boot/boot.elf
+QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp $(QEMU_CFG_FLAGS) -kernel kernel/boot/boot.elf
 QEMU_REPLAY_FILENAME:=replay.bin
 QEMU_RECORD_FLAGS:=\
 	-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
