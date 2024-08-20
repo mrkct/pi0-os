@@ -4,16 +4,15 @@
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
 
-namespace kernel {
 
-static uintptr_t g_last_mapped_chunk = areas::heap.start;
-static uintptr_t g_brk = areas::heap.start;
+static uintptr_t g_last_mapped_chunk = areas::kernel_heap.start;
+static uintptr_t g_brk = areas::kernel_heap.start;
 
 static size_t CHUNK_SIZE = 4 * _1KB;
 
 static Error brk(uintptr_t new_brk)
 {
-    if (new_brk < areas::heap.start || new_brk > areas::heap.end)
+    if (new_brk < areas::kernel_heap.start || new_brk > areas::kernel_heap.end)
         return BadParameters;
 
     auto must_be_mapped_up_to = round_down<uintptr_t>(new_brk, CHUNK_SIZE);
@@ -48,7 +47,7 @@ static Error brk(uintptr_t new_brk)
 
 static Error sbrk(size_t size, uintptr_t& address)
 {
-    if (g_brk > areas::heap.end - size)
+    if (g_brk > areas::kernel_heap.end - size)
         return OutOfMemory;
 
     auto old_brk = g_brk;
@@ -102,6 +101,4 @@ Error krealloc(void*& addr, size_t size)
         return OutOfMemory;
     addr = a;
     return Success;
-}
-
 }

@@ -9,7 +9,7 @@ start:
 	mrc p15, 0, r5, c0, c0, 5
 	and r5, r5, #3
 	cmp r5, #0
-	b multicore_halt
+	bne multicore_halt
 #endif
 
     // Clear the BSS

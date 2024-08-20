@@ -3,15 +3,13 @@
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
 
-namespace kernel {
-
-extern "C" uint8_t __higher_half_start[];
-extern "C" uint8_t __kernel_end[];
 
 struct {
     PhysicalPage* data;
     size_t len;
 } g_pages;
+
+static uintptr_t s_physical_ram_starting_address;
 
 struct PhysicalPage* g_free_pages_lists[] = {
     [static_cast<size_t>(PageOrder::_1KB)] = nullptr,
@@ -33,6 +31,7 @@ static PageOrder bigger_order(PageOrder order)
 
     kassert_not_reached();
 }
+
 static PageOrder smaller_order(PageOrder order)
 {
     switch (order) {
@@ -50,12 +49,13 @@ static PageOrder smaller_order(PageOrder order)
 
 struct PhysicalPage* addr2page(uintptr_t addr)
 {
-    auto idx = addr / _1KB;
+    kassert(addr >= s_physical_ram_starting_address);
+    auto idx = (addr - s_physical_ram_starting_address) / _1KB;
     kassert(idx < g_pages.len);
     return &g_pages.data[idx];
 }
 
-uintptr_t page2addr(struct PhysicalPage* page) { return (page - g_pages.data) * _1KB; }
+uintptr_t page2addr(struct PhysicalPage* page) { return s_physical_ram_starting_address + (page - g_pages.data) * _1KB; }
 static size_t page2array_index(struct PhysicalPage* page) { return page - g_pages.data; }
 
 static void append_page_to_free_pages_list(struct PhysicalPage* page, PageOrder order)
@@ -107,23 +107,25 @@ static void remove_page_from_free_pages_list(struct PhysicalPage* page, PageOrde
     kassert_not_reached();
 }
 
-Error physical_page_allocator_init(size_t total_physical_memory_size)
+Error physical_page_allocator_init(BootParams const *boot_params)
 {
-    total_physical_memory_size = round_down<size_t>(total_physical_memory_size, _16KB);
+    s_physical_ram_starting_address = boot_params->ram_start;
+    
+    size_t total_physical_memory_size = round_down<size_t>(boot_params->ram_size, _16KB);
     g_pages.len = total_physical_memory_size / _1KB;
 
-    auto start_of_pages_data_addr = reinterpret_cast<uintptr_t>(__kernel_end);
+    // FIXME: This is because we know that the bootloader places the bootmem after
+    //        everything else, but we should not depend on that
+    uintptr_t first_free_address = boot_params->bootmem_start + boot_params->bootmem_size;
+
+    auto start_of_pages_data_addr = first_free_address;
     auto end_of_pages_data_addr = round_up(start_of_pages_data_addr + g_pages.len * sizeof(PhysicalPage), _16KB);
     g_pages.data = reinterpret_cast<PhysicalPage*>(start_of_pages_data_addr);
 
     memset(g_pages.data, 0, g_pages.len * sizeof(PhysicalPage));
 
     auto idx_step = _16KB / _1KB;
-
-    // NOTE: end_of_pages_data_addr is a virtual address, since the first 32MBs of the higher half
-    //       are mapped to the first 32MBs of memory, we can convert the address simply by subtracting
-    //       the offset of the higher half
-    auto first_free_page_idx = (end_of_pages_data_addr - reinterpret_cast<uintptr_t>(__higher_half_start)) / _1KB;
+    auto first_free_page_idx = (end_of_pages_data_addr - areas::physical_mem.start) / _1KB;
     auto last_free_page_idx = total_physical_memory_size / _1KB - idx_step;
 
     for (auto i = last_free_page_idx; i >= first_free_page_idx; i -= idx_step) {
@@ -274,6 +276,4 @@ void physical_page_print_statistics()
     kprintf("  Free 1KB pages: %d\n", count_items(g_free_pages_lists[static_cast<size_t>(PageOrder::_1KB)]));
     kprintf("  Free 4KB pages: %d\n", count_items(g_free_pages_lists[static_cast<size_t>(PageOrder::_4KB)]));
     kprintf("  Free 16KB pages: %d\n", count_items(g_free_pages_lists[static_cast<size_t>(PageOrder::_16KB)]));
-}
-
 }

@@ -1,16 +1,28 @@
 #pragma once
 
-#include <kernel/error.h>
+#include <kernel/base.h>
 #include <kernel/memory/areas.h>
+#include <kernel/boot/boot.h>
 #include <kernel/arch/arm/armv6mmu.h>
 #include <kernel/interrupt.h>
 #include <kernel/memory/physicalalloc.h>
 
-namespace kernel {
+
+uintptr_t virt2phys(uintptr_t virt);
+
+uintptr_t phys2virt(uintptr_t phys);
+
 
 struct AddressSpace {
     struct PhysicalPage* ttbr0_page;
+    FirstLevelEntry *get_root_table_ptr() const { return reinterpret_cast<FirstLevelEntry*>(phys2virt(page2addr(ttbr0_page))); }
 };
+
+void vm_early_init(BootParams const *boot_params);
+
+void vm_init();
+
+void *ioremap(uintptr_t phys_addr, size_t size);
 
 struct AddressSpace& vm_current_address_space();
 
@@ -18,7 +30,6 @@ struct AddressSpace& vm_kernel_address_space();
 
 uintptr_t vm_read_current_ttbr0();
 
-uintptr_t virt2phys(uintptr_t virt);
 
 Error vm_init_kernel_address_space();
 
@@ -57,5 +68,3 @@ enum class PageFaultHandlerResult {
     KernelFatal
 };
 PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr);
-
-}

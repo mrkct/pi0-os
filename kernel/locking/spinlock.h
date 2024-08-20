@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace kernel {
 
 typedef struct {
     uint32_t is_taken;
@@ -17,5 +16,3 @@ void take(Spinlock&);
 bool is_taken(Spinlock& lock);
 
 void release(Spinlock&);
-
-}

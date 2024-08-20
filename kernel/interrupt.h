@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace kernel {
 
 enum class InterruptVector: int {
     Reset = 0,
@@ -47,5 +46,3 @@ void interrupt_install_swi_handler(uint32_t swi_number, InterruptHandler);
 void interrupt_install_basic_irq_handler(uint32_t irq_number, InterruptHandler);
 void interrupt_install_irq1_handler(uint32_t irq_number, InterruptHandler);
 void interrupt_install_irq2_handler(uint32_t irq_number, InterruptHandler);
-
-}

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <kernel/sizes.h>
-#include <kernel/lib/math.h>
+#include <kernel/lib/more_math.h>
 #include "board/board.h"
 
 

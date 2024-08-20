@@ -1,19 +1,11 @@
 #pragma once
 
-#include <kernel/error.h>
-#include <stdarg.h>
-#include <stddef.h>
+#include <kernel/base.h>
 
-namespace kernel {
 
-struct VideoConsole;
+typedef void (*PutCharFunc)(char c);
 
-void kprintf_video_init(VideoConsole&);
-
-size_t ksnprintf(char* buffer, size_t buffer_size, char const* format, va_list args);
-
-size_t ksprintf(char* buffer, size_t buffer_size, char const* format, ...);
+void kprintf_set_putchar_func(PutCharFunc f);
 
 size_t kprintf(char const* format, ...);
 
-}

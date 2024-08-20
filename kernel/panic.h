@@ -2,20 +2,45 @@
 
 #include <stddef.h>
 
-namespace kernel {
 size_t kprintf(char const* format, ...);
-}
+
+#ifndef UNIT_TEST
 
 #define panic(...)                                                       \
     do {                                                                 \
         asm volatile("cpsid i");                                         \
-        kernel::kprintf("=========== KERNEL PANIC :^( ===========\n");   \
-        kernel::kprintf("At %s:%d\n", __FILE__, __LINE__);               \
-        kernel::kprintf(__VA_ARGS__);                                    \
-        kernel::kprintf("\n========================================\n"); \
+        kprintf("=========== KERNEL PANIC :^( ===========\n");           \
+        kprintf("At %s:%d\n", __FILE__, __LINE__);                       \
+        kprintf(__VA_ARGS__);                                            \
+        kprintf("\n========================================\n");         \
         while (1)                                                        \
             ;                                                            \
     } while (0)
+
+#define panic_no_print(...)      \
+    do {                         \
+        asm volatile("cpsid i"); \
+        while (1)                \
+            ;                    \
+    } while (0)
+
+#else
+
+#include <stdio.h>
+#include <assert.h>
+
+#define panic(...)                                                      \
+    do {                                                                \
+        fprintf(stderr, "=========== KERNEL PANIC :^( ===========\n");  \
+        fprintf(stderr, "At %s:%d\n", __FILE__, __LINE__);              \
+        fprintf(stderr, __VA_ARGS__);                                   \
+        fprintf(stderr, "\n========================================\n");\
+        assert(false);                                                  \
+    } while(0);
+
+#define panic_no_print(...) panic(__VA_ARGS__)
+
+#endif
 
 #define FORMAT_TASK_STATE                               \
     "\t r0: %x\t r1: %x\t r2: %x\t r3: %x\n"            \
@@ -36,12 +61,7 @@ size_t kprintf(char const* format, ...);
     (state)->task_lr,                                   \
     (state)->spsr
 
-#define panic_no_print(...)      \
-    do {                         \
-        asm volatile("cpsid i"); \
-        while (1)                \
-            ;                    \
-    } while (0)
+
 
 #define kassert_not_reached() panic("ASSERTION FAILED: not reached")
 
@@ -56,3 +76,5 @@ size_t kprintf(char const* format, ...);
         if (!(expr))                                         \
             panic_no_print("ASSERTION FAILED: " #expr "\n"); \
     } while (0)
+
+#define todo() panic("TODO")

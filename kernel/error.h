@@ -3,7 +3,6 @@
 #include <kernel/panic.h>
 #include <stdint.h>
 
-namespace kernel {
 
 enum class GenericErrorCode {
     Success,
@@ -114,6 +113,25 @@ struct Error {
                 __result.extra_data == nullptr ? "no" : "yes");                           \
     } while (0)
 
+#define EARLY_MUST(expr)                                                                    \
+    do {                                                                                    \
+        auto __result = (expr);                                                             \
+        if (!__result.is_success()) {                                                       \
+            panic_no_print(                                                                 \
+                "The following expression returned an error:\n" #expr "\n"                  \
+                "Called from %s:%d\n"                                                       \
+                "| Error: %s\n"                                                             \
+                "| DeviceSpecificError: %lu (%lx)\n"                                        \
+                "| Message: \"%s\"\n"                                                       \
+                "| Extra data available: %s\n",                                             \
+                __FILE__, __LINE__,                                                         \
+                __generic_error_code_to_string(__result.generic_error_code),                \
+                __result.device_specific_error_code, __result.device_specific_error_code,   \
+                __result.user_message,                                                      \
+                __result.extra_data == nullptr ? "no" : "yes");                             \
+        }                                                                                   \
+    } while(0)
+
 #define TODO() panic("TODO: %s:%d\n", __FILE__, __LINE__)
 
 static constexpr Error Success { GenericErrorCode::Success, 0, "Success", nullptr };
@@ -136,5 +154,3 @@ static constexpr Error PathTooLong { GenericErrorCode::PathTooLong, 0, "Path too
 static constexpr Error NotImplemented { GenericErrorCode::NotImplemented, 0, "Not implemented", nullptr };
 static constexpr Error TooManyOpenFiles { GenericErrorCode::TooManyOpenFiles, 0, "Too many open files", nullptr };
 static constexpr Error AlreadyInUse { GenericErrorCode::AlreadyInUse, 0, "Resource is already in use", nullptr };
-
-}

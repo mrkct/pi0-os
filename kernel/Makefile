@@ -20,7 +20,17 @@ ARCH_SOURCES=\
 
 SOURCES=\
 	$(ARCH_SOURCES) \
+	kernel/kprintf.cpp \
 	kernel/main.cpp \
+	kernel/drivers/char/pl011.cpp \
+	kernel/drivers/device.cpp \
+	kernel/drivers/devicemanager.cpp \
+	kernel/locking/spinlock.cpp \
+	kernel/memory/kheap.cpp \
+	kernel/memory/physicalalloc.cpp \
+	kernel/memory/vm.cpp \
+	kernel/newlib.cpp \
+
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))

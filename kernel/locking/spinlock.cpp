@@ -1,7 +1,6 @@
-#include <kernel/locking/spinlock.h>
-#include <kernel/task/scheduler.h>
+#include <kernel/interrupt.h>
+#include "spinlock.h"
 
-namespace kernel {
 
 static bool try_acquire(Spinlock& lock)
 {
@@ -35,6 +34,4 @@ void release(Spinlock& lock)
 bool is_taken(Spinlock& lock)
 {
     return lock.is_taken != 0;
-}
-
 }

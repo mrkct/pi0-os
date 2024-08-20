@@ -2,7 +2,6 @@
 
 #include <kernel/error.h>
 
-namespace kernel {
 
 Error kheap_init();
 
@@ -25,5 +24,3 @@ Error kfree(T* address)
 }
 
 Error krealloc(void*&, size_t size);
-
-}

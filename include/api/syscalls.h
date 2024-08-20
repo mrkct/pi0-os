@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <errno.h>
 
 
 #define SYSCALL_VECTOR 0x10
@@ -65,6 +66,12 @@ static inline uint32_t syscall(SyscallIdentifiers id, uint32_t* extra_return, ui
 
     return result;
 }
+
+typedef enum MajorDeviceNumber {
+    Maj_TTY = 4,
+    Maj_Console = 5,
+    Maj_UART = 6,
+} MajorDeviceNumber;
 
 #include "files.h"
 #include "process.h"
