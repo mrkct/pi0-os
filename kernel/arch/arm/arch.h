@@ -40,6 +40,34 @@ static inline void wait_cycles(uint32_t cycles)
                  : [cycles] "+r"(cycles));
 }
 
+static inline bool try_acquire(uint32_t *lock)
+{
+    uint32_t old_value = 0;
+    asm volatile(
+        "mov r0, #1\n"
+        "swp %0, r0, [%1]\n"
+        : "=r&"(old_value)
+        : "r"(lock)
+        : "r0");
+
+    return old_value == 0;
+}
+
+static inline bool interrupt_are_enabled()
+{
+    uint32_t cpsr;
+    asm volatile("mrs %0, cpsr"
+                 : "=r"(cpsr));
+    return !(cpsr & (1 << 7));
+}
+static inline void interrupt_enable() { asm volatile("cpsie i"); }
+static inline void interrupt_disable() { asm volatile("cpsid i"); }
+
+static inline void cpu_relax()
+{
+    asm volatile("wfe");
+}
+
 template<typename Callback>
 Error retry_with_timeout(Callback callback)
 {

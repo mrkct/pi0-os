@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <kernel/arch/arch.h>
 
 
 enum class InterruptVector: int {
@@ -31,16 +32,6 @@ struct VectorFrame {
 typedef void (*InterruptHandler)(SuspendedTaskState*);
 
 void interrupt_init();
-
-static inline bool interrupt_are_enabled()
-{
-    uint32_t cpsr;
-    asm volatile("mrs %0, cpsr"
-                 : "=r"(cpsr));
-    return !(cpsr & (1 << 7));
-}
-static inline void interrupt_enable() { asm volatile("cpsie i"); }
-static inline void interrupt_disable() { asm volatile("cpsid i"); }
 
 void interrupt_install_swi_handler(uint32_t swi_number, InterruptHandler);
 void interrupt_install_basic_irq_handler(uint32_t irq_number, InterruptHandler);

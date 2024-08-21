@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <kernel/base.h>
 #include <kernel/memory/vm.h>
-#include <kernel/arch/arm/io.h>
+#include <kernel/arch/arch.h>
 #include <include/api/syscalls.h>
 
 
@@ -95,4 +95,42 @@ private:
 public:
     UART(): CharacterDevice(Maj_UART, s_next_minor++, "uart")
     {}
+
+    virtual int32_t ioctl(uint32_t request, void *argp) override;
+};
+
+class GPIOController: public CharacterDevice
+{
+private:
+    static uint8_t s_next_minor;
+public:
+    GPIOController(): CharacterDevice(Maj_GPIO, s_next_minor++, "gpio")
+    {}
+
+    enum class PinState { Low, High };
+    enum class PullState { None, Up, Down };
+    enum class PinFunction {
+        Input,
+        Output,
+        Alt0,
+        Alt1,
+        Alt2,
+        Alt3,
+        Alt4,
+        Alt5,
+    };
+
+    virtual int64_t read(uint8_t *buffer, size_t size) override;
+    virtual int64_t write(const uint8_t *buffer, size_t size) override;
+    virtual int32_t ioctl(uint32_t request, void *argp) override;
+
+
+    virtual int32_t configure_pin(uint32_t port, uint32_t pin, PinFunction function) = 0;
+    virtual int32_t configure_pin_pull_up_down(uint32_t port, uint32_t pin, PullState) = 0;
+
+
+    virtual int32_t get_port_count() = 0;
+    virtual int32_t get_port_pin_count(uint32_t port) = 0;
+    virtual int32_t get_pin_state(uint32_t port, uint32_t pin) = 0;
+    virtual int32_t set_pin_state(uint32_t port, uint32_t pin, PinState state) = 0;
 };

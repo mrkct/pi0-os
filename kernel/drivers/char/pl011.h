@@ -35,7 +35,11 @@ private:
     static_assert(offsetof(RegisterMap, PeriphID) == 0xfe0);
 
 public:
-    PL011UART(uintptr_t phys_adr);
+    struct Config {
+        uintptr_t physaddr;
+    };
+
+    PL011UART(Config const *config);
 
     virtual int32_t init() override;
     virtual int32_t shutdown() override;
@@ -48,6 +52,6 @@ protected:
 
 private:
     bool m_initialized { false };
-    uintptr_t m_peripheral_physical_address;
+    Config m_config;
     RegisterMap volatile *r;
 };

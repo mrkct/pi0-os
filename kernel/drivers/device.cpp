@@ -3,6 +3,7 @@
 
 uint8_t Console::s_next_minor = 0;
 uint8_t UART::s_next_minor = 0;
+uint8_t GPIOController::s_next_minor = 0;
 
 
 Device::Device(uint8_t major, uint8_t minor, char const* name)
@@ -38,5 +39,30 @@ int64_t default_seek_function(
 
 int32_t Console::ioctl(uint32_t, void*)
 {
+    todo();
+    return -ENOTSUP;
+}
+
+int32_t UART::ioctl(uint32_t, void*)
+{
+    todo();
+    return -ENOTSUP;
+}
+
+int64_t GPIOController::read(uint8_t *, size_t)
+{
+    todo();
+    return -ENOTSUP;
+}
+
+int64_t GPIOController::write(const uint8_t *, size_t)
+{
+    todo();
+    return -ENOTSUP;
+}
+
+int32_t GPIOController::ioctl(uint32_t, void *)
+{
+    todo();
     return -ENOTSUP;
 }

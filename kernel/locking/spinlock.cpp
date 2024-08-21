@@ -1,23 +1,10 @@
-#include <kernel/interrupt.h>
+#include <kernel/arch/arch.h>
 #include "spinlock.h"
 
 
-static bool try_acquire(Spinlock& lock)
-{
-    uint32_t old_value = 0;
-    asm volatile(
-        "mov r0, #1\n"
-        "swp %0, r0, [%1]\n"
-        : "=r&"(old_value)
-        : "r"(&lock.is_taken)
-        : "r0");
-
-    return old_value == 0;
-}
-
 void take(Spinlock& lock)
 {
-    while (!try_acquire(lock)) {
+    while (!try_acquire(&lock.is_taken)) {
         asm volatile("wfe");
     }
     lock.need_reenable_interrupts = interrupt_are_enabled();

@@ -1,8 +1,8 @@
 #include "pl011.h"
 
 
-PL011UART::PL011UART(uintptr_t peripheral_phys_addr)
-    :   UART(), m_peripheral_physical_address(peripheral_phys_addr)
+PL011UART::PL011UART(Config const *config)
+    :   UART(), m_config(*config)
 {
 }
 
@@ -12,7 +12,7 @@ int32_t PL011UART::init()
         return 0;
     }
 
-    r = static_cast<RegisterMap volatile*>(ioremap(m_peripheral_physical_address, sizeof(RegisterMap)));
+    r = static_cast<RegisterMap volatile*>(ioremap(m_config.physaddr, sizeof(RegisterMap)));
 
     iowrite32(&r->CR, 0x0);         // Turn off UART
     iowrite32(&r->ICR, 0x7ff);      // Clear all IRQs

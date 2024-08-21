@@ -22,10 +22,13 @@ SOURCES=\
 	$(ARCH_SOURCES) \
 	kernel/kprintf.cpp \
 	kernel/main.cpp \
+	kernel/drivers/char/bcm2835_aux_uart.cpp \
+	kernel/drivers/char/bcm2835_gpio.cpp \
 	kernel/drivers/char/pl011.cpp \
 	kernel/drivers/device.cpp \
 	kernel/drivers/devicemanager.cpp \
 	kernel/locking/spinlock.cpp \
+	kernel/memory/bootalloc.cpp \
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \

@@ -71,6 +71,7 @@ typedef enum MajorDeviceNumber {
     Maj_TTY = 4,
     Maj_Console = 5,
     Maj_UART = 6,
+    Maj_GPIO = 7,
 } MajorDeviceNumber;
 
 #include "files.h"
