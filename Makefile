@@ -1,6 +1,6 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-export BOARD ?= raspi0
+export BOARD ?= virt
 include board/$(BOARD)/config.mk
 
 ifdef CONFIG_BUNDLED_DTB

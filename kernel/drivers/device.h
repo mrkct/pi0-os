@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <kernel/base.h>
+#include <kernel/irq.h>
 #include <kernel/memory/vm.h>
 #include <kernel/arch/arch.h>
 #include <include/api/syscalls.h>
@@ -14,18 +15,34 @@ class Device
 public:
     enum class Type {
         CharacterDevice,
-        BlockDevice
+        BlockDevice,
+        InterruptController
     };
 
-    Device(uint8_t major, uint8_t minor, const char *name);
+    virtual Device::Type type() const = 0;
+    virtual int32_t init() = 0;
+    virtual int32_t shutdown() = 0;
+};
+
+class InterruptController: public Device
+{
+public:
+    virtual Device::Type type() const override { return Device::Type::InterruptController; }
+
+    virtual void mask_interrupt(void *irq) = 0;
+    virtual void unmask_interrupt(void *irq) = 0;
+    virtual void install_irq(void *irq_descriptor, InterruptHandler handler, void *arg) = 0;
+    virtual void dispatch_irq(InterruptFrame *frame) = 0;
+};
+
+class FileDevice: public Device
+{
+public:
+    FileDevice(uint8_t major, uint8_t minor, const char *name);
 
     virtual uint8_t major() const { return m_major; }
     virtual uint8_t minor() const { return m_minor; }
     virtual const char *name() const { return m_name; }
-    virtual Type type() const = 0;
-
-    virtual int32_t init() = 0;
-    virtual int32_t shutdown() = 0;
 
     virtual int64_t read(int64_t offset, uint8_t *buffer, size_t size) = 0;
     virtual int64_t write(int64_t offset, const uint8_t *buffer, size_t size) = 0;
@@ -40,14 +57,14 @@ private:
     char m_name[32];
 };
 
-class CharacterDevice: public Device
+class CharacterDevice: public FileDevice
 {
 public:
     CharacterDevice(uint8_t major, uint8_t minor, const char *name)
-        : Device(major, minor, name)
+        : FileDevice(major, minor, name)
     {}
 
-    virtual Type type() const override { return Type::CharacterDevice; }
+    virtual Device::Type type() const override { return Device::Type::CharacterDevice; }
 
     virtual int64_t read(int64_t, uint8_t *buffer, size_t size) override { return read(buffer, size); }
     virtual int64_t read(uint8_t *buffer, size_t size) = 0;
@@ -58,14 +75,14 @@ public:
     virtual int64_t seek(int64_t, int) override { return 0; }
 };
 
-class BlockDevice: public Device
+class BlockDevice: public FileDevice
 {
 public:
     BlockDevice(uint8_t major, uint8_t minor, const char *name)
-        : Device(major, minor, name)
+        : FileDevice(major, minor, name)
     {}
 
-    virtual Type type() const override { return Type::BlockDevice; }
+    virtual Device::Type type() const override { return Device::Type::BlockDevice; }
 };
 
 class Console: public CharacterDevice

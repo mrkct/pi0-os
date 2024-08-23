@@ -4,7 +4,6 @@
 #include <kernel/memory/areas.h>
 #include <kernel/boot/boot.h>
 #include <kernel/arch/arm/armv6mmu.h>
-#include <kernel/interrupt.h>
 #include <kernel/memory/physicalalloc.h>
 
 

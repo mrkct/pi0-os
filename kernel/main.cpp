@@ -30,6 +30,10 @@ extern "C" void kernel_main(BootParams const *boot_params)
 
     kprintf("Loading device drivers....\n");
     devicemanager_init_available_peripherals(boot_params);
+
+    kprintf("Initializing interrupt subsystem...\n");
+    irq_init();
+
     
     while (1) {
         ;

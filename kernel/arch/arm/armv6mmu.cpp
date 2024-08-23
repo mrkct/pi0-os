@@ -1,6 +1,5 @@
 #include "armv6mmu.h"
 
-namespace kernel {
 
 const char *dfsr_status_to_string(uint32_t dfsr_status)
 {
@@ -26,6 +25,4 @@ const char *dfsr_status_to_string(uint32_t dfsr_status)
     case 0b00010: return "Debug Event";
     default: return "Unknown";
     }
-}
-
 }

@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <kernel/base.h>
+#include "armirq.h"
 
 
 static inline void memory_barrier()
@@ -53,31 +53,7 @@ static inline bool try_acquire(uint32_t *lock)
     return old_value == 0;
 }
 
-static inline bool interrupt_are_enabled()
-{
-    uint32_t cpsr;
-    asm volatile("mrs %0, cpsr"
-                 : "=r"(cpsr));
-    return !(cpsr & (1 << 7));
-}
-static inline void interrupt_enable() { asm volatile("cpsie i"); }
-static inline void interrupt_disable() { asm volatile("cpsid i"); }
-
 static inline void cpu_relax()
 {
     asm volatile("wfe");
-}
-
-template<typename Callback>
-Error retry_with_timeout(Callback callback)
-{
-    constexpr uint32_t TIMEOUT = 1000000;
-    for (uint32_t i = 0; i < TIMEOUT; ++i) {
-        if (callback())
-            return Success;
-
-        wait_cycles(500);
-    }
-
-    return ResponseTimeout;
 }

@@ -6,7 +6,7 @@ uint8_t UART::s_next_minor = 0;
 uint8_t GPIOController::s_next_minor = 0;
 
 
-Device::Device(uint8_t major, uint8_t minor, char const* name)
+FileDevice::FileDevice(uint8_t major, uint8_t minor, char const* name)
     : m_major(major), m_minor(minor)
 {
     sprintf(m_name, "%s%d", name, (int) minor);

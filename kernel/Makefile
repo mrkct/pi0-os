@@ -15,8 +15,10 @@ else
 endif
 
 ARCH_SOURCES=\
-	kernel/arch/arm/start.S \
-	kernel/arch/arm/armv6mmu.cpp
+	kernel/arch/arm/start.S 	 	\
+	kernel/arch/arm/armirq.cpp   	\
+	kernel/arch/arm/armv6mmu.cpp 	\
+	kernel/arch/arm/irq.S
 
 SOURCES=\
 	$(ARCH_SOURCES) \
@@ -25,6 +27,7 @@ SOURCES=\
 	kernel/drivers/char/bcm2835_aux_uart.cpp \
 	kernel/drivers/char/bcm2835_gpio.cpp \
 	kernel/drivers/char/pl011.cpp \
+	kernel/drivers/irqc/bcm2835_irqc.cpp \
 	kernel/drivers/device.cpp \
 	kernel/drivers/devicemanager.cpp \
 	kernel/locking/spinlock.cpp \
@@ -32,7 +35,9 @@ SOURCES=\
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \
-	kernel/newlib.cpp \
+	kernel/irq.cpp \
+	kernel/newlib.cpp
+
 
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))

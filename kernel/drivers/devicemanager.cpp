@@ -1,14 +1,21 @@
 #include <kernel/memory/bootalloc.h>
 
 #include "devicemanager.h"
+
 #include "char/pl011.h"
 #include "char/bcm2835_aux_uart.h"
 #include "char/bcm2835_gpio.h"
-#include "char/console/chardevconsole.h"
+
+#include "irqc/bcm2835_irqc.h"
+
+
+// FIXME: This is an ugly place for this constant
+static constexpr uintptr_t RASPI0_IOBASE = 0x20000000;
 
 
 static Device *s_devices[64];
 static struct {
+    InterruptController *irqc;
     CharacterDevice *kernel_log;
     BlockDevice *storage;
 } s_defaults;
@@ -33,6 +40,7 @@ static constexpr Driver s_drivers[] = {
     basic_init<PL011UART>("arm,pl011"),
     basic_init<BCM2835GPIOController>("brcm,bcm2835-gpio"),
     basic_init<BCM2835AuxUART>("brcm,bcm2835-aux-uart"),
+    basic_init<BCM2835InterruptController>("brcm,bcm2835-armctrl-ic"),
 };
 
 static Driver const *find_driver(const char *compatible)
@@ -76,7 +84,15 @@ static DetectedMachine detect_machine(BootParams const *boot_params)
 
 static void raspi0_load_peripherals()
 {
-    todo();
+    const char *irqc_compatible = "brcm,bcm2835-armctrl-ic";
+    Driver const *irqc_drv = find_driver(irqc_compatible);
+
+    BCM2835InterruptController::Config irqc_config {
+        .iobase = RASPI0_IOBASE,
+        .offset = 0x0000B000
+    };
+    auto *irqc_dev = reinterpret_cast<InterruptController*>(irqc_drv->load(irqc_compatible, mustmalloc(irqc_drv->required_space), &irqc_config)); 
+    s_defaults.irqc = irqc_dev;
 }
 
 static void virt_load_peripherals()
@@ -94,10 +110,10 @@ void devicemanager_init_kernel_log_device(BootParams const *boot_params)
         Driver const *gpio_drv = find_driver(gpio_compatible);
         kassert(gpio_drv != nullptr);
 
-        const uintptr_t iobase = 0x20000000;
+        
 
         BCM2835GPIOController::Config gpio_config {
-            .iobase = iobase,
+            .iobase = RASPI0_IOBASE,
             .offset = 0x00200000,   // FIXME: Check this
         };
         GPIOController *gpio_dev = reinterpret_cast<GPIOController*>(gpio_drv->load(gpio_compatible, bootalloc(gpio_drv->required_space), &gpio_config));
@@ -116,10 +132,10 @@ void devicemanager_init_kernel_log_device(BootParams const *boot_params)
             kassert(uart_drv != nullptr);
         
             BCM2835AuxUART::Config uart_config {
-                .iobase = iobase,
+                .iobase = RASPI0_IOBASE,
                 .offset = 0x215000,
             };
-            Device *uart_dev = uart_drv->load(uart_compatible, bootalloc(uart_drv->required_space), &uart_config);
+            FileDevice *uart_dev = static_cast<FileDevice*>(uart_drv->load(uart_compatible, bootalloc(uart_drv->required_space), &uart_config));
             if (uart_dev && 0 == uart_dev->init()) {
                 register_device(uart_dev);
                 s_defaults.kernel_log = reinterpret_cast<CharacterDevice*>(uart_dev);
@@ -167,3 +183,5 @@ void devicemanager_init_available_peripherals(BootParams const *boot_params)
 }
 
 CharacterDevice *devicemanager_get_kernel_log_device() { return s_defaults.kernel_log; }
+
+InterruptController *devicemanager_get_interrupt_controller_device() { return s_defaults.irqc; }
