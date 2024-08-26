@@ -122,7 +122,7 @@ static void data_abort_handler(InterruptFrame* state)
     uint32_t dfsr = read_dfsr();
     uint32_t fault_status = dfsr_fault_status(dfsr);
     panic(
-        "[DATA ABORT]: %s accessing memory address %p while executing instruction %p\n",
+        "[DATA ABORT]: %s accessing memory address %p while executing instruction %p\n"
         FORMAT_TASK_STATE,
         dfsr_status_to_string(fault_status),
         faulting_addr,

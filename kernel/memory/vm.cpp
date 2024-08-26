@@ -31,6 +31,21 @@ void vm_init()
     g_current_address_space = g_kernel_address_space = AddressSpace {
         .ttbr0_page = addr2page(vm_read_current_ttbr0()),
     };
+
+    /**
+     * The bootloader had to identity map the physical memory because otherwise
+     * it would have died when it enabled the MMU before jumping to the kernel.
+     * TODO: Fix the bootloader to not do this
+     * 
+     * Here we unmap all those pages it mapped, since otherwise they would trip
+     * the double-use checks in vm_map
+    */
+    auto *table = g_kernel_address_space.get_root_table_ptr();
+    for (uintptr_t i = 0; i < s_ram.size; i += _1MB) {
+        table[lvl1_index(s_ram.phys_start_addr + i)].raw = 0;
+    }
+    invalidate_tlb();
+    
     s_init_state = InitState::Completed;
 }
 
@@ -48,6 +63,7 @@ static void *ioremap_early(uintptr_t phys_addr, size_t size)
     s_ioremap_next_available_address += aligned_size;
 
     auto *table = reinterpret_cast<FirstLevelEntry*>(phys2virt(vm_read_current_ttbr0()));
+    kprintf("Table: %p\n", table);
     for (uintptr_t i = 0; i < aligned_size; i += _1MB) {
         table[lvl1_index(start_of_mapping + i)].section = SectionEntry::make_entry(aligned_phys_addr + i, PageAccessPermissions::PriviledgedOnly);
         invalidate_tlb_entry(start_of_mapping + i);
@@ -135,12 +151,8 @@ Error vm_create_address_space(struct AddressSpace& as)
     for (size_t i = lvl1_index(KERNEL_START); i < LVL1_ENTRIES; i++)
         lvl1_table[i].raw = kernel_lvl1_table[i].raw;
 
-    // Map the first 1MB of virtual memory to the first 1MB of physical memory
-    // This is necessary because the CPU jumps to the vector table, which is located there and
-    // it must be always be accessible or we risk a fault loop (the CPU will try to jump to the
-    // vector table, but it will fault because it's not mapped, so it will try to jump to the
-    // vector table and so on)
-    lvl1_table[0].section = SectionEntry::make_entry(0x00000000, PageAccessPermissions::PriviledgedOnly);
+    // Map the vector table too...
+    lvl1_table[0] = kernel_lvl1_table[0];
 
     return Success;
 }

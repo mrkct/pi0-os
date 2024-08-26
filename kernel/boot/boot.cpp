@@ -108,7 +108,7 @@ extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t load_address)
 
     activate_mmu_and_jump_to_kernel(
         (uint32_t) page_translation_table,
-        (uint32_t) kernel_stack,
+        (uint32_t) REMAP_TO_PHYS_MEMORY_HOLE(kernel_stack),
         (uint32_t) CONFIG_KERNEL_VIRT_START_ADDRESS
     );
 }
