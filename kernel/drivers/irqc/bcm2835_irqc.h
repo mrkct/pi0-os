@@ -13,8 +13,12 @@ public:
 
     BCM2835InterruptController(Config const* config);
 
+    enum class Group { Basic, Pending1, Pending2 };
+    static inline uint32_t irq(Group group, uint32_t idx) {
+        return (group == Group::Basic ? 0 : group == Group::Pending1 ? 1 : 2) * 32 + idx;
+    }
+
     struct IrqDescriptor {
-        enum class Group { Basic, Pending1, Pending2 };
         Group group;
         uint32_t irq;
 
@@ -23,10 +27,6 @@ public:
                 .group = static_cast<Group>(idx / 32),
                 .irq = idx % 32,
             };
-        }
-
-        uint32_t idx() const {
-            return (group == Group::Basic ? 0 : group == Group::Pending1 ? 1 : 2) * 32 + irq;
         }
     };
 
@@ -40,6 +40,7 @@ public:
     virtual void dispatch_irq(InterruptFrame *frame) override;
 private:
     struct RegisterMap {
+        uint8_t reserved[0x200];
         uint32_t basic_pending;
         uint32_t pending1;
         uint32_t pending2;
@@ -51,15 +52,16 @@ private:
         uint32_t disable_irq2;
         uint32_t disable_basic_irq;
     };
-    static_assert(sizeof(RegisterMap) == 0x28);
+    static_assert(offsetof(RegisterMap, basic_pending) == 0x200);
+    static_assert(offsetof(RegisterMap, pending1) == 0x204);
+    static_assert(sizeof(RegisterMap) == 0x228);
 
     struct Irq {
         InterruptHandler handler;
         void *arg;
     };
 
-    uintptr_t m_iobase;
-    uintptr_t m_offset;
+    Config m_config;
     RegisterMap volatile *r;
     
     Irq m_basic_irqs[32];

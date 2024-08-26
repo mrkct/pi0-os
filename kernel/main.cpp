@@ -25,18 +25,20 @@ extern "C" void kernel_main(BootParams const *boot_params)
     kprintf("Completing virtual memory subsystem initialization...\n");
     vm_init();
 
+    kprintf("Initializing interrupt subsystem...\n");
+    irq_init();
+
     kprintf("Initializing kernel heap...\n");
     kheap_init();
 
     kprintf("Discovering available devices...\n");
     devicemanager_load_available_peripherals(boot_params);
 
-    kprintf("Initializing interrupt subsystem...\n");
-    irq_init();
-
-    kprintf("Initializing devices...\n");
-    devicemanager_init_peripherals();
+    kprintf("Enabling interrupts...\n");
+    irq_enable();
     
+
+    kprintf("Starting kernel...\n");
     while (1) {
         ;
     }

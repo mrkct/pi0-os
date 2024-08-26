@@ -11,11 +11,13 @@ public:
     struct Config {
         uintptr_t iobase;
         uintptr_t offset;
+        uint32_t irq;
     };
 
     BCM2835AuxUART(Config const *config);
 
     virtual int32_t init() override;
+    virtual int32_t init_for_early_boot() override;
     virtual int32_t shutdown() override;
 
     virtual int32_t ioctl(uint32_t request, void *argp) override;
@@ -27,10 +29,11 @@ protected:
 private:
     int64_t writebyte(uint8_t c);
 
+    int32_t init_except_interrupt();
+
+    void irq_handler();
+
     bool m_initialized { false };
-    
-    uintptr_t m_iobase;
-    uintptr_t m_offset;
-    
+    Config m_config;
     BCM2835AuxRegisterMap volatile *r;
 };

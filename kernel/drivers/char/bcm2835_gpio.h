@@ -30,7 +30,7 @@ public:
 
 private:
     struct RegisterMap {
-        uint32_t GPFSEL[5];
+        uint32_t GPFSEL[6];
         uint32_t reserved;
         uint32_t GPSET[2];
         uint32_t reserved2;
@@ -57,6 +57,9 @@ private:
         uint32_t reserved12;
         uint32_t test;
     };
+    static_assert(offsetof(RegisterMap, GPCLR) == 0x28);
+    static_assert(offsetof(RegisterMap, GPREN) == 0x4c);
+    static_assert(offsetof(RegisterMap, GPPUD) == 0x94);
 
     uintptr_t m_iobase;
     uintptr_t m_offset;

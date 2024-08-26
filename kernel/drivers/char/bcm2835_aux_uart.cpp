@@ -2,17 +2,16 @@
 
 
 BCM2835AuxUART::BCM2835AuxUART(Config const *config)
-    : UART(), m_iobase(config->iobase), m_offset(config->offset)
+    : UART(), m_config(*config)
 {
 }
 
-int32_t BCM2835AuxUART::init()
+int32_t BCM2835AuxUART::init_except_interrupt()
 {
-    if (m_initialized) {
+    if (r != nullptr)
         return 0;
-    }
 
-    r = static_cast<BCM2835AuxRegisterMap volatile*>(ioremap(m_iobase + m_offset, sizeof(BCM2835AuxRegisterMap)));
+    r = static_cast<BCM2835AuxRegisterMap volatile*>(ioremap(m_config.iobase + m_config.offset, sizeof(BCM2835AuxRegisterMap)));
 
     static constexpr uint32_t MINI_UART_ENABLED = 1;
     iowrite32(&r->enables, MINI_UART_ENABLED);
@@ -41,6 +40,32 @@ int32_t BCM2835AuxUART::init()
     static constexpr uint32_t RX_ENABLE = 1 << 0;
     iowrite32(&r->mu_cntl_reg, TX_ENABLE | RX_ENABLE);
 
+    return 0;
+}
+
+int32_t BCM2835AuxUART::init_for_early_boot()
+{
+    return init_except_interrupt();
+}
+
+int32_t BCM2835AuxUART::init()
+{
+    if (m_initialized)
+        return 0;
+
+    int32_t rc = init_except_interrupt();
+    if (rc != 0)
+        return rc;
+
+    // Check errata: TX and RX bits are swapped, and you also need to set bits 3:2
+    static constexpr uint32_t RX_IRQ_ENABLE = 1 | (1 << 2);
+    auto ier = ioread32(&r->mu_ier_reg);
+    ier |= RX_IRQ_ENABLE;
+    iowrite32(&r->mu_ier_reg, ier);
+
+    irq_install(m_config.irq, [](void *arg) { reinterpret_cast<BCM2835AuxUART*>(arg)->irq_handler(); }, this);
+    irq_mask(m_config.irq, false);
+
     m_initialized = true;
 
     return 0;
@@ -64,9 +89,8 @@ int64_t BCM2835AuxUART::writebyte(uint8_t c)
 
 int64_t BCM2835AuxUART::write(const uint8_t *buffer, size_t size)
 {
-    if (!m_initialized) {
+    if (r == nullptr)
         return -EIO;
-    }
 
     int64_t rc = 0;
 
@@ -79,7 +103,6 @@ int64_t BCM2835AuxUART::write(const uint8_t *buffer, size_t size)
 
     return size;
 }
-
 
 int64_t BCM2835AuxUART::read(uint8_t*, size_t)
 {
@@ -95,4 +118,20 @@ int64_t BCM2835AuxUART::read(uint8_t*, size_t)
 int32_t BCM2835AuxUART::ioctl(uint32_t, void*)
 {
     return -ENOTSUP;
+}
+
+void BCM2835AuxUART::irq_handler()
+{
+    kprintf("UART IRQ\n");
+    static constexpr uint32_t IRQ_PENDING = 1;
+    if ((ioread32(&r->mu_iir_reg) & IRQ_PENDING) != 0)
+        return;
+        
+    auto irq_source = ioread32(&r->mu_iir_reg);
+    
+    // Check if it is a UART "Receiver holds valid byte" interrupt
+    if ((irq_source >> 1 & 0b11) == 0b10) {
+        uint8_t data = ioread32(&r->mu_io_reg) & 0xff;
+        kprintf("UART: %c\n", data);
+    }
 }

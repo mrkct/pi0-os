@@ -17,13 +17,39 @@ static inline void memory_barrier()
         : "r3");
 }
 
+static inline uint8_t ioread8(uintptr_t reg)
+{
+    memory_barrier();
+    return *reinterpret_cast<volatile uint8_t*>(reg);
+}
+
+static inline uint16_t ioread16(uintptr_t reg)
+{
+    memory_barrier();
+    return *reinterpret_cast<volatile uint16_t*>(reg);
+}
+
 static inline uint32_t ioread32(uintptr_t reg)
 {
     memory_barrier();
     return *reinterpret_cast<uint32_t volatile*>(reg);
 }
 
+static inline uint8_t ioread8(volatile void *reg) { return ioread8(reinterpret_cast<uintptr_t>(reg)); }
+static inline uint16_t ioread16(volatile void *reg) { return ioread16(reinterpret_cast<uintptr_t>(reg)); }
 static inline uint32_t ioread32(volatile void *reg) { return ioread32(reinterpret_cast<uintptr_t>(reg)); }
+
+static inline void iowrite8(uintptr_t reg, uint8_t value)
+{
+    memory_barrier();
+    *reinterpret_cast<uint8_t volatile*>(reg) = value;
+}
+
+static inline void iowrite16(uintptr_t reg, uint16_t value)
+{
+    memory_barrier();
+    *reinterpret_cast<uint16_t volatile*>(reg) = value;
+}
 
 static inline void iowrite32(uintptr_t reg, uint32_t data)
 {
@@ -31,6 +57,8 @@ static inline void iowrite32(uintptr_t reg, uint32_t data)
     *reinterpret_cast<uint32_t volatile*>(reg) = data;
 }
 
+static inline void iowrite8(volatile void *reg, uint8_t value) { iowrite8(reinterpret_cast<uintptr_t>(reg), value); }
+static inline void iowrite16(volatile void *reg, uint16_t value) { iowrite16(reinterpret_cast<uintptr_t>(reg), value); }
 static inline void iowrite32(volatile void *reg, uint32_t data) { iowrite32(reinterpret_cast<uintptr_t>(reg), data); }
 
 static inline void wait_cycles(uint32_t cycles)
