@@ -4,7 +4,9 @@
 
 void devicemanager_init_kernel_log_device(BootParams const *boot_params);
 
-void devicemanager_init_available_peripherals(BootParams const *boot_params);
+void devicemanager_load_available_peripherals(BootParams const *boot_params);
+
+void devicemanager_init_peripherals();
 
 CharacterDevice *devicemanager_get_kernel_log_device();
 

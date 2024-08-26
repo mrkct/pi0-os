@@ -28,12 +28,14 @@ extern "C" void kernel_main(BootParams const *boot_params)
     kprintf("Initializing kernel heap...\n");
     kheap_init();
 
-    kprintf("Loading device drivers....\n");
-    devicemanager_init_available_peripherals(boot_params);
+    kprintf("Discovering available devices...\n");
+    devicemanager_load_available_peripherals(boot_params);
 
     kprintf("Initializing interrupt subsystem...\n");
     irq_init();
 
+    kprintf("Initializing devices...\n");
+    devicemanager_init_peripherals();
     
     while (1) {
         ;

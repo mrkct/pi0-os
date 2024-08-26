@@ -6,11 +6,18 @@ BCM2835GPIOController::BCM2835GPIOController(Config const *config)
 {
 }
 
+int32_t BCM2835GPIOController::init_for_early_boot()
+{
+    if (r != nullptr)
+        return 0;
+    
+    r = static_cast<RegisterMap volatile*>(ioremap(m_iobase + m_offset, sizeof(RegisterMap)));
+    return 0;
+}
+
 int32_t BCM2835GPIOController::init()
 {
-    r = static_cast<RegisterMap volatile*>(ioremap(m_iobase + m_offset, sizeof(RegisterMap)));
-
-    return 0;
+    return init_for_early_boot();
 }
 
 int32_t BCM2835GPIOController::shutdown()

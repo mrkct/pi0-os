@@ -21,4 +21,6 @@ static inline void irq_enable() { arch_irq_enable(); }
 
 static inline void irq_disable() { arch_irq_disable(); }
 
-void irq_install(void *irq, InterruptHandler, void *arg);
+void irq_install(uint32_t irq, InterruptHandler, void *arg);
+
+void irq_mask(uint32_t irq, bool mask);

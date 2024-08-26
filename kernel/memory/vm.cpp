@@ -61,8 +61,16 @@ void *ioremap(uintptr_t phys_addr, size_t size)
     if (s_init_state == InitState::Early)
         return ioremap_early(phys_addr, size);
     
-    todo();
-    return nullptr;
+    size = round_up<uintptr_t>(size, 4096);
+    uintptr_t start_of_mapping = s_ioremap_next_available_address;
+    kassert(start_of_mapping % 4*_1KB == 0);
+    kassert(start_of_mapping + size <= areas::peripherals.end);
+
+    s_ioremap_next_available_address += size;
+
+    MUST(vm_map_mmio(vm_current_address_space(), phys_addr, start_of_mapping, size));
+
+    return reinterpret_cast<void*>(start_of_mapping);
 }
 
 struct AddressSpace& vm_current_address_space()

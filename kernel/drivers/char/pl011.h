@@ -37,11 +37,13 @@ private:
 public:
     struct Config {
         uintptr_t physaddr;
+        uint32_t irq;
     };
 
     PL011UART(Config const *config);
 
     virtual int32_t init() override;
+    virtual int32_t init_for_early_boot() override;
     virtual int32_t shutdown() override;
 
     virtual int32_t ioctl(uint32_t request, void *argp) override;
@@ -51,7 +53,11 @@ protected:
     virtual int64_t write(const uint8_t *buffer, size_t size) override;    
 
 private:
-    bool m_initialized { false };
+    int32_t init_except_interrupt();
+
+    void irq_handler();
+
+    bool m_fully_initialized { false };
     Config m_config;
     RegisterMap volatile *r;
 };

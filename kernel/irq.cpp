@@ -4,23 +4,32 @@
 #include "irq.h"
 
 
-static InterruptController *s_irqc;
-
 void irq_init()
 {
     arch_irq_init();
-    s_irqc = devicemanager_get_interrupt_controller_device();
     irq_enable();
 }
 
-void irq_install(void *irq, InterruptHandler handler, void *arg)
+void irq_install(uint32_t irq, InterruptHandler handler, void *arg)
 {
-    kassert(s_irqc != nullptr);
-    s_irqc->install_irq(irq, handler, arg);
+    auto *irqc = devicemanager_get_interrupt_controller_device();
+    kassert(irqc != nullptr);
+    irqc->install_irq(irq, handler, arg);
 }
 
 void dispatch_irq(InterruptFrame *frame)
 {
-    kassert(s_irqc != nullptr);
-    s_irqc->dispatch_irq(frame);
+    auto *irqc = devicemanager_get_interrupt_controller_device();
+    kassert(irqc != nullptr);
+    irqc->dispatch_irq(frame);
+}
+
+void irq_mask(uint32_t irq, bool mask)
+{
+    auto *irqc = devicemanager_get_interrupt_controller_device();
+    kassert(irqc != nullptr);
+    if (mask)
+        irqc->mask_interrupt(irq);
+    else
+        irqc->unmask_interrupt(irq);
 }

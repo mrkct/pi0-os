@@ -17,6 +17,7 @@ public:
     BCM2835GPIOController(const Config *config);
 
     virtual int32_t init() override;
+    virtual int32_t init_for_early_boot() override;
     virtual int32_t shutdown() override;
 
     virtual int32_t configure_pin(uint32_t port, uint32_t pin, PinFunction function) override;

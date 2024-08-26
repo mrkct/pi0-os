@@ -17,14 +17,26 @@ public:
         enum class Group { Basic, Pending1, Pending2 };
         Group group;
         uint32_t irq;
+
+        static IrqDescriptor from_idx(uint32_t idx) {
+            return IrqDescriptor {
+                .group = static_cast<Group>(idx / 32),
+                .irq = idx % 32,
+            };
+        }
+
+        uint32_t idx() const {
+            return (group == Group::Basic ? 0 : group == Group::Pending1 ? 1 : 2) * 32 + irq;
+        }
     };
 
-    virtual int32_t init() override;
-    virtual int32_t shutdown() override { panic("You can't shutdown the interrupt controller!"); }
+    virtual const char *name() const override { return "BCM2835 Interrupt Controller"; }
 
-    virtual void mask_interrupt(void *irq) override;
-    virtual void unmask_interrupt(void *irq) override;
-    virtual void install_irq(void *irq_descriptor, InterruptHandler handler, void *arg) override;
+    virtual int32_t init() override;
+
+    virtual void mask_interrupt(uint32_t irqidx) override;
+    virtual void unmask_interrupt(uint32_t irqidx) override;
+    virtual void install_irq(uint32_t irqidx, InterruptHandler handler, void *arg) override;
     virtual void dispatch_irq(InterruptFrame *frame) override;
 private:
     struct RegisterMap {

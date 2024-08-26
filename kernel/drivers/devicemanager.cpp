@@ -7,6 +7,7 @@
 #include "char/bcm2835_gpio.h"
 
 #include "irqc/bcm2835_irqc.h"
+#include "irqc/gic2.h"
 
 
 // FIXME: This is an ugly place for this constant
@@ -41,6 +42,7 @@ static constexpr Driver s_drivers[] = {
     basic_init<BCM2835GPIOController>("brcm,bcm2835-gpio"),
     basic_init<BCM2835AuxUART>("brcm,bcm2835-aux-uart"),
     basic_init<BCM2835InterruptController>("brcm,bcm2835-armctrl-ic"),
+    basic_init<GlobalInterruptController2>("arm,cortex-a15-gic"),
 };
 
 static Driver const *find_driver(const char *compatible)
@@ -86,18 +88,39 @@ static void raspi0_load_peripherals()
 {
     const char *irqc_compatible = "brcm,bcm2835-armctrl-ic";
     Driver const *irqc_drv = find_driver(irqc_compatible);
-
     BCM2835InterruptController::Config irqc_config {
         .iobase = RASPI0_IOBASE,
         .offset = 0x0000B000
     };
     auto *irqc_dev = reinterpret_cast<InterruptController*>(irqc_drv->load(irqc_compatible, mustmalloc(irqc_drv->required_space), &irqc_config)); 
+    kassert(0 == irqc_dev->init());
     s_defaults.irqc = irqc_dev;
+
+
+    if (s_defaults.kernel_log)
+        kassert(0 == s_defaults.kernel_log->init());
+
+    // The rest of the devices...
 }
 
 static void virt_load_peripherals()
 {
-    // TODO: The other peripherals...
+    const char *irqc_compatible = "arm,cortex-a15-gic";
+    Driver const *irqc_drv = find_driver(irqc_compatible);
+    kassert(irqc_drv != nullptr);
+    GlobalInterruptController2::Config irqc_config = {
+        .distributor_address = 0x08000000,
+        .cpu_interface_address = 0x08010000
+    };
+    auto *irqc_dev = reinterpret_cast<InterruptController*>(irqc_drv->load(irqc_compatible, mustmalloc(irqc_drv->required_space), &irqc_config));
+    kassert(0 == irqc_dev->init());
+    s_defaults.irqc = irqc_dev;
+
+
+    if (s_defaults.kernel_log)
+        kassert(0 == s_defaults.kernel_log->init());
+
+
 }
 
 void devicemanager_init_kernel_log_device(BootParams const *boot_params)
@@ -110,14 +133,12 @@ void devicemanager_init_kernel_log_device(BootParams const *boot_params)
         Driver const *gpio_drv = find_driver(gpio_compatible);
         kassert(gpio_drv != nullptr);
 
-        
-
         BCM2835GPIOController::Config gpio_config {
             .iobase = RASPI0_IOBASE,
             .offset = 0x00200000,   // FIXME: Check this
         };
         GPIOController *gpio_dev = reinterpret_cast<GPIOController*>(gpio_drv->load(gpio_compatible, bootalloc(gpio_drv->required_space), &gpio_config));
-        if (gpio_dev && 0 == gpio_dev->init()) {
+        if (gpio_dev && 0 == gpio_dev->init_for_early_boot()) {
             register_device(gpio_dev);
             
             gpio_dev->configure_pin_pull_up_down(0, 14, GPIOController::PullState::None);
@@ -136,7 +157,7 @@ void devicemanager_init_kernel_log_device(BootParams const *boot_params)
                 .offset = 0x215000,
             };
             FileDevice *uart_dev = static_cast<FileDevice*>(uart_drv->load(uart_compatible, bootalloc(uart_drv->required_space), &uart_config));
-            if (uart_dev && 0 == uart_dev->init()) {
+            if (uart_dev && 0 == uart_dev->init_for_early_boot()) {
                 register_device(uart_dev);
                 s_defaults.kernel_log = reinterpret_cast<CharacterDevice*>(uart_dev);
             }
@@ -147,10 +168,11 @@ void devicemanager_init_kernel_log_device(BootParams const *boot_params)
     case DetectedMachine::Virt: {
         Driver const *driver = find_driver("arm,pl011");
         PL011UART::Config config {
-            .physaddr = 0x9000000
+            .physaddr = 0x9000000,
+            .irq = 1,
         };
         console = (CharacterDevice*) driver->load("arm,pl011", bootalloc(driver->required_space), &config);
-        if (console && 0 == console->init()) {
+        if (console && 0 == console->init_for_early_boot()) {
             register_device(console);
             s_defaults.kernel_log = console;
         }
@@ -161,7 +183,7 @@ void devicemanager_init_kernel_log_device(BootParams const *boot_params)
     }
 }
 
-void devicemanager_init_available_peripherals(BootParams const *boot_params)
+void devicemanager_load_available_peripherals(BootParams const *boot_params)
 {
     switch (detect_machine(boot_params)) {
     case DetectedMachine::Raspi0:
@@ -173,12 +195,24 @@ void devicemanager_init_available_peripherals(BootParams const *boot_params)
     case DetectedMachine::Unknown:
         panic("Unknown machine");
     }
+}
+
+void devicemanager_init_peripherals()
+{
+    kprintf("Initializing interrupt controller...\n");
+    kassert(0 == s_defaults.irqc->init());
+
+    kprintf("Initializing kernel log device...\n");
+    if (s_defaults.kernel_log)
+        kassert(0 == s_defaults.kernel_log->init());
 
     for (size_t i = 0; i < array_size(s_devices); i++) {
-        if (s_devices[i] == nullptr) {
-            break;
+        if (s_devices[i]) {
+            kprintf("Initializing device '%s'...\n", s_devices[i]->name());
+            int32_t rc = s_devices[i]->init();
+            if (rc != 0)
+                kprintf("  Failed to initialize device '%s' (rc=%d)\n", s_devices[i]->name(), rc);
         }
-        s_devices[i]->init();
     }
 }
 

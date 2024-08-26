@@ -1,11 +1,6 @@
 #include "bcm2835_irqc.h"
 
 
-static inline BCM2835InterruptController::IrqDescriptor *IRQ(void *irq)
-{
-    return reinterpret_cast<BCM2835InterruptController::IrqDescriptor*>(irq);
-}
-
 BCM2835InterruptController::BCM2835InterruptController(Config const* config)
     : m_iobase(config->iobase), m_offset(config->offset)
 {
@@ -23,57 +18,56 @@ int32_t BCM2835InterruptController::init()
     return 0;
 }
 
-void BCM2835InterruptController::mask_interrupt(void *_irq)
+void BCM2835InterruptController::mask_interrupt(uint32_t irqidx)
 {
-    auto *irq = IRQ(_irq);
-    switch (irq->group) {
+    auto irqd = IrqDescriptor::from_idx(irqidx);
+    switch (irqd.group) {
     case IrqDescriptor::Group::Basic:
-        iowrite32(r->disable_basic_irq, 1 << irq->irq);
+        iowrite32(r->disable_basic_irq, 1 << irqd.irq);
         break;
     case IrqDescriptor::Group::Pending1:
-        iowrite32(r->disable_irq1, 1 << irq->irq);
+        iowrite32(r->disable_irq1, 1 << irqd.irq);
         break;
     case IrqDescriptor::Group::Pending2:
-        iowrite32(r->disable_irq2, 1 << irq->irq);
+        iowrite32(r->disable_irq2, 1 << irqd.irq);
         break;
     }
 }
 
-void BCM2835InterruptController::unmask_interrupt(void *irq)
+void BCM2835InterruptController::unmask_interrupt(uint32_t irqidx)
 {
-    auto *irq_descriptor = IRQ(irq);
-    switch (irq_descriptor->group) {
+    auto irqd = IrqDescriptor::from_idx(irqidx);
+    switch (irqd.group) {
     case IrqDescriptor::Group::Basic:
-        iowrite32(r->enable_basic_irq, 1 << irq_descriptor->irq);
+        iowrite32(r->enable_basic_irq, 1 << irqd.irq);
         break;
     case IrqDescriptor::Group::Pending1:
-        iowrite32(r->enable_irq1, 1 << irq_descriptor->irq);
+        iowrite32(r->enable_irq1, 1 << irqd.irq);
         break;
     case IrqDescriptor::Group::Pending2:
-        iowrite32(r->enable_irq2, 1 << irq_descriptor->irq);
+        iowrite32(r->enable_irq2, 1 << irqd.irq);
         break;
     }
 }
 
-void BCM2835InterruptController::install_irq(
-    void *_irq, InterruptHandler handler, void *arg)
+void BCM2835InterruptController::install_irq(uint32_t irqidx, InterruptHandler handler, void *arg)
 {
-    auto *irq = IRQ(_irq);
-    switch (irq->group) {
+    auto irqd = IrqDescriptor::from_idx(irqidx);
+    switch (irqd.group) {
     case IrqDescriptor::Group::Basic:
-        kassert(irq->irq < array_size(m_basic_irqs));
-        kassert(m_basic_irqs[irq->irq].handler == nullptr);
-        m_basic_irqs[irq->irq] = { handler, arg };
+        kassert(irqd.irq < array_size(m_basic_irqs));
+        kassert(m_basic_irqs[irqd.irq].handler == nullptr);
+        m_basic_irqs[irqd.irq] = { handler, arg };
         break;
     case IrqDescriptor::Group::Pending1:
-        kassert(irq->irq < array_size(m_pending1_irqs));
-        kassert(m_pending1_irqs[irq->irq].handler == nullptr);
-        m_pending1_irqs[irq->irq] = { handler, arg };
+        kassert(irqd.irq < array_size(m_pending1_irqs));
+        kassert(m_pending1_irqs[irqd.irq].handler == nullptr);
+        m_pending1_irqs[irqd.irq] = { handler, arg };
         break;
     case IrqDescriptor::Group::Pending2:
-        kassert(irq->irq < array_size(m_pending2_irqs));
-        kassert(m_pending2_irqs[irq->irq].handler == nullptr);
-        m_pending2_irqs[irq->irq] = { handler, arg };
+        kassert(irqd.irq < array_size(m_pending2_irqs));
+        kassert(m_pending2_irqs[irqd.irq].handler == nullptr);
+        m_pending2_irqs[irqd.irq] = { handler, arg };
         break;
     }
 }
