@@ -144,12 +144,12 @@ static void data_abort_handler(InterruptFrame* state)
     */
 }
 
-static void prefetch_abort_handler(InterruptFrame* suspended_state)
+static void prefetch_abort_handler(InterruptFrame*)
 {
     panic("unhandled PREFETCH_ABORT");
 }
 
-static void undefined_instruction_handler(InterruptFrame *suspended_state)
+static void undefined_instruction_handler(InterruptFrame*)
 {
     panic("unhandled UNDEFINED_INSTRUCTION");
 }

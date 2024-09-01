@@ -86,10 +86,10 @@ void BCM2835InterruptController::dispatch_irq(InterruptFrame *frame)
     bool also_check_pending1 = basic & ONE_OR_MORE_BITS_SET_IN_PENDING1;
     bool also_check_pending2 = basic & ONE_OR_MORE_BITS_SET_IN_PENDING2;
 
-    auto const& call_irq = [](Irq &irq, const char *name, uint32_t idx) {
+    auto const& call_irq = [frame](Irq &irq, const char *name, uint32_t idx) {
         if (irq.handler == nullptr)
             panic("IRQ %s-%u not installed", name, idx);
-        irq.handler(irq.arg);
+        irq.handler(frame, irq.arg);
     };
 
     // We only care about the first 10 bits because the rest are repeated

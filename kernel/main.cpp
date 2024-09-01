@@ -1,6 +1,9 @@
 #include <kernel/boot/boot.h>
-#include <kernel/kprintf.h>
 #include <kernel/drivers/devicemanager.h>
+#include <kernel/kprintf.h>
+#include <kernel/timer.h>
+
+#include <kernel/drivers/irqc/gic2.h>
 
 
 extern "C" void kernel_main(BootParams const *boot_params)
@@ -34,12 +37,21 @@ extern "C" void kernel_main(BootParams const *boot_params)
     kprintf("Discovering available devices...\n");
     devicemanager_load_available_peripherals(boot_params);
 
+    kprintf("Initializing timer subsystem...\n");
+    timer_init();
+
     kprintf("Enabling interrupts...\n");
     irq_enable();
     
+    uint32_t counter = 0;
+    timer_exec_periodic(1000, [](void *_counter) {
+        uint32_t *counter = (uint32_t*) _counter;
+        kprintf("Tick %u..\n", *counter);
+        (*counter)++;
+    }, &counter);
 
     kprintf("Starting kernel...\n");
     while (1) {
-        ;
+        cpu_relax();
     }
 }

@@ -4,7 +4,7 @@
 #include <kernel/arch/arch.h>
 
 
-inline void dispatch_syscall(InterruptFrame *frame, uint32_t syscall_number)
+inline void dispatch_syscall(InterruptFrame *, uint32_t)
 {
     todo();
 }

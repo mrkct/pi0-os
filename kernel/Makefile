@@ -29,6 +29,8 @@ SOURCES=\
 	kernel/drivers/char/pl011.cpp \
 	kernel/drivers/irqc/bcm2835_irqc.cpp \
 	kernel/drivers/irqc/gic2.cpp \
+	kernel/drivers/timer/armv7timer.cpp \
+	kernel/drivers/timer/bcm2835_systimer.cpp \
 	kernel/drivers/device.cpp \
 	kernel/drivers/devicemanager.cpp \
 	kernel/locking/spinlock.cpp \
@@ -37,7 +39,8 @@ SOURCES=\
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \
 	kernel/irq.cpp \
-	kernel/newlib.cpp
+	kernel/newlib.cpp \
+	kernel/timer.cpp
 
 
 

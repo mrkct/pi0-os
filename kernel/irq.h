@@ -4,7 +4,7 @@
 #include <kernel/arch/arch.h>
 
 
-typedef void (*InterruptHandler)(void*);
+typedef void (*InterruptHandler)(InterruptFrame*, void*);
 
 void irq_init();
 

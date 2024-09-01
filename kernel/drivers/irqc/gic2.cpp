@@ -1,8 +1,6 @@
 #include "gic2.h"
 
 
-static constexpr uint32_t RESERVED_IRQS = 32;
-
 GlobalInterruptController2::GlobalInterruptController2(Config const *config)
     :   InterruptController(), m_config(*config)
 {
@@ -22,12 +20,12 @@ int32_t GlobalInterruptController2::init()
 
 void GlobalInterruptController2::mask_interrupt(uint32_t irqidx)
 {
-    iowrite32(&rd->icenable[(RESERVED_IRQS + irqidx) / 32], 1 << (irqidx % 32));
+    iowrite32(&rd->icenable[(irqidx) / 32], 1 << (irqidx % 32));
 }
 
 void GlobalInterruptController2::unmask_interrupt(uint32_t irqidx)
 {
-    iowrite32(&rd->isenable[(RESERVED_IRQS + irqidx) / 32], 1 << (irqidx % 32));
+    iowrite32(&rd->isenable[(irqidx) / 32], 1 << (irqidx % 32));
 }
 
 void GlobalInterruptController2::install_irq(uint32_t irqidx, InterruptHandler handler, void *arg)
@@ -44,14 +42,17 @@ void GlobalInterruptController2::dispatch_irq(InterruptFrame *frame)
         if (irqidx >= 1020)
             break;
 
-        kassert(irqidx >= RESERVED_IRQS);
-        irqidx -= RESERVED_IRQS;
-
         if (m_handlers[irqidx].handler == nullptr)
             panic("Unhandled interrupt %u", irqidx);
 
-        m_handlers[irqidx].handler(m_handlers[irqidx].arg);
+        m_handlers[irqidx].handler(frame, m_handlers[irqidx].arg);
 
         iowrite32(&rc->eoir, iar);
     }
+}
+
+void GlobalInterruptController2::unmask_all()
+{
+    //for (uint32_t i = 0; i < 255; i++)
+    //    unmask_interrupt(i);
 }

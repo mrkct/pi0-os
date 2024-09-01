@@ -53,7 +53,7 @@ int32_t PL011UART::init()
     cr |= 1 << 9;                       // Enable uart receiver
     iowrite32(&r->CR, cr);
 
-    irq_install(m_config.irq, [](void *arg) { static_cast<PL011UART*>(arg)->irq_handler(); }, this);
+    irq_install(m_config.irq, [](auto*, void *arg) { static_cast<PL011UART*>(arg)->irq_handler(); }, this);
 
     iowrite32(&r->IMSC, RXINTR_MASK);
     iowrite32(&r->ICR, 0x7ff);          // Clear all IRQs, if they were set

@@ -14,7 +14,7 @@ public:
     BCM2835InterruptController(Config const* config);
 
     enum class Group { Basic, Pending1, Pending2 };
-    static inline uint32_t irq(Group group, uint32_t idx) {
+    static constexpr inline uint32_t irq(Group group, uint32_t idx) {
         return (group == Group::Basic ? 0 : group == Group::Pending1 ? 1 : 2) * 32 + idx;
     }
 

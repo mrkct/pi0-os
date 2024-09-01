@@ -16,7 +16,8 @@ public:
     enum class Type {
         CharacterDevice,
         BlockDevice,
-        InterruptController
+        InterruptController,
+        SystemTimer,
     };
 
     virtual const char *name() const = 0;
@@ -37,6 +38,19 @@ public:
     virtual void unmask_interrupt(uint32_t irqidx) = 0;
     virtual void install_irq(uint32_t irqidx, InterruptHandler handler, void *arg) = 0;
     virtual void dispatch_irq(InterruptFrame *frame) = 0;
+};
+
+class SystemTimer: public Device
+{
+public:
+    virtual Device::Type type() const override { return Device::Type::SystemTimer; }
+    virtual int32_t shutdown() override { panic("You can't shutdown the system timer!"); }
+
+    typedef void (*SystemTimerCallback)(InterruptFrame*, SystemTimer&, uint64_t, void*);
+
+    virtual uint64_t ticks() const = 0;
+    virtual uint64_t ticks_per_ms() const = 0;
+    virtual void start(uint64_t ticks, SystemTimerCallback, void *arg) = 0;
 };
 
 class FileDevice: public Device

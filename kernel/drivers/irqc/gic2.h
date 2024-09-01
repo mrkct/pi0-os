@@ -22,6 +22,8 @@ public:
     virtual void install_irq(uint32_t irqidx, InterruptHandler handler, void *arg) override;
     virtual void dispatch_irq(InterruptFrame *frame) override;
 
+    void unmask_all();
+
 private:
     struct DistributorRegisterMap {
         uint32_t ctlr;

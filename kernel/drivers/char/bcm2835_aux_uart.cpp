@@ -63,7 +63,7 @@ int32_t BCM2835AuxUART::init()
     ier |= RX_IRQ_ENABLE;
     iowrite32(&r->mu_ier_reg, ier);
 
-    irq_install(m_config.irq, [](void *arg) { reinterpret_cast<BCM2835AuxUART*>(arg)->irq_handler(); }, this);
+    irq_install(m_config.irq, [](auto*, void *arg) { reinterpret_cast<BCM2835AuxUART*>(arg)->irq_handler(); }, this);
     irq_mask(m_config.irq, false);
 
     m_initialized = true;

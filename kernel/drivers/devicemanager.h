@@ -9,3 +9,5 @@ void devicemanager_load_available_peripherals(BootParams const *boot_params);
 CharacterDevice *devicemanager_get_kernel_log_device();
 
 InterruptController *devicemanager_get_interrupt_controller_device();
+
+SystemTimer *devicemanager_get_system_timer_device();

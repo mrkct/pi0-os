@@ -1,24 +1,22 @@
 #pragma once
 
-#include <kernel/memory/kheap.h>
-#include <kernel/error.h>
+#include <kernel/base.h>
+
+
+#define INTRUSIVE_LINKED_LIST_HEADER(Type) \
+    Type *prev; \
+    Type *next;
 
 
 template<typename T>
-struct ListNode {
-    T value;
-    ListNode<T> *prev, *next;
-};
-
-template<typename T>
-struct LinkedList {
-    ListNode<T> *head;
-    ListNode<T> *tail;
+struct IntrusiveLinkedList {
+    T *head;
+    T *tail;
 
     template<typename Func>
     void foreach(Func func)
     {
-        ListNode<T> *current = head;
+        auto *current = head;
         while (current) {
             auto *next = current->next;
             func(current);
@@ -29,7 +27,7 @@ struct LinkedList {
     template<typename Func>
     void foreach_reverse(Func func)
     {
-        ListNode<T> *current = tail;
+        auto *current = tail;
         while (current) {
             auto *prev = current->prev;
             func(current);
@@ -38,9 +36,9 @@ struct LinkedList {
     }
 
     template<typename Filter>
-    ListNode<T>* find(Filter filter)
+    T* find(Filter filter)
     {
-        ListNode<T> *current = head;
+        auto *current = head;
         while (current) {
             if (filter(current))
                 return current;
@@ -50,7 +48,7 @@ struct LinkedList {
         return nullptr;
     }
 
-    void remove(ListNode<T> *node)
+    void remove(T *node)
     {
         if (node->prev == nullptr) {
             head = node->next;
@@ -69,21 +67,7 @@ struct LinkedList {
         }
     }
 
-    kernel::Error add(T const& value)
-    {
-        ListNode<T> *node;
-        TRY(kernel::kmalloc(sizeof(*node), node));
-        *node = {
-            .value = value,
-            .prev = nullptr,
-            .next = head
-        };
-        add(node);
-
-        return kernel::Success;
-    }
-
-    void add(ListNode<T> *node)
+    void add(T *node)
     {
         node->prev = nullptr;
         node->next = head;
@@ -103,8 +87,8 @@ struct LinkedList {
 
     bool is_empty() const { return head != nullptr; }
 
-    ListNode<T>* first() const { return head; }
-    ListNode<T>* last() const { return tail; }
+    T* first() const { return head; }
+    T* last() const { return tail; }
 
     void free() const
     {

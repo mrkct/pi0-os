@@ -9,6 +9,9 @@
 #include "irqc/bcm2835_irqc.h"
 #include "irqc/gic2.h"
 
+#include "timer/armv7timer.h"
+#include "timer/bcm2835_systimer.h"
+
 
 static void raspi0_init_log_device();
 static void raspi0_load_peripherals();
@@ -21,6 +24,7 @@ static Device *s_devices[64];
 static struct {
     InterruptController *irqc;
     CharacterDevice *kernel_log;
+    SystemTimer *systimer;
     BlockDevice *storage;
 } s_defaults;
 
@@ -46,6 +50,8 @@ static constexpr Driver s_drivers[] = {
     basic_init<BCM2835AuxUART>("brcm,bcm2835-aux-uart"),
     basic_init<BCM2835InterruptController>("brcm,bcm2835-armctrl-ic"),
     basic_init<GlobalInterruptController2>("arm,cortex-a15-gic"),
+    basic_init<BCM2835SystemTimer>("brcm,bcm2835-system-timer"),
+    basic_init<ARMv7Timer>("arm,armv7-timer"),
 };
 
 static Driver const *find_driver(const char *compatible)
@@ -118,6 +124,8 @@ CharacterDevice *devicemanager_get_kernel_log_device() { return s_defaults.kerne
 
 InterruptController *devicemanager_get_interrupt_controller_device() { return s_defaults.irqc; }
 
+SystemTimer *devicemanager_get_system_timer_device() { return s_defaults.systimer; }
+
 /////////////////////////////// RASPBERRY PI 0 ////////////////////////////////
 
 static constexpr uintptr_t RASPI0_IOBASE = 0x20000000;
@@ -182,6 +190,18 @@ static void raspi0_load_peripherals()
     rc = s_defaults.kernel_log->init();
     if (rc != 0)
         panic("Failed to initialize kernel log device: %d\n", rc);
+    
+    kprintf("Initializing system timer...\n");
+    Driver const *systimer_drv = find_driver("brcm,bcm2835-system-timer");
+    BCM2835SystemTimer::Config systimer_config {
+        .address = RASPI0_IOBASE + 0x00003000,
+        .clock_frequency = 1000000,
+    };
+    auto *systimer_dev = reinterpret_cast<SystemTimer*>(systimer_drv->load(irqc_compatible, mustmalloc(systimer_drv->required_space), &systimer_config));
+    rc = systimer_dev->init();
+    if (rc != 0)
+        panic("Failed to initialize system timer: %d\n", rc);
+    s_defaults.systimer = systimer_dev;
 }
 
 ////////////////////////////////// QEMU VIRT //////////////////////////////////
@@ -191,7 +211,7 @@ static void virt_init_log_device()
     Driver const *driver = find_driver("arm,pl011");
     PL011UART::Config config {
         .physaddr = 0x9000000,
-        .irq = 1,
+        .irq = 32 + 1,
     };
     auto *console = (CharacterDevice*) driver->load("arm,pl011", bootalloc(driver->required_space), &config);
     if (console && 0 == console->init_for_early_boot()) {
@@ -224,4 +244,18 @@ static void virt_load_peripherals()
     rc = s_defaults.kernel_log->init();
     if (rc != 0)
         panic("Failed to initialize kernel log device: %d\n", rc);
+
+    const char *systimer_compatible = "arm,armv7-timer";
+    kprintf("Initializing system timer (%s)...\n", systimer_compatible);
+    Driver const *systimer_drv = find_driver(systimer_compatible);
+    kassert(systimer_drv != nullptr);
+    ARMv7Timer::Config systimer_config {
+        .irq = 30,
+    };
+    auto *systimer = reinterpret_cast<SystemTimer*>(systimer_drv->load(systimer_compatible, mustmalloc(systimer_drv->required_space), &systimer_config));
+    rc = systimer->init();
+    if (rc != 0)
+        panic("Failed to initialize system timer: %d\n", rc);
+    register_device(systimer);
+    s_defaults.systimer = systimer;
 }
