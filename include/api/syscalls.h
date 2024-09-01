@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <errno.h>
+#include <sys/time.h>
 
 
 
@@ -49,6 +50,7 @@ typedef enum MajorDeviceNumber {
     Maj_Console = 5,
     Maj_UART = 6,
     Maj_GPIO = 7,
+    Maj_RTC = 8,
 } MajorDeviceNumber;
 
 #include "files.h"

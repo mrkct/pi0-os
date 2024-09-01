@@ -27,12 +27,14 @@ SOURCES=\
 	kernel/drivers/char/bcm2835_aux_uart.cpp \
 	kernel/drivers/char/bcm2835_gpio.cpp \
 	kernel/drivers/char/pl011.cpp \
+	kernel/drivers/char/pl031.cpp \
 	kernel/drivers/irqc/bcm2835_irqc.cpp \
 	kernel/drivers/irqc/gic2.cpp \
 	kernel/drivers/timer/armv7timer.cpp \
 	kernel/drivers/timer/bcm2835_systimer.cpp \
 	kernel/drivers/device.cpp \
 	kernel/drivers/devicemanager.cpp \
+	kernel/lib/more_time.c \
 	kernel/locking/spinlock.cpp \
 	kernel/memory/bootalloc.cpp \
 	kernel/memory/kheap.cpp \
@@ -45,6 +47,7 @@ SOURCES=\
 
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
+DEPENDS:=$(patsubst %.c, %.c.d, $(DEPENDS))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))
 DEPENDS:=$(DEPENDS) linker.ld 
 DEPENDS:= $(addprefix $(SOURCES_ROOT), $(DEPENDS))
@@ -65,6 +68,9 @@ kernel.elf: $(OBJS)
 -include $(DEPENDS)
 
 %.cpp.o: %.cpp Makefile
+	$(CXX) $< -c -o $@ $(CXXFLAGS)
+
+%.c.o: %.c Makefile
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
 %.S.o: %.S Makefile

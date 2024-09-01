@@ -169,3 +169,19 @@ public:
     virtual int32_t get_pin_state(uint32_t port, uint32_t pin) = 0;
     virtual int32_t set_pin_state(uint32_t port, uint32_t pin, PinState state) = 0;
 };
+
+class RealTimeClock: public CharacterDevice
+{
+private:
+    static uint8_t s_next_minor;
+public:
+    RealTimeClock(): CharacterDevice(Maj_RTC, s_next_minor++, "rtc")
+    {}
+
+    virtual int64_t read(uint8_t*, size_t) { return -ENOTSUP; } 
+    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP;}
+    virtual int32_t ioctl(uint32_t request, void *argp) override;
+
+    virtual int32_t get_time(DateTime&) = 0;
+    virtual int32_t set_time(const DateTime) = 0;
+};

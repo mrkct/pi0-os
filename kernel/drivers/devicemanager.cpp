@@ -2,9 +2,10 @@
 
 #include "devicemanager.h"
 
-#include "char/pl011.h"
 #include "char/bcm2835_aux_uart.h"
 #include "char/bcm2835_gpio.h"
+#include "char/pl011.h"
+#include "char/pl031.h"
 
 #include "irqc/bcm2835_irqc.h"
 #include "irqc/gic2.h"
@@ -52,6 +53,7 @@ static constexpr Driver s_drivers[] = {
     basic_init<GlobalInterruptController2>("arm,cortex-a15-gic"),
     basic_init<BCM2835SystemTimer>("brcm,bcm2835-system-timer"),
     basic_init<ARMv7Timer>("arm,armv7-timer"),
+    basic_init<PL031>("arm,pl031"),
 };
 
 static Driver const *find_driver(const char *compatible)
@@ -258,4 +260,21 @@ static void virt_load_peripherals()
         panic("Failed to initialize system timer: %d\n", rc);
     register_device(systimer);
     s_defaults.systimer = systimer;
+
+    const char *rtc_compatible = "arm,pl031";
+    kprintf("Initializing RTC (%s)...\n", rtc_compatible);
+    Driver const *rtc_drv = find_driver(rtc_compatible);
+    kassert(rtc_drv != nullptr);
+    PL031::Config rtc_config {
+        .physaddr = 0x09010000
+    };
+    auto *rtc = reinterpret_cast<RealTimeClock*>(rtc_drv->load(rtc_compatible, mustmalloc(rtc_drv->required_space), &rtc_config));
+    rc = rtc->init();
+    if (rc != 0)
+        panic("Failed to initialize RTC: %d\n", rc);
+    register_device(rtc);
+    DateTime now;
+    if (0 == rtc->get_time(now)) {
+        kprintf("Current time: %d-%d-%d %d:%d:%d\n", now.year, now.month, now.day, now.hour, now.minute, now.second);
+    }
 }
