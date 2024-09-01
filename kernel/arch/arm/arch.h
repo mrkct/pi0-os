@@ -85,3 +85,73 @@ static inline void cpu_relax()
 {
     asm volatile("wfe");
 }
+
+
+/**
+ * \brief Move to Coprocessor from ARM core register
+ * Inline-assembly for the following instruction:
+ *  MCR<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
+ * 
+ * Where 'value' is loaded into a register and passed as Rt
+*/
+#define ARM_MCR(coproc, opc1, value, CRn, CRm, opc2)                                \
+    do {                                                                            \
+        asm volatile(                                                               \
+            "mcr " #coproc ", " #opc1 ", %0, " #CRn ", " #CRm ", " #opc2 "\n"       \
+            :                                                                       \
+            : "r"(value)                                                            \
+            : "memory"                                                              \
+        );                                                                          \
+    } while(0)
+
+/**
+ * \brief Move to Coprocessor from two ARM core registers
+ * Inline-assembly for the following instruction:
+ *  MCRR<c> <coproc>, <opc1>, <Rt>, <Rt2>, <CRm>
+ * 
+ * Where 'value' is loaded into a register and passed as Rt
+*/
+#define ARM_MCRR(coproc, opc1, value1, value2, CRm)                                 \
+    do {                                                                            \
+        asm volatile(                                                               \
+            "mcrr " #coproc ", " #opc1 ", %0, %1, " #CRm "\n"                       \
+            :                                                                       \
+            : "r"(value1), "r"(value2)                                              \
+            : "memory"                                                              \
+        );                                                                          \
+    } while(0)
+
+
+/**
+ * \brief Move to ARM core register from Coprocessor
+ * Inline-assembly for the following instruction:
+ *  MRC<c> <coproc>, <opc1>, <Rt>, <CRn>, <CRm>{, <opc2>}
+ * 
+ * Where 'value' is loaded into a register and passed as Rt
+*/
+#define ARM_MRC(coproc, opc1, value, CRn, CRm, opc2)                                \
+    do {                                                                            \
+        asm volatile(                                                               \
+            "mrc " #coproc ", " #opc1 ", %0, " #CRn ", " #CRm ", " #opc2 "\n"       \
+            : "=r"(value)                                                           \
+            :                                                                       \
+            : "memory"                                                              \
+        );                                                                          \
+    } while(0)
+
+/**
+ * \brief Move to two ARM core registers from Coprocessor
+ * Inline-assembly for the following instruction:
+ *  MRRC<c> <coproc>, <opc>, <Rt>, <Rt2>, <CRm>
+ * 
+ * Where 'value1' and 'value2' are where Rt and Rt2 will be stored
+*/
+#define ARM_MRRC(coproc, opc1, value1, value2, CRm)                                 \
+    do {                                                                            \
+        asm volatile(                                                               \
+            "mrrc " #coproc ", " #opc1 ", %0, %1, " #CRm "\n"                       \
+            : "=r"(value1), "=r"(value2)                                            \
+            :                                                                       \
+            : "memory"                                                              \
+        );                                                                          \
+    } while(0)
