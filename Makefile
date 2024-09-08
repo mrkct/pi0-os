@@ -1,6 +1,9 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 export BOARD ?= virt
+export RECORD ?= 0
+export REPLAY ?= 0
+
 include board/$(BOARD)/config.mk
 
 ifdef CONFIG_BUNDLED_DTB
@@ -8,14 +11,9 @@ ifdef CONFIG_BUNDLED_DTB
 endif
 
 QEMU:=qemu-system-arm
+
 QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp $(QEMU_CFG_FLAGS) -kernel kernel/boot/boot.elf
-QEMU_REPLAY_FILENAME:=replay.bin
-QEMU_RECORD_FLAGS:=\
-	-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
-	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
-QEMU_REPLAY_FLAGS:=\
-	-icount shift=auto,rr=replay,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
-	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
+QEMU_BOARD_SPECIFIC_TARGETS ?= # empty
 
 .PHONY: all kernel userland clean qemu qemu-gdb 
 
@@ -27,22 +25,12 @@ kernel:
 userland:
 	# $(MAKE) -e -C userland
 
-snapshot-drive.qcow2:
-	qemu-img create -f qcow2 snapshot-drive.qcow2 4G
+qemu: all $(QEMU_BOARD_SPECIFIC_TARGETS)
+	$(QEMU) $(QEMU_FLAGS)
 
-qemu: all
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS)
-
-qemu-record: all snapshot-drive.qcow2
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS)
-
-qemu-gdb: all
+qemu-gdb: all $(QEMU_BOARD_SPECIFIC_TARGETS)
 	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS) -s -S
-
-qemu-gdb-replay: all snapshot-drive.qcow2
-	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
+	$(QEMU) $(QEMU_FLAGS) -s -S
 
 clean:
 	$(MAKE) -e -C kernel clean

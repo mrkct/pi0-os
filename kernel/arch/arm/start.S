@@ -26,6 +26,12 @@ start:
     cmp r4, r9
     blo 1b
 
+    // Drop privileges to 'System'
+    //  We need to move the 'Supervisor' sp to the 'System' sp
+    mov r0, sp
+    cpsid if, #0x1f
+    mov sp, r0
+
     // NOTE: The bootloader has already setup a stack for us
     mov r0, sp
     bl kernel_main
