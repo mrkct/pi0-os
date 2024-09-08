@@ -5,7 +5,7 @@
 void take(Spinlock& lock)
 {
     while (!try_acquire(&lock.is_taken)) {
-        asm volatile("wfe");
+        cpu_relax();
     }
     lock.need_reenable_interrupts = irq_enabled();
     irq_disable();
