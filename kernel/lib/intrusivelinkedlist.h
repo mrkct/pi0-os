@@ -78,6 +78,26 @@ struct IntrusiveLinkedList {
             tail = head;
     }
 
+    void append(T *node)
+    {
+        if (head == nullptr) {
+            return add(node);
+        }
+        
+        node->next = nullptr;
+        node->prev = tail;
+        tail->next = node;
+        tail = node;
+    }
+
+    T *pop()
+    {
+        T *el = first();
+        if (el)
+            remove(el);
+        return el;
+    }
+
     size_t length() const
     {
         size_t count = 0;
