@@ -4,11 +4,11 @@
 
 
 struct InterruptFrame {
-    uint32_t task_lr;
-    uint32_t task_sp;
-    uint32_t r[13];
-    uint32_t lr;
-    uint32_t spsr;
+    uint32_t task_sp;           // The sp register when the CPU is in 'User'/'System' mode
+    uint32_t supervisor_lr;     // The lr register saved from 'Supervisor' mode
+    uint32_t r[13];             // The r0-r12 registers
+    uint32_t lr;                // Address that will be returned to after the trap
+    uint32_t spsr;              // "Saved Program Status Register", pushed immediately at trap entrys
 
     void set_syscall_return_value(uint32_t value) { r[0] = value; }
 };
