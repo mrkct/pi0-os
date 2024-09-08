@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <errno.h>
 #include <memory>
 
 #include <kernel/kprintf.h>
