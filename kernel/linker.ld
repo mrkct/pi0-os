@@ -34,4 +34,18 @@ SECTIONS
         . = ALIGN(64);
         __bss_end = .;
     }
+
+    /*
+        This extra section at the end is important!
+
+        The bootloader doesn't include an ELF loader, it just loads the .bin
+        created with objcopy. The bootloader must also map memory for the
+        .bss, but objcopy rightfully strips it away if its possible.
+        
+        This dummy value at the end forces objcopy to keep the .bss.
+    */
+    .bootloaderhack :
+    {
+        LONG(1234);
+    }
 }

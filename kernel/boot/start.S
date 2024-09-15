@@ -68,6 +68,9 @@ activate_mmu_and_jump_to_kernel:
 #ifdef CONFIG_ARMV6
     ldr r7, =#0x400000                      // Set '[U]naligned Data Access Operations' enabled
     orr r0, r0, r7                          // | Reason: https://gitlab.com/qemu-project/qemu/-/issues/1878
+    ldr r7, =#0x800000                      // Set 'Extended Page Tables (XP)' enabled
+    orr r0, r0, r7                          // | Use the "new"(ARMv6 and v7) MMU descriptor format,
+                                            //   instead of the ARMv5 backward compatible one
 #endif
     orr r0, r0, #0x1                        // Set MMU Enable bit
     mcr p15, 0, r0, c1, c0, 0               // Write "System Control Register"

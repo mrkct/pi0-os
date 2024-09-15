@@ -56,10 +56,13 @@ enum class PageAccessPermissions : uint8_t {
     UserFullAccess = 0b11
 };
 
+// Note: In ARMv7 this changed name from "Coarse Page Table" to simply "Page Table"
 static constexpr uint32_t COARSE_PAGE_TABLE_ENTRY_ID = 0b01;
 struct CoarsePageTableEntry {
     uint32_t identifier : 2;
-    uint32_t sbz : 3;
+    uint32_t sbz : 1;
+    uint32_t non_secure : 1;
+    uint32_t sbz2 : 1;
     uint32_t domain : 4;
     uint32_t impl_defined : 1;
     uint32_t base_addr : 22;
@@ -71,6 +74,8 @@ struct CoarsePageTableEntry {
         return {
             .identifier = COARSE_PAGE_TABLE_ENTRY_ID,
             .sbz = 0,
+            .non_secure = 0,
+            .sbz2 = 0,
             .domain = 0,
             .impl_defined = 0,
             .base_addr = ((uint32_t)address >> 10) & 0x3fffff,
@@ -84,12 +89,16 @@ struct SectionEntry {
     uint32_t identifier : 2;
     uint32_t bufferable_writes : 1;
     uint32_t cachable : 1;
-    uint32_t sbz : 1;
+    uint32_t execute_never : 1;
     uint32_t domain : 4;
-    uint32_t impl_defined : 1;
+    uint32_t impl_defined : 1; // This was 'P' in ARMv6 and became implementation defined in ARMv7
     uint32_t access_permission : 2;
     uint32_t tex : 3;
-    uint32_t sbz2 : 5;
+    uint32_t access_permission_extension : 1;
+    uint32_t shared : 1;
+    uint32_t not_global : 1;
+    uint32_t is_supersection : 1;
+    uint32_t non_secure : 1;
     uint32_t base_addr : 12;
 
     uintptr_t base_address() const { return base_addr << 20; }
@@ -100,12 +109,16 @@ struct SectionEntry {
             .identifier = SECTION_ENTRY_ID,
             .bufferable_writes = 0,
             .cachable = 0,
-            .sbz = 0,
+            .execute_never = 0,
             .domain = 0,
             .impl_defined = 0,
             .access_permission = static_cast<uint8_t>(permissions),
             .tex = 0b000,
-            .sbz2 = 0,
+            .access_permission_extension = 0,
+            .shared = 0,
+            .not_global = 0,
+            .is_supersection = 0,
+            .non_secure = 0,
             .base_addr = ((uint32_t)addr >> 20) & 0xfff,
         };
     }
@@ -117,10 +130,11 @@ struct SmallPageEntry {
     uint32_t identifier : 2;
     uint32_t bufferable_writes : 1;
     uint32_t cachable : 1;
-    uint32_t ap0 : 2;
-    uint32_t ap1 : 2;
-    uint32_t ap2 : 2;
-    uint32_t ap3 : 2;
+    uint32_t access_permission : 2;
+    uint32_t tex : 3;
+    uint32_t access_permission_extension : 1;
+    uint32_t shared : 1;
+    uint32_t non_global : 1;
     uint32_t address : 20;
 
     uintptr_t base_address() const { return address << 12; }
@@ -131,10 +145,11 @@ struct SmallPageEntry {
             .identifier = SMALL_PAGE_ENTRY_ID,
             .bufferable_writes = 0,
             .cachable = 0,
-            .ap0 = static_cast<uint8_t>(permissions),
-            .ap1 = static_cast<uint8_t>(permissions),
-            .ap2 = static_cast<uint8_t>(permissions),
-            .ap3 = static_cast<uint8_t>(permissions),
+            .access_permission = static_cast<uint8_t>(permissions),
+            .tex = 0b000,
+            .access_permission_extension = 0,
+            .shared = 0,
+            .non_global = 0,
             .address = ((uint32_t)address >> 12) & 0xfffff,
         };
     }

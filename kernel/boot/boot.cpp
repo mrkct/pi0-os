@@ -34,7 +34,7 @@ extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t load_address)
     {
         uintptr_t next_virt = CONFIG_KERNEL_VIRT_START_ADDRESS;
         uintptr_t next_phys = (uintptr_t) __bundle_kernel_start;
-        size_t size = round_up<size_t>((uintptr_t) &__bundle_kernel_end - (uintptr_t) &__bundle_kernel_start, _1MB);
+        size_t size = round_up<size_t>((uintptr_t) &__bundle_kernel_end - (uintptr_t) &__bundle_kernel_start, _4KB);
         size_t mapped = 0;
 
         while (mapped < size) {
@@ -43,6 +43,8 @@ extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t load_address)
             if (next_virt % _1MB == 0 && next_phys % _1MB == 0) {
                 page_translation_table[lvl1_idx].section = SectionEntry::make_entry(next_phys, PageAccessPermissions::PriviledgedOnly);
                 mapped += _1MB;
+                next_virt += _1MB;
+                next_phys += _1MB;
                 continue;
             }
 
@@ -58,6 +60,7 @@ extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t load_address)
                 EARLY_ASSERT(table[idx].raw == 0);
                 table[idx].small_page = SmallPageEntry::make_entry(next_phys, PageAccessPermissions::PriviledgedOnly);
                 next_phys += _4KB;
+                next_virt += _4KB;
             }
         }
     }
