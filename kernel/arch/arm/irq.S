@@ -16,20 +16,7 @@
 .endif
     srsdb sp!, #0x13                    // Stores the current mode's spsr and lr on Supervisor mode's stack
     cpsid if, #0x13                     // Change processor mode to Supervisor with disabled IRQs and FIQs
-    push {r0-r12}
-    push {lr}                           // Note that we're pushing also LR because if an interrupt triggered
-                                        // while the CPU was in Supervisor mode, then this trap would trash
-                                        // that register and everything would break there once it returned
-    
-    // We want to also save and restore the 'User'/'System' stack pointer since they might be changed
-    // by the trap handler if a context switch is needed.
-    //
-    // The 'sp' register is banked, and therefore not directly accessible in 'Supervisor' mode, but
-    // both 'System' and 'User' modes share the same and we can change temporarily to that
-    cpsid if, #0x1f                     // Change processor mode to System with disabled IRQs, FIQs and interrupts
-    mov r0, sp                          // Store the current stack pointer(same one used by the user) in r0
-    cpsid if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
-    push {r0}                           // Store the current stack pointer on Supervisor mode's stack
+    push {r0-r12, lr}
 
     // Stack alignment: The stack pointer must be 8-byte aligned before calling the handler.
     // We need to save whatever alignment correction we do here so we can undo it after the handler returns.
@@ -50,19 +37,13 @@
     pop     {r1}
     add     sp, sp, r1
 
-    // Restore the user's stack pointer
-    pop {r0}
-    cpsid if, #0x1f                     // Change processor mode to System with disabled IRQs, FIQs and interrupts
-    mov sp, r0                          // Restore the user's stack pointer
-    cpsid if, #0x13                     // Change processor mode back to Supervisor with enabled IRQs, FIQs and interrupts
-
-    pop {lr}
-    pop {r0-r12}
+    pop {r0-r12, lr}
     rfeia sp!                           // Restores the previously stored sprs and lr from the stack and
                                         // changes processor mode back to the one stored in the spsr
 .endm
 
-TRAMPOLINE reset_trampoline, #0x0
+reset_trampoline:
+    b reset_trampoline
 
 TRAMPOLINE undefined_instruction_trampoline, #0x4
 
@@ -98,3 +79,27 @@ vector_table_data_start:
     fast_irq_addr:              .word fast_irq_trampoline
 .global vector_table_data_end
 vector_table_data_end:
+
+
+// Keep aligned with the ContextSwitchContext struct in armirq.h !
+.global _arch_context_switch
+_arch_context_switch:
+    push {r0-r12, lr}
+
+    cps #0x1f
+    mov r3, sp
+    mov r4, lr
+    cps #0x13
+    push {r3, r4}
+
+    str sp, [r0]
+    mov sp, r1
+
+    pop  {r3, r4}
+    cps #0x1f
+    mov sp, r3
+    mov lr, r4
+    cps #0x13
+
+    pop  {r0-r12, lr}
+    mov pc, lr

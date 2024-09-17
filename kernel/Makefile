@@ -35,6 +35,7 @@ SOURCES=\
 	kernel/drivers/device.cpp \
 	kernel/drivers/devicemanager.cpp \
 	kernel/lib/more_time.c \
+	kernel/locking/irqlock.cpp \
 	kernel/locking/spinlock.cpp \
 	kernel/memory/bootalloc.cpp \
 	kernel/memory/kheap.cpp \
@@ -42,7 +43,9 @@ SOURCES=\
 	kernel/memory/vm.cpp \
 	kernel/irq.cpp \
 	kernel/newlib.cpp \
-	kernel/timer.cpp
+	kernel/timer.cpp \
+	kernel/scheduler.cpp \
+	kernel/syscall.cpp \
 
 
 

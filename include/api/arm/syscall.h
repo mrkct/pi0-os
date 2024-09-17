@@ -5,27 +5,31 @@
 #include <stddef.h>
 
 
-#define ARM_SWI_SYSCALL 0x10
+#define ARM_SWI_SYSCALL 0x00
 
-static inline uint32_t syscall(uint32_t id, uint32_t* extra_return, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
+static inline int syscall(
+    uint32_t id,
+    uint32_t arg1, uint32_t arg2, uint32_t arg3,
+    uint32_t arg4, uint32_t arg5, uint32_t arg6
+)
 {
-    uint32_t result, value;
+    uint32_t result;
 
-    asm volatile("mov r7, %2\n"
-                 "mov r0, %3\n"
-                 "mov r1, %4\n"
-                 "mov r2, %5\n"
-                 "mov r3, %6\n"
-                 "mov r4, %7\n"
-                 "svc %8\n"
-                 "mov %0, r0\n"
-                 "mov %1, r1\n"
-                 : "=r"(result), "=r"(value)
-                 : "r"(id), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "i"(ARM_SWI_SYSCALL)
-                 : "r0", "r1", "r2", "r3", "r4", "r7", "memory");
-
-    if (extra_return)
-        *extra_return = value;
+    register uint32_t r0 asm("r0") = id;
+    register uint32_t r1 asm("r1") = arg1;
+    register uint32_t r2 asm("r2") = arg2;
+    register uint32_t r3 asm("r3") = arg3;
+    register uint32_t r4 asm("r4") = arg4;
+    register uint32_t r5 asm("r5") = arg5;
+	register uint32_t r6 asm("r6") = arg6;
+	
+	__asm__ __volatile__(
+			"swi %1"
+			: "=r"(r0)
+			: "i"(ARM_SWI_SYSCALL),
+              "r"(r0), "r"(r1), "r"(r2),
+              "r"(r3), "r"(r4), "r"(r5), "r"(r6)
+			: "cc", "memory");
 
     return result;
 }

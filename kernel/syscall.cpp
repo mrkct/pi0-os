@@ -1,0 +1,22 @@
+#include <api/syscalls.h>
+#include <kernel/scheduler.h>
+
+#include "syscall.h"
+
+
+int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
+    sysarg_t arg1, sysarg_t arg2, sysarg_t arg3,
+    sysarg_t arg4, sysarg_t arg5, sysarg_t arg6)
+{
+    int rc;
+    switch (syscall) {
+    case SYS_Yield:
+        sys$yield();
+        break;
+    default:
+        kprintf("Unknown syscall %d\n", syscall);
+        rc = -ENOSYS;
+    }
+
+    return rc;
+}

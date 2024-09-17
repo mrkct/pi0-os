@@ -155,3 +155,16 @@ static inline void cpu_relax()
             : "memory"                                                              \
         );                                                                          \
     } while(0)
+
+static inline uint32_t read_cpsr()
+{
+    uint32_t cpsr;
+    asm volatile("mrs %0, cpsr" : "=r" (cpsr));
+    return cpsr;
+}
+
+static inline bool is_supervisor_mode()
+{
+    uint32_t cpsr = read_cpsr();
+    return (cpsr & 0x1F) == 0x13;
+}

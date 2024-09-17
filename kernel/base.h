@@ -16,6 +16,7 @@
 
 #include <kernel/lib/more_math.h>
 #include <kernel/lib/memory.h>
+#include <kernel/lib/arrayutils.h>
 #include <kernel/lib/more_string.h>
 
 struct Range {

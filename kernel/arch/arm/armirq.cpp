@@ -1,5 +1,6 @@
 #include <kernel/syscall.h>
 #include <kernel/memory/vm.h>
+#include <kernel/scheduler.h>
 
 #include "armirq.h"
 #include "armv6mmu.h"
@@ -20,7 +21,6 @@ enum class InterruptVector: int {
     "\t r0: %x\t r1: %x\t r2: %x\t r3: %x\n"            \
     "\t r4: %x\t r5: %x\t r6: %x\t r7: %x\n"            \
     "\t r8: %x\t r9: %x\t r10: %x\t r11: %x\n"          \
-    "\t sp: %p\n"                                       \
     "\t spsr: %x"
 
 #define FORMAT_ARGS_TASK_STATE(state)                   \
@@ -30,7 +30,6 @@ enum class InterruptVector: int {
     (state)->r[6],  (state)->r[7],                      \
     (state)->r[8],  (state)->r[9],                      \
     (state)->r[10], (state)->r[11],                     \
-    (state)->task_sp,                                   \
     (state)->spsr
 
 
@@ -53,7 +52,9 @@ extern "C" void irq_and_exception_handler(uint32_t vector_offset, InterruptFrame
     case InterruptVector::SoftwareInterrupt: {
         auto swi_number = *reinterpret_cast<uint32_t*>(frame->lr - 4) & 0xff;
         if (swi_number == ARM_SWI_SYSCALL) {
-            dispatch_syscall(frame, frame->r[0]);
+            frame->r[0] = dispatch_syscall(frame, frame->r[0],
+                frame->r[1], frame->r[2], frame->r[3],
+                frame->r[4], frame->r[5], frame->r[6]);
         }
         break;
     }
@@ -92,9 +93,6 @@ static void data_abort_handler(InterruptFrame* state)
     }
     
     if (result == PageFaultHandlerResult::ProcessFatal) {
-        /*
-        FIXME: Uncomment this when the kernel has a proper crash handler
-
         uint32_t dfsr = read_dfsr();
         uint32_t fault_status = dfsr_fault_status(dfsr);
         
@@ -102,15 +100,14 @@ static void data_abort_handler(InterruptFrame* state)
             "[DATA ABORT]: Process %s crashed\n"
             "Reason: %s accessing memory address %p while executing instruction %p\n"
             FORMAT_TASK_STATE,
-            get_running_task_name(),
+            cpu_current_process()->name,
             dfsr_status_to_string(fault_status),
             faulting_addr,
             state->lr,
             FORMAT_ARGS_TASK_STATE(state)
         );
-        change_task_state(scheduler_current_task(), TaskState::Zombie);
-        scheduler_step(state);
-        */
+        // TODO: change_task_state(scheduler_current_task(), TaskState::Zombie);
+        // TODO: scheduler_step(state);
         todo();
         return;
     }
@@ -162,3 +159,45 @@ void arch_irq_init()
 
     MUST(vm_map(vm_current_address_space(), page, 0, PageAccessPermissions::PriviledgedOnly));
 }
+
+extern "C" void _arch_context_switch(ContextSwitchFrame **from, ContextSwitchFrame *to);
+
+void arch_context_switch(ContextSwitchFrame **from, ContextSwitchFrame *to)
+{
+    kassert(is_supervisor_mode());
+    _arch_context_switch(from, to);
+}
+
+extern "C" void procentry();
+
+void arch_create_initial_kernel_stack(void **kernel_stack_ptr, uintptr_t userstack, uintptr_t entrypoint, bool privileged)
+{
+    auto *sp = reinterpret_cast<uint8_t*>(*kernel_stack_ptr);
+
+    struct Trapframe {
+        uint32_t lr;
+        uint32_t spsr;
+    };
+    sp -= sizeof(Trapframe);
+    auto *trapstack = reinterpret_cast<Trapframe*>(sp);
+    trapstack->lr = entrypoint;
+    trapstack->spsr = (privileged ? 0x1f : 0x10);
+
+
+    sp -= sizeof(ContextSwitchFrame);
+    auto *ctx = reinterpret_cast<ContextSwitchFrame*>(sp);
+    // just because it makes debugging easier
+    for (uint32_t i = 0; i < 13; i++)
+        ctx->r[i] = i;
+    ctx->user_lr = 0;
+    ctx->user_sp = userstack;
+    ctx->lr = reinterpret_cast<uintptr_t>(procentry);
+
+    *kernel_stack_ptr = sp;
+}
+
+asm(
+".global procentry \n"
+"procentry: \n"
+" rfeia sp! \n"
+);
