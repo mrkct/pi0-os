@@ -1,9 +1,12 @@
 #include <kernel/boot/boot.h>
 #include <kernel/drivers/devicemanager.h>
 #include <kernel/kprintf.h>
+#include <kernel/scheduler.h>
 #include <kernel/timer.h>
 
-#include <kernel/drivers/irqc/gic2.h>
+
+
+static void proc1();
 
 
 extern "C" void kernel_main(BootParams const *boot_params)
@@ -40,18 +43,44 @@ extern "C" void kernel_main(BootParams const *boot_params)
     kprintf("Initializing timer subsystem...\n");
     timer_init();
 
-    kprintf("Enabling interrupts...\n");
-    irq_enable();
-    
-    uint32_t counter = 0;
-    timer_exec_periodic(1000, [](void *_counter) {
-        uint32_t *counter = (uint32_t*) _counter;
-        kprintf("Tick %u..\n", *counter);
-        (*counter)++;
-    }, &counter);
+    create_first_process(proc1);
+    scheduler_start();
+}
 
-    kprintf("Starting kernel...\n");
-    while (1) {
-        cpu_relax();
+static void yield()
+{
+    syscall(SYS_Yield, 0, 0, 0, 0, 0, 0);
+}
+
+static int fork()
+{
+    return syscall(SYS_Fork, 0, 0, 0, 0, 0, 0);
+}
+
+static void wait(int secs)
+{
+    auto *timer = devicemanager_get_system_timer_device();
+    uint64_t last = timer->ticks();
+    
+    while (timer->ticks() - last < (secs * 1000 *timer->ticks_per_ms())) {
+        yield();
+    }
+}
+
+static void proc1()
+{
+    kprintf("I am main\n");
+
+    int pid = fork();
+    if (pid == 0) {
+        while (true) {
+            kprintf("I am child\n");
+            wait(3);
+        }        
+    } else {
+        while (true) {
+            kprintf("I am main with child %d\n", pid);
+            wait(1);
+        }
     }
 }

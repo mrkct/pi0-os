@@ -9,7 +9,7 @@
 #include "scheduler.h"
 
 
-#define SCHEDULER_LOG_ENABLED
+// #define SCHEDULER_LOG_ENABLED
 #ifdef SCHEDULER_LOG_ENABLED
 #define LOG(fmt, ...) kprintf(fmt, __VA_ARGS__)
 #else
@@ -25,8 +25,16 @@ static size_t s_all_threads_len = 0;
 static ContextSwitchFrame *s_scheduler_ctx = nullptr;
 
 
+static void free_process(Process *process);
 static void free_thread(Thread *thread);
 
+static void free_process(Process *process)
+{
+    auto lock = irq_lock();
+    for (size_t i = 0; i < process->threads.count; i++)
+        free_thread(process->threads.data[i]);
+    release(lock);
+}
 
 static void free_thread(Thread *thread)
 {
@@ -91,25 +99,28 @@ static void register_thread(Thread *thread)
     release(lock);
 }
 
-Process *alloc_process(const char *name, size_t thread_count)
+Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged)
 {
-    kassert(thread_count > 0);
+    Process *new_process = nullptr;
+    Thread **threads_array = nullptr;
+    Thread *first_thread = nullptr;
+    void *user_stack = nullptr;
 
     size_t required_mem = sizeof(Process) + // Process struct
-        thread_count * sizeof(Thread*) +    // Array where the process stores pointers to all of its threads
-        thread_count * sizeof(Thread);      // The threads themselves
+        sizeof(Thread*) +    // Array where the process stores pointers to all of its threads (just 1 element)
+        sizeof(Thread);      // The starting thread itself
     uint8_t *mem = reinterpret_cast<uint8_t*>(malloc(required_mem));
     if (mem == nullptr)
-        return nullptr;
+        goto cleanup;
 
-    Process *new_process = reinterpret_cast<Process*>(mem);
+    new_process = reinterpret_cast<Process*>(mem);
     mem += sizeof(Process);
 
-    Thread **threads_array = reinterpret_cast<Thread**>(mem);
-    mem += thread_count * sizeof(Thread*);
+    threads_array = reinterpret_cast<Thread**>(mem);
+    mem += sizeof(Thread*);
 
-    Thread *new_threads = reinterpret_cast<Thread*>(mem);
-    mem += thread_count * sizeof(Thread);
+    first_thread = reinterpret_cast<Thread*>(mem);
+    mem += sizeof(Thread);
 
 
     new_process->next_available_tid = 0;
@@ -118,33 +129,49 @@ Process *alloc_process(const char *name, size_t thread_count)
     strcpy(const_cast<char*>(new_process->name), name);
     
     if (!vm_create_address_space(new_process->address_space).is_success()) {
-        panic("cleanup not implemented yet");
-        return nullptr;
+        kprintf("Failed to create address space for new process %s\n", name);
+        goto cleanup;
     }
 
     new_process->threads.data = threads_array;
-    new_process->threads.count = thread_count;
+    new_process->threads.allocated = 1;
+    new_process->threads.count = 1;
+    new_process->threads.data[0] = first_thread;
 
-    for (size_t i = 0; i < thread_count; i++) {
-        Thread *thread = &new_threads[i];
-        thread->tid = new_process->next_available_tid++;
-        thread->process = new_process;
-        thread->kernel_stack_ptr = alloc_kernel_stack();
-        if (thread->kernel_stack_ptr == nullptr) {
-            panic("Failed to allocate kernel stack for thread #%u, and the cleanup logic is not implemented yet", i);
-        }
-        thread->state = ThreadState::Suspended;
-        new_process->threads.data[i] = thread;
-
-        thread->iframe = static_cast<InterruptFrame*>(alloc_thread_user_stack(&new_process->address_space, i));
-        if (thread->iframe == nullptr) {
-            panic("Failed to allocate user stack for thread #%u, and the cleanup logic is not implemented yet", i);
-        }
-
-        register_thread(thread);
+    first_thread->tid = new_process->next_available_tid++;
+    first_thread->process = new_process;
+    first_thread->kernel_stack_ptr = alloc_kernel_stack();
+    if (first_thread->kernel_stack_ptr == nullptr) {
+        kprintf("Failed to allocate kernel stack for first thread of new process %s\n", name);
+        goto cleanup;
+    }
+    first_thread->state = ThreadState::Suspended;
+    user_stack = alloc_thread_user_stack(&new_process->address_space, 0);
+    if (user_stack == nullptr) {
+        kprintf("Failed to allocate user stack for first thread of new process %s\n", name);
+        goto cleanup;
     }
 
+    arch_create_initial_kernel_stack(
+        &first_thread->kernel_stack_ptr,
+        &first_thread->iframe,
+        reinterpret_cast<uintptr_t>(user_stack),
+        reinterpret_cast<uintptr_t>(entrypoint),
+        privileged);
+
+    register_thread(first_thread);
     return new_process;
+
+cleanup:
+    if (new_process) {
+        vm_free(new_process->address_space);
+        if (new_process->threads.data[0]->kernel_stack_ptr) {
+            // TODO: Free the kernel stack memory
+        }
+    }
+    free(mem);
+
+    return nullptr;
 }
 
 Thread  *cpu_current_thread()    { return s_current_thread; }
@@ -152,11 +179,9 @@ Process *cpu_current_process()   { return cpu_current_thread()->process; }
 
 void create_first_process(void (*entrypoint)(void))
 {
-    Process *stage2 = alloc_process("kernel", 1);
+    Process *stage2 = alloc_process("kernel", entrypoint, true);
     kassert(stage2 != nullptr);
-
     Thread *thread = stage2->threads.data[0];
-    arch_create_initial_kernel_stack(&thread->kernel_stack_ptr, reinterpret_cast<uintptr_t>(thread->iframe), reinterpret_cast<uintptr_t>(entrypoint), true);
     thread->state = ThreadState::Runnable;
 
     // timer_install_scheduler_callback(5, scheduler_step);
@@ -179,7 +204,7 @@ void scheduler_start()
             }
 
             kassert(thread->state == ThreadState::Runnable);
-            LOG("[SCHED]: Context switching to %s[%d]\n", thread->process->name, thread->tid);
+            LOG("[SCHED]: Context switching to %s[%d/%d]\n", thread->process->name, thread->process->pid, thread->tid);
             
             // This should be protected someway if we want to support multicore
             // otherwise 2 cores could end up scheduling the same thread using the same kernel stack
@@ -190,7 +215,31 @@ void scheduler_start()
     }
 }
 
-void sys$yield()
+int sys$yield()
 {
     arch_context_switch(reinterpret_cast<ContextSwitchFrame**>(&s_current_thread->kernel_stack_ptr), s_scheduler_ctx);
+    return 0;
+}
+
+int sys$fork()
+{
+    auto *current_process = cpu_current_process();
+    auto *current_thread = cpu_current_thread();
+
+    // entrypoint and priviledged don't matter, we're going to copy the other process state anyway
+    Process *forked = alloc_process(current_process->name, NULL, false);
+    if (forked == nullptr)
+        return -ENOMEM;
+
+    Thread *forked_thread = forked->threads.data[0];
+    if (Error err = vm_fork(current_process->address_space, forked->address_space); !err.is_success()) {
+        free_process(forked);
+        return -ENOMEM;
+    }
+
+    *(forked_thread->iframe) = *(current_thread->iframe);
+    forked_thread->iframe->set_syscall_return_value(0);
+
+    forked_thread->state = ThreadState::Runnable;
+    return forked->pid;
 }

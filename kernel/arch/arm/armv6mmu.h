@@ -138,6 +138,7 @@ struct SmallPageEntry {
     uint32_t address : 20;
 
     uintptr_t base_address() const { return address << 12; }
+    PageAccessPermissions permissions() const { return static_cast<PageAccessPermissions>(access_permission); }
 
     static SmallPageEntry make_entry(uintptr_t address, PageAccessPermissions permissions)
     {

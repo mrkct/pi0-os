@@ -331,6 +331,8 @@ Error vm_memset(struct AddressSpace& as, uintptr_t dest, uint8_t val, size_t siz
 void vm_free(struct AddressSpace &as)
 {
     auto *lvl1_table = as.get_root_table_ptr();
+    if (lvl1_table == nullptr)
+        return;
     
     const auto KERNEL_START = areas::kernel_area.start;
     for (size_t i = 0; i < lvl1_index(KERNEL_START); i++) {
@@ -355,6 +357,54 @@ void vm_free(struct AddressSpace &as)
 
     memset(lvl1_table, 0, LVL1_TABLE_SIZE);
     MUST(physical_page_free(as.ttbr0_page, PageOrder::_16KB));
+}
+
+Error vm_fork(AddressSpace &as, AddressSpace &out_forked)
+{
+    Error rc = Success;
+
+    constexpr uintptr_t kernel_start_idx = lvl1_index(areas::kernel_area.start);
+    auto *src_lvl1 = as.get_root_table_ptr();
+    auto *dst_lvl1 = out_forked.get_root_table_ptr();
+    for (size_t i = 0; i < kernel_start_idx; i++) {
+        auto &entry = src_lvl1[i];
+        if (entry.is_empty())
+            continue;
+        
+        if (entry.is_section())
+            panic("forking sections is not implemented!");
+
+        kassert(entry.is_coarse_page());
+        
+        PhysicalPage *pgtable;
+        if (rc = physical_page_alloc(PageOrder::_1KB, pgtable); !rc.is_success())
+            goto error;
+
+        dst_lvl1[i].coarse = CoarsePageTableEntry::make_entry(page2addr(pgtable));
+        
+        for (size_t j = 0; j < LVL2_ENTRIES; j++) {
+            auto &dst_lvl2_entry = reinterpret_cast<SecondLevelEntry*>(phys2virt(page2addr(pgtable)))[j];
+            auto &src_lvl2_entry = reinterpret_cast<SecondLevelEntry*>(phys2virt(entry.coarse.base_address()))[j];
+            if (src_lvl2_entry.raw == 0)
+                continue;
+            
+            PhysicalPage *page;
+            if (rc = physical_page_alloc(PageOrder::_4KB, page); !rc.is_success())
+                goto error;
+            
+            auto *src = reinterpret_cast<void*>(phys2virt(src_lvl2_entry.small_page.base_address()));
+            auto *dst = reinterpret_cast<void*>(phys2virt(page2addr(page)));
+
+            memcpy(dst, src, _4KB);
+            dst_lvl2_entry.small_page = SmallPageEntry::make_entry(page2addr(page), src_lvl2_entry.small_page.permissions());
+        }
+    }
+
+    return Success;
+
+error:
+    vm_free(out_forked);
+    return rc;
 }
 
 PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr)

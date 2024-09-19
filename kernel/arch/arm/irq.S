@@ -18,13 +18,19 @@
     cpsid if, #0x13                     // Change processor mode to Supervisor with disabled IRQs and FIQs
     push {r0-r12, lr}
 
+    cps #0x1f
+    mov r3, sp
+    mov r4, lr
+    cps #0x13
+    push {r3, r4}
+
     // Stack alignment: The stack pointer must be 8-byte aligned before calling the handler.
     // We need to save whatever alignment correction we do here so we can undo it after the handler returns.
     and r0, sp, #4
     sub sp, sp, r0
     push {r0}
 
-    // 2nd argument of the handler: The address at where the SavedTaskState starts
+    // 2nd argument of the handler: The address at where the InterruptFrame starts
     mov r1, sp
     add r1, r1, r0                      // Stack alignment correction
     add r1, r1, #4                      // Because we pushed the alignment correction on the stack
@@ -36,11 +42,20 @@
     // Restore stack alignment
     pop     {r1}
     add     sp, sp, r1
+    b pop_iframe_and_return
+.endm
+
+.global pop_iframe_and_return
+pop_iframe_and_return:
+    pop  {r3, r4}
+    cps #0x1f
+    mov sp, r3
+    mov lr, r4
+    cps #0x13
 
     pop {r0-r12, lr}
     rfeia sp!                           // Restores the previously stored sprs and lr from the stack and
                                         // changes processor mode back to the one stored in the spsr
-.endm
 
 reset_trampoline:
     b reset_trampoline
@@ -86,20 +101,8 @@ vector_table_data_end:
 _arch_context_switch:
     push {r0-r12, lr}
 
-    cps #0x1f
-    mov r3, sp
-    mov r4, lr
-    cps #0x13
-    push {r3, r4}
-
     str sp, [r0]
     mov sp, r1
-
-    pop  {r3, r4}
-    cps #0x1f
-    mov sp, r3
-    mov lr, r4
-    cps #0x13
 
     pop  {r0-r12, lr}
     mov pc, lr

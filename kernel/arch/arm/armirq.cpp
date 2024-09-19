@@ -168,36 +168,33 @@ void arch_context_switch(ContextSwitchFrame **from, ContextSwitchFrame *to)
     _arch_context_switch(from, to);
 }
 
-extern "C" void procentry();
+extern "C" void pop_iframe_and_return();
 
-void arch_create_initial_kernel_stack(void **kernel_stack_ptr, uintptr_t userstack, uintptr_t entrypoint, bool privileged)
+void arch_create_initial_kernel_stack(
+    void **kernel_stack_ptr,
+    InterruptFrame **out_iframe,
+    uintptr_t userstack,
+    uintptr_t entrypoint,
+    bool privileged
+)
 {
     auto *sp = reinterpret_cast<uint8_t*>(*kernel_stack_ptr);
-
-    struct Trapframe {
-        uint32_t lr;
-        uint32_t spsr;
-    };
-    sp -= sizeof(Trapframe);
-    auto *trapstack = reinterpret_cast<Trapframe*>(sp);
-    trapstack->lr = entrypoint;
-    trapstack->spsr = (privileged ? 0x1f : 0x10);
-
+    sp -= sizeof(InterruptFrame);
+    auto *iframe = reinterpret_cast<InterruptFrame*>(sp);
+    for (uint32_t i = 0; i < 13; i++)
+        iframe->r[i] = i;
+    iframe->user_lr = 0;
+    iframe->user_sp = userstack;
+    iframe->lr = entrypoint;
+    iframe->spsr = (privileged ? 0x1f : 0x10);
+    *out_iframe = iframe;
 
     sp -= sizeof(ContextSwitchFrame);
     auto *ctx = reinterpret_cast<ContextSwitchFrame*>(sp);
     // just because it makes debugging easier
     for (uint32_t i = 0; i < 13; i++)
         ctx->r[i] = i;
-    ctx->user_lr = 0;
-    ctx->user_sp = userstack;
-    ctx->lr = reinterpret_cast<uintptr_t>(procentry);
+    ctx->lr = reinterpret_cast<uintptr_t>(pop_iframe_and_return);
 
     *kernel_stack_ptr = sp;
 }
-
-asm(
-".global procentry \n"
-"procentry: \n"
-" rfeia sp! \n"
-);

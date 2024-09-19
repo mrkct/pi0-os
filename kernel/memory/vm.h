@@ -50,6 +50,8 @@ void vm_switch_address_space(struct AddressSpace&);
 
 void vm_free(struct AddressSpace&);
 
+Error vm_fork(AddressSpace&, AddressSpace&);
+
 template<typename Callback>
 auto vm_using_address_space(struct AddressSpace& as, Callback c)
 {

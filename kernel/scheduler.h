@@ -35,6 +35,7 @@ struct Process {
     
     struct {
         Thread **data;
+        size_t allocated;
         size_t count;
     } threads;
 };
@@ -50,15 +51,18 @@ Thread *cpu_current_thread();
 /**
  * \brief Allocates a new process
  * 
- * Allocates a new process with the given name and that many threads.
+ * Allocates a new process with the given name and 1 thread
+ * starting at \ref entrypoint
  * 
- * All the threads allocated with this function will have their
- * \ref Thread::state set to \ref ThreadState::Suspended and their
- * kernel stacks empty, therefore they require some extra initialization.
+ * The initial thread will have its \ref Thread::state set
+ * to \ref ThreadState::Suspended. This is to allow extra
+ * initialization to be done before starting the thread.
  * 
  * Once you have completed their initialization you should change their
  * state to start them
 */
-Process *alloc_process(const char *name, size_t thread_count);
+Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged);
 
-void sys$yield();
+int sys$yield();
+
+int sys$fork();

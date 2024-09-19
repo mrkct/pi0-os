@@ -11,7 +11,10 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     int rc;
     switch (syscall) {
     case SYS_Yield:
-        sys$yield();
+        rc = sys$yield();
+        break;
+    case SYS_Fork:
+        rc = sys$fork();
         break;
     default:
         kprintf("Unknown syscall %d\n", syscall);

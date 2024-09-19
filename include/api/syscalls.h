@@ -13,6 +13,7 @@ typedef enum SyscallIdentifiers {
     SYS_Exit = 2,
     SYS_DebugLog = 3,
     SYS_GetProcessInfo = 4,
+    SYS_Fork = 5,
 
     SYS_OpenFile = 10,
     SYS_ReadFile = 11,
@@ -46,6 +47,7 @@ typedef enum SyscallIdentifiers {
 
 
 typedef enum MajorDeviceNumber {
+    Maj_Disk = 3,
     Maj_TTY = 4,
     Maj_Console = 5,
     Maj_UART = 6,
@@ -53,8 +55,8 @@ typedef enum MajorDeviceNumber {
     Maj_RTC = 8,
 } MajorDeviceNumber;
 
-#include "files.h"
-#include "process.h"
-#include "input.h"
+// #include "files.h"
+// #include "process.h"
+// #include "input.h"
 #include "time.h"
-#include "windows.h"
+// #include "windows.h"

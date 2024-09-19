@@ -13,8 +13,6 @@ static inline int syscall(
     uint32_t arg4, uint32_t arg5, uint32_t arg6
 )
 {
-    uint32_t result;
-
     register uint32_t r0 asm("r0") = id;
     register uint32_t r1 asm("r1") = arg1;
     register uint32_t r2 asm("r2") = arg2;
@@ -31,7 +29,7 @@ static inline int syscall(
               "r"(r3), "r"(r4), "r"(r5), "r"(r6)
 			: "cc", "memory");
 
-    return result;
+    return r0;
 }
 
 
