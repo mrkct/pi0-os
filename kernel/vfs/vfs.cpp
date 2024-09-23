@@ -1,9 +1,6 @@
 #include "vfs.h"
 #include "path.h"
 
-#include <kernel/task/scheduler.h>
-
-namespace kernel {
 
 static constexpr uint32_t MAX_MOUNTPOINTS = 8;
 static constexpr uint32_t MAX_OPEN_FILES = 256;
@@ -243,72 +240,4 @@ Error vfs_stat(const char *path, api::Stat &stat)
         .size = entry.size
     };
     return Success;
-}
-
-bool vfs_can_read_data(FileCustody&)
-{
-    // TODO: Implement this
-    return true;
-}
-
-Error vfs_duplicate_custody(FileCustody &original, FileCustody &out_copy)
-{
-    original.file->refcount++;
-    out_copy = original;
-    return Success;
-}
-
-void vfs_get_default_stdin_stdout_stderr(FileCustody &fc_stdin, FileCustody &fc_stdout, FileCustody &fc_stderr)
-{
-    static File empty_file = File {
-        .fs = NULL,
-        .refcount = 1,
-        .filetype = api::CharacterDevice,
-        .size = 0,
-        .opaque = NULL,
-
-        .read = [](File&, uint64_t, uint8_t*, uint32_t, uint32_t &bytes_read) {
-            bytes_read = 0;
-            return Success;
-        },
-        .write = NULL,
-        .seek = NULL,
-        .close = [](File&) { return Success; }
-    };
-
-    static File kprintf_file = File {
-        .fs = NULL,
-        .refcount = 1,
-        .filetype = api::CharacterDevice,
-        .size = 0,
-        .opaque = NULL,
-
-        .read = NULL,
-        .write = [](File&, uint64_t, uint8_t const *data, uint32_t size, uint32_t &bytes_written) {
-            for (uint32_t i = 0; i < size; i++)
-                kprintf("%c", data[i]);
-            bytes_written = size;
-            return Success;
-        },
-        .seek = NULL,
-        .close = [](File&) { return Success; }
-    };
-
-    fc_stdin = FileCustody {
-        .file = &empty_file,
-        .flags = 0,
-        .seek_position = 0
-    };
-    fc_stdout = FileCustody {
-        .file = &kprintf_file,
-        .flags = 0,
-        .seek_position = 0
-    };
-    fc_stderr = FileCustody {
-        .file = &kprintf_file,
-        .flags = 0,
-        .seek_position = 0
-    };
-}
-
 }

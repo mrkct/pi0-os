@@ -7,8 +7,6 @@
 #include "filesystem.h"
 
 
-namespace kernel {
-
 struct FileCustody {
     File *file;
 
@@ -29,13 +27,3 @@ Error vfs_seek(FileCustody&, api::FileSeekMode, int32_t);
 Error vfs_close(FileCustody&);
 
 Error vfs_stat(const char *path, api::Stat&);
-
-bool vfs_can_read_data(FileCustody &custody);
-
-Error vfs_duplicate_custody(FileCustody&, FileCustody&);
-
-Error vfs_init();
-
-void vfs_get_default_stdin_stdout_stderr(FileCustody &fc_stdin, FileCustody &fc_stdout, FileCustody &fc_stderr);
-
-}
