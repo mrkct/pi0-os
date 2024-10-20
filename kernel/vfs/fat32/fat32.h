@@ -1,11 +1,9 @@
 #pragma once
 
-#include <kernel/vfs/filesystem.h>
-#include <kernel/device/storage.h>
+#include <kernel/drivers/device.h>
+#include <kernel/vfs/vfs.h>
+
+#include "fat32_structures.h"
 
 
-namespace kernel {
-
-Error fat32_create(Filesystem& fs, Storage& storage);
-
-}
+int fat32_try_create(BlockDevice &storage, Filesystem **out_fs);

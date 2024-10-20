@@ -1,8 +1,6 @@
 #pragma once
 
 #include <stddef.h>
-
-static inline void irq_disable();
 #include <kernel/irq.h>
 
 size_t kprintf(char const* format, ...);

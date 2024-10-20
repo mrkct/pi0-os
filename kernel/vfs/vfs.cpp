@@ -1,243 +1,481 @@
 #include "vfs.h"
-#include "path.h"
+
+#define LOG_ENABLED
+#define LOG_TAG "[VFS] "
+#include <kernel/log.h>
+
+/**
+ * 
+ * ## The Inode Cache (icache)
+ * The inode cache is where all the currently open inodes are stored.
+ * 
+ * Every entry in it must be unique and opened by at least 1 process.
+ * It should not be possible to get an inode from the icache that
+ * has a refcount of 0, or that it is not currently open.
+ * 
+ * If an inode is returned from the icache, it can be assumed that the
+ * inode's open function has been previously called and it was successful
+ */
 
 
-static constexpr uint32_t MAX_MOUNTPOINTS = 8;
-static constexpr uint32_t MAX_OPEN_FILES = 256;
-
-struct OpenFileEntry {
-    File file; // This member should always come first due to implementation reasons
-    bool is_entry_valid;
-    Path path;
+struct MountPoint {
+    INTRUSIVE_LINKED_LIST_HEADER(MountPoint);
+    Filesystem *fs;
+    char *path;
 };
 
-static struct {
-    struct {
-        Path path;
-        Filesystem *filesystem;
-    } mountpoints[MAX_MOUNTPOINTS];
-    uint32_t mountpoints_length;
-    OpenFileEntry open_files[MAX_OPEN_FILES];
-} s_vfs;
-
-static Error open_dirent(Path path, uint32_t flags, DirectoryEntry entry, FileCustody &out_custody);
+static IntrusiveLinkedList<MountPoint> s_mountpoints;
 
 
-static File *lookup_open_files_list(Path path)
+/**
+ * Creates a canonicalized path from a string.
+ * 
+ * A canonicalized path is defined as a path where:
+ * - There is no leading separator ('hello', not '/hello')
+ * - There is no trailing separator ('hello', not 'hello/)
+ * - There are no '.' or '..' components ('hello/world', not 'hello/./useless/../world')
+ * 
+ * The separators in the returned path are replaced with '\0'.
+ * This makes it easier to iterate over the path components.
+ * The end of the path is marked by an empty component
+ * (meaning there are 2 '\0' at the end) 
+ * 
+ * This function allocates a new string and returns it.
+ * It is your duty to free it.
+ * 
+*/
+static char *canonicalize_path(const char *path)
 {
-    for (uint32_t i = 0; i < MAX_OPEN_FILES; i++) {
-        auto& that = s_vfs.open_files[i];
-        if (that.is_entry_valid && path_compare(path, that.path, that.file.fs->is_case_sensitive))
-            return &that.file;
-    }
+    while (*path == '/')
+        path++;
 
-    return NULL;
-}
+    size_t pathlen = strlen(path);
+    char *cpath = (char*) malloc(pathlen + 2);
+    if (cpath == NULL)
+        return NULL;
+    
+    memcpy(cpath, path, pathlen);
+    cpath[pathlen] = '\0';
+    cpath[pathlen + 1] = '\0';
 
-static Error reserve_element_in_open_file_list(Path path, File* &file)
-{
-    for (uint32_t i = 0; i < MAX_OPEN_FILES; i++) {
-        auto& that = s_vfs.open_files[i];
-        if (!that.is_entry_valid) {
-            that.path = path;
-            that.is_entry_valid = true;
-            file = &that.file;
-            return Success;
+    // Collapse consecutive separators ('hello///world' into 'hello/world')
+    {
+        char *src = cpath;
+        char *cpath_end = cpath + pathlen + 2;
+
+        while (*src) {
+            if (*src != '/') {
+                src++;
+                continue;
+            }
+
+            // Count how many '/' there are
+            int count = 0;
+            char *temp = src;
+            while (*temp == '/') {
+                temp++;
+                count++;
+            }
+
+
+            if (count == 1) {
+                src++;
+                continue;
+            }
+
+            kassert(count > 1);
+            memmove(src + 1, temp, cpath_end - temp);
+            src++;
         }
     }
 
-    return OutOfMemory;
+    // TODO: Remove the '.' ('hello/./world' into 'hello/world')
+    // TODO: Handle the '..' ('hello/../world' into 'world')
+
+    size_t cpath_len = strlen(cpath);
+    for (size_t i = 0; i < cpath_len; i++) {
+        if (cpath[i] == '/')
+            cpath[i] = '\0';
+    }
+    cpath[cpath_len] = '\0';
+    cpath[cpath_len + 1] = '\0';
+    return cpath;
 }
 
-static Error remove_from_open_files_list(File *file)
+static Inode *icache_lookup(InodeCache *icache, InodeIdentifier identifier)
 {
-    // NOTE: We can do this because 'file' is the first member of the struct
-    OpenFileEntry *entry = (OpenFileEntry*) file;
-    if (entry < s_vfs.open_files || (uint32_t)(entry - s_vfs.open_files) >= MAX_OPEN_FILES)
-        return NotFound;
-
-    entry->is_entry_valid = false;
-    return Success;
-}
-
-static Error traverse_to_direntry(Filesystem &filesystem, Path path, DirectoryEntry &out_entry)
-{
-    if (path.len == 0 || (path.len == 1 && path.str[0] == '/')) {
-        TRY(filesystem.root_directory(filesystem, out_entry));
-        return Success;
+    auto *entry = icache->list.find_first([&](InodeCache::Entry *entry) {
+        return entry->identifier == identifier;
+    });
+    if (entry == nullptr) {
+        LOGD("Looking up inode %lu in icache ... failed", identifier);
+        return nullptr;
     }
 
-    if (path.str[0] != '/')
-        return BadParameters;    
+    LOGD("Looking up inode %lu in icache ... found (refcoubt: %d)", identifier, entry->inode->refcount);
+    return entry->inode;
+}
 
-    DirectoryEntry dirent;
-    FileCustody directory;
-    Path basedir = path_basedir(path);
-    Path basename = path_basename(path);
+static int icache_insert(InodeCache *icache, InodeIdentifier identifier, Inode *inode)
+{
+    kassert(icache_lookup(icache, identifier) == nullptr);
+
+    auto *entry = (InodeCache::Entry*) malloc(sizeof(InodeCache::Entry));
+    if (entry == nullptr)
+        return -ENOMEM;
+
+    *entry = InodeCache::Entry {
+        .prev = nullptr,
+        .next = nullptr,
+        .identifier = identifier,
+        .inode = inode
+    };
+    icache->list.add(entry);
+
+    LOGD("Inserting inode %lu into icache", identifier);
+    return 0;
+}
+
+static Inode *icache_remove(InodeCache *icache, InodeIdentifier identifier)
+{
+    auto *entry = icache->list.find_first([&](InodeCache::Entry *entry) {
+        return entry->identifier == identifier;
+    });
+    if (entry == nullptr)
+        return nullptr;
     
-    TRY(traverse_to_direntry(filesystem, basedir, dirent));
-    TRY(open_dirent(basedir, api::OPEN_FLAG_READ, dirent, directory));
+    icache->list.remove(entry);
+    Inode *inode = entry->inode;
+    free(entry);
 
-    Error error = Success;
-    uint32_t bytes_read;
-    do {
-        error = vfs_read(directory, (uint8_t*) &dirent, sizeof(DirectoryEntry), bytes_read);
-        if (!error.is_success())
-            break;
+    return inode;
+}
+
+static int open_inode(Inode *inode)
+{
+    if (inode->refcount > 0) {
+        inode->refcount++;
+        LOGI("Opening inode %lu (increasing refcount to %d)", inode->identifier, inode->refcount);
+        return 0;
+    }
+
+    auto *fs = inode->filesystem;
+    LOGI("Opening inode %lu", inode->identifier);
+    int rc = fs->ops->open_inode(fs, inode);
+    if (rc != 0) {
+        LOGE("Failed to open inode %lu: %d", inode->identifier, rc);
+        return rc;
+    }
+
+    inode->refcount = 1;
+    return 0;
+}
+
+static void close_inode(Inode *inode)
+{
+    if (inode == nullptr)
+        return;
+
+    kassert(inode->refcount > 0);
+    if (inode->refcount > 1) {
+        inode->refcount--;
+        return;
+    }
+
+    inode->filesystem->ops->close_inode(inode->filesystem, inode);
+}
+
+static void free_custody(FileCustody *custody)
+{
+    if (custody == nullptr)
+        return;
+    
+    close_inode(custody->inode);
+    free(custody);
+}
+
+static int alloc_custody(Inode *inode, uint32_t flags, FileCustody **out_custody)
+{
+    auto *custody = static_cast<FileCustody*>(malloc(sizeof(FileCustody)));
+    if (!custody)
+        return -ENOMEM;
+    
+    custody->inode = inode;
+    custody->flags = flags;
+    custody->offset = 0;
+    *out_custody = custody;
+    return 0;
+}
+
+static int lookup_inode(Inode *parent, const char *name, Inode **out_inode)
+{
+    int rc;
+    Inode temp = {};
+
+    LOGI("Looking up inode %s in %lu", name, parent->identifier);
+    rc = parent->dir_ops->lookup(parent, name, &temp);
+    if (rc != 0) {
+        LOGE("Failed to lookup entry '%s' in inode %lu", name, parent->identifier);
+        return rc;
+    }
+    LOGI("Found");
+
+    *out_inode = icache_lookup(&parent->filesystem->icache, temp.identifier);
+    if (*out_inode != nullptr)
+        return open_inode(*out_inode);
+
+    *out_inode = (Inode*) malloc(sizeof(Inode));
+    if (*out_inode == nullptr)
+        return -ENOMEM;
         
-        if (bytes_read != sizeof(DirectoryEntry)) {
-            error = NotFound;
+    **out_inode = temp;
+    (*out_inode)->refcount = 0;
+    rc = open_inode(*out_inode);
+    if (rc != 0) {
+        free(*out_inode);
+        *out_inode = nullptr;
+        return rc;
+    }
+    
+    rc = icache_insert(&parent->filesystem->icache, temp.identifier, *out_inode);
+    if (rc != 0) {
+        close_inode(*out_inode);
+        free(*out_inode);
+        *out_inode = nullptr;
+        return rc;
+    }
+
+    return 0;
+}
+
+/**
+ * Traverses a path in a filesystem.
+ * The path needs to be relative to the filesystem and already canonicalized.
+ * 
+ * If the lookup is successful, the found inode and its parent will be stored
+ * in out_parent and out_inode respectively. The pointers are owned by the
+ * filesystem's inode cache.
+ * 
+ * If the lookup failed on the last component of the path, and the inode
+ * for the component before that last one is a directory, out_inode will be
+ * not be set but out_parent will be set to the parent of the last component.
+ * 
+ * In all other cases, both out_parent and out_inode will be set to nullptr.
+ * 
+ * @param fs The filesystem to lookup in
+ * @param fs_relative_canonicalized_path The path to lookup, relative to the filesystem
+ * @param out_parent The parent inode of the inode we're looking for
+ * @param out_inode The inode we're looking for
+ * 
+ * @return 0 on success, -errno on failure
+ * 
+*/
+static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_path, Inode **out_parent, Inode **out_inode)
+{
+    const char *path = fs_relative_canonicalized_path;
+    int rc = 0;
+
+    Inode *parent = nullptr;
+    Inode *inode = icache_lookup(&fs->icache, fs->root);
+    if (inode == nullptr) {
+        LOGE("root inode not found");
+        return -ENOENT;
+    }
+
+    // The loop below assumes that the previous inode was already opened
+    rc = open_inode(inode);
+    if (rc != 0) {
+        LOGE("failed to open root inode");
+        return rc;
+    }
+
+    while (rc == 0 && *path) {
+        close_inode(parent);
+        parent = inode;
+        inode = nullptr;
+
+        if (parent->type != InodeType::Directory) {
+            LOGE("parent inode is not a directory");
+            rc = -ENOTDIR;
             break;
         }
-    } while (!path_compare(basename, dirent.name, dirent.fs->is_case_sensitive));
 
-    vfs_close(directory);
-    if (error.is_success())
-        out_entry = dirent;
-    
-    return error;
-}
-
-static Error traverse_to_direntry(Path path, DirectoryEntry &out_entry)
-{
-    Filesystem *filesystem = NULL;
-    Path fs_relative_path;
-    for (uint32_t i = 0; i < s_vfs.mountpoints_length; i++) {
-        if (path_startswith(path, s_vfs.mountpoints[i].path)) {
-            fs_relative_path = path_from_string(path.str + s_vfs.mountpoints[i].path.len);
-            filesystem = s_vfs.mountpoints[i].filesystem;
-            break;
+        LOGD("lookup for '%s'", path);
+        rc = lookup_inode(parent, path, &inode);
+        if (rc != 0) {
+            LOGE("lookup failed");
+            rc = -ENOENT;
+            // do not 'break', we want to know if this was the last component below
         }
+
+        path += strlen(path) + 1;
     }
 
-    if (!filesystem)
-        return NotFound;
+    if (rc == 0) {
+        LOGI("lookup successful");
+        *out_parent = parent;
+        *out_inode = inode;
+    } else if (rc == -ENOENT && parent->type == InodeType::Directory && *path == '\0') {
+        LOGE("lookup failed at the last component");
+        *out_parent = parent;
+        *out_inode = nullptr;
+    } else {
+        LOGE("lookup failed");
+        close_inode(parent);
+        *out_parent = nullptr;
+        *out_inode = nullptr;
+    }
+
+    return rc;
+}
+
+static int traverse(const char *path, Inode **out_parent, Inode **out_inode)
+{
+    int rc;
+    char *cpath = canonicalize_path(path);
+    if (cpath == nullptr)
+        return -ENOMEM;
+
+    LOGI("lookup for '%s' (canonicalized to '%s')", path, cpath);
+
+    // NOTE: This assumes that the paths in the mountpoints are ordered by length descending
+    auto *mp = s_mountpoints.find_first([&](MountPoint *mp) {
+        return startswith(cpath, mp->path);
+    });
+    if (mp == nullptr) {
+        LOGW("no mountpoint found");
+        rc = -ENOENT;
+    } else {
+        LOGI("found mountpoint '%s'", mp->path);
+        rc = traverse_in_fs(mp->fs, cpath + strlen(mp->path), out_parent, out_inode);
+    }
+
+    free(cpath);
+    return rc;
+}
+
+int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
+{
+    int rc = 0;
+    Inode *parent = nullptr;
+    Inode *inode = nullptr;
+
+    *out_custody = nullptr;
+    rc = traverse(path, &parent, &inode);
+
+    if (rc != 0 && parent != nullptr && (flags & O_CREAT)) {
+        kassert(parent != nullptr);
+        kassert(parent->type == InodeType::Directory);
+        TODO();
+        rc = -ENOTSUP;
+    } else if (rc == 0) {
+        auto *fs = inode->filesystem;
+        kassert(fs != nullptr);
+        kassert(fs->ops != nullptr);
+        kassert(fs->ops->open_inode != nullptr);
+    }
+
+    if (rc == 0 && inode->type == InodeType::Directory)
+        rc = -EISDIR;
+
+    if (rc == 0)
+        rc = alloc_custody(inode, flags, out_custody);
+
+    if (rc != 0) {
+        close_inode(parent);
+        close_inode(inode);
+        free_custody(*out_custody);
+    }
+
+    LOGD("vfs_open(%s) -> %d (%s)", path, rc, strerror(rc));
+    return rc;
+}
+
+int vfs_mount(const char *path, Filesystem &fs)
+{
+    int rc = 0;
+    Inode *root_inode = (Inode*) malloc(sizeof(Inode));
+    char *cpath = canonicalize_path(path);
+    auto *mp = (MountPoint*) malloc(sizeof(MountPoint));
+    if (cpath == nullptr || mp == nullptr || root_inode == nullptr) {
+        free(cpath);
+        free(mp);
+        free(root_inode);
+        return -ENOMEM;
+    }
     
-    TRY(traverse_to_direntry(*filesystem, fs_relative_path, out_entry));
-    return Success;
-}
+    mp->path = cpath;
+    mp->fs = &fs;
 
-static Error open_dirent(Path path, uint32_t flags, DirectoryEntry entry, FileCustody &out_custody)
-{
-    File *file;
-    TRY(reserve_element_in_open_file_list(path, file));
-
-    if (auto err = entry.fs->open(entry, *file); !err.is_success()) {
-        remove_from_open_files_list(file);
-        return err;
+    auto *after = s_mountpoints.find_first([&](MountPoint *mp) {
+        return strlen(mp->path) < strlen(cpath);
+    });
+    if (after) {
+        s_mountpoints.append_before(mp, after);
+    } else {
+        s_mountpoints.add(mp);
     }
 
-    out_custody = {
-        .file = file, 
-        .flags = flags,
-        .seek_position = 0
-    };
+    fs.ops->on_mount(&fs, root_inode);
+    rc = open_inode(root_inode);
+    kassert(rc == 0); // TODO: handle this error
+    icache_insert(&fs.icache, root_inode->identifier, root_inode);
 
-    return Success;
+    return rc;
 }
 
-Error vfs_mount(const char *stringpath, Filesystem *fs)
+ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
 {
-    Path path = path_from_string(stringpath);
-    if (s_vfs.mountpoints_length == MAX_MOUNTPOINTS)
-        return OutOfMemory;
-    
-    // Paths must be stored in reverse-order by path length, otherwise the lookup is harder to do
-    size_t pos;
-    for (pos = 0; pos < s_vfs.mountpoints_length; pos++) {
-        if (s_vfs.mountpoints[pos].path.len < path.len)
-            break;
-    }
+    if (custody->inode->type == InodeType::Directory)
+        return -EISDIR;
 
-    for (size_t i = s_vfs.mountpoints_length; i > pos; i--) {
-        s_vfs.mountpoints[i] = s_vfs.mountpoints[i - 1];
-    }
-    s_vfs.mountpoints[pos] = {
-        .path = path,
-        .filesystem = fs
-    };
-    s_vfs.mountpoints_length++;
+    LOGI("vfs_read(%u bytes, custody offset @ %u)", size, custody->offset);
+    auto *inode = custody->inode;
+    ssize_t rc = inode->file_ops->read(inode, custody->offset, buffer, size);
+    if (rc > 0)
+        vfs_seek(custody, SEEK_SET, rc);
 
-    return Success;
+    return rc;
 }
 
-Error vfs_open(const char *stringpath, uint32_t flags, FileCustody &out_custody)
+ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
 {
-    Path path = path_from_string(stringpath);
-    File *file = lookup_open_files_list(path);
-    if (file) {
-        file->refcount++;
-        out_custody = {
-            .file = file,
-            .flags = flags,
-            .seek_position = 0
-        };
-        return Success;
-    }
+    if (custody->inode->type == InodeType::Directory)
+        return -EISDIR;
 
-    DirectoryEntry entry;
-    TRY(traverse_to_direntry(path, entry));
-    TRY(open_dirent(path, flags, entry, out_custody));
+    auto *inode = custody->inode;
+    ssize_t rc = inode->file_ops->write(inode, custody->offset, buffer, size);
+    if (rc > 0)
+        vfs_seek(custody, SEEK_SET, rc);
 
-    return Success;
+    return rc;
 }
 
-Error vfs_read(FileCustody &custody, uint8_t *buffer, uint32_t size, uint32_t &bytes_read)
+int vfs_seek(FileCustody *custody, int whence, int32_t offset)
 {
-    bytes_read = 0;
-    if (!custody.file->read)
-        return NotSupported;
-
-    Error result = custody.file->read(*custody.file, custody.seek_position, buffer, size, bytes_read);
-    if (result.is_success())
-        custody.seek_position += bytes_read;
-    return result;
+    auto *inode = custody->inode;
+    custody->offset = inode->file_ops->seek(inode, custody->offset, whence, offset);
+    return 0;
 }
 
-Error vfs_write(FileCustody &custody, uint8_t const *buffer, uint32_t size, uint32_t &bytes_written)
+int vfs_close(FileCustody *custody)
 {
-    bytes_written = 0;
-    if (!custody.file->write)
-        return NotSupported;
-    
-    Error result = custody.file->write(*custody.file, custody.seek_position, buffer, size, bytes_written);
-    if (result.is_success())
-        custody.seek_position += bytes_written;
-    return result;
+    free_custody(custody);
+    return 0;
 }
 
-Error vfs_seek(FileCustody &custody, api::FileSeekMode mode, int32_t offset)
+int vfs_stat(const char *path, struct stat *stat)
 {
-    if (!custody.file->seek)
-        return NotSupported;
+    int rc;
+    Inode *parent = nullptr;
+    Inode *inode = nullptr;
 
-    uint64_t new_seek;
-    TRY(custody.file->seek(*custody.file, custody.seek_position, mode, offset, new_seek));
-    custody.seek_position = new_seek;
+    rc = traverse(path, &parent, &inode);
 
-    return Success;
-}
+    if (rc != 0)
+        rc = inode->ops->stat(inode, stat);
 
-Error vfs_close(FileCustody &custody)
-{
-    custody.file->refcount--;
-    if (custody.file->refcount == 0) {
-        if (custody.file->close)
-            custody.file->close(*custody.file);
-        remove_from_open_files_list(custody.file);
-    }
-
-    return Success;
-}
-
-Error vfs_stat(const char *path, api::Stat &stat)
-{
-    DirectoryEntry entry;
-    TRY(traverse_to_direntry(path_from_string(path), entry));
-
-    stat = {
-        .type = entry.filetype,
-        .size = entry.size
-    };
-    return Success;
+    close_inode(parent);
+    close_inode(inode);
+    return rc;
 }

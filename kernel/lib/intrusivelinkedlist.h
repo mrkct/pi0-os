@@ -48,6 +48,13 @@ struct IntrusiveLinkedList {
         return nullptr;
     }
 
+    template<typename Filter>
+    T* find_first(Filter filter)
+    {
+        // Just for clarity
+        return find(filter);
+    }
+
     void remove(T *node)
     {
         if (node->prev == nullptr) {
@@ -88,6 +95,18 @@ struct IntrusiveLinkedList {
         node->prev = tail;
         tail->next = node;
         tail = node;
+    }
+
+    void append_before(T *node, T *before)
+    {
+        if (before->prev == nullptr) {
+            add(node);
+            return;
+        }
+        node->prev = before->prev;
+        node->prev->next = node;
+        node->next = before;
+        before->prev = node;
     }
 
     T *pop()

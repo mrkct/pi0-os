@@ -5,10 +5,9 @@
 #include <kernel/irq.h>
 #include <kernel/memory/vm.h>
 #include <kernel/arch/arch.h>
+#include <kernel/file.h>
 #include <include/api/syscalls.h>
 
-
-int64_t default_seek_function(int64_t offset, int whence, int64_t filesize);
 
 class Device
 {
@@ -19,9 +18,10 @@ public:
         InterruptController,
         SystemTimer,
     };
+    virtual ~Device() {}
 
     virtual const char *name() const = 0;
-    virtual Device::Type type() const = 0;
+    virtual Device::Type device_type() const = 0;
     virtual int32_t init_for_early_boot() { return -ENOTSUP; }
     virtual int32_t init() = 0;
     virtual int32_t shutdown() = 0;
@@ -30,8 +30,9 @@ public:
 class InterruptController: public Device
 {
 public:
-    virtual Device::Type type() const override { return Device::Type::InterruptController; }
+    virtual ~InterruptController() {}
 
+    virtual Device::Type device_type() const override { return Device::Type::InterruptController; }
     virtual int32_t shutdown() override { panic("You can't shutdown the interrupt controller!"); }
 
     virtual void mask_interrupt(uint32_t irqidx) = 0;
@@ -43,7 +44,9 @@ public:
 class SystemTimer: public Device
 {
 public:
-    virtual Device::Type type() const override { return Device::Type::SystemTimer; }
+    virtual ~SystemTimer() {}
+
+    virtual Device::Type device_type() const override { return Device::Type::SystemTimer; }
     virtual int32_t shutdown() override { panic("You can't shutdown the system timer!"); }
 
     typedef void (*SystemTimerCallback)(InterruptFrame*, SystemTimer&, uint64_t, void*);
@@ -53,22 +56,19 @@ public:
     virtual void start(uint64_t ticks, SystemTimerCallback, void *arg) = 0;
 };
 
-class FileDevice: public Device
+class FileDevice: public Device, public File
 {
 public:
     FileDevice(uint8_t major, uint8_t minor, const char *name);
+    virtual ~FileDevice() {}
 
     virtual uint8_t major() const { return m_major; }
     virtual uint8_t minor() const { return m_minor; }
     virtual const char *name() const override { return m_name; }
 
-    virtual int64_t read(int64_t offset, uint8_t *buffer, size_t size) = 0;
-    virtual int64_t write(int64_t offset, const uint8_t *buffer, size_t size) = 0;
-    virtual int64_t seek(int64_t offset, int whence) = 0;
+    virtual int64_t read(int64_t, uint8_t *buffer, size_t size) = 0;
+    virtual int64_t write(int64_t, const uint8_t *buffer, size_t size) = 0;
     virtual int32_t ioctl(uint32_t request, void *argp) = 0;
-
-protected:
-    int64_t m_seekoff = 0;
 
 private:
     uint8_t m_major, m_minor;
@@ -81,26 +81,29 @@ public:
     CharacterDevice(uint8_t major, uint8_t minor, const char *name)
         : FileDevice(major, minor, name)
     {}
+    virtual ~CharacterDevice() {}
 
-    virtual Device::Type type() const override { return Device::Type::CharacterDevice; }
+    virtual Device::Type device_type() const override { return Device::Type::CharacterDevice; }
 
     virtual int64_t read(int64_t, uint8_t *buffer, size_t size) override { return read(buffer, size); }
     virtual int64_t read(uint8_t *buffer, size_t size) = 0;
 
     virtual int64_t write(int64_t, const uint8_t *buffer, size_t size) override { return write(buffer, size); }
     virtual int64_t write(const uint8_t *buffer, size_t size) = 0;
-
-    virtual int64_t seek(int64_t, int) override { return 0; }
 };
 
 class BlockDevice: public FileDevice
 {
+private:
+    static uint8_t s_next_minor;
 public:
-    BlockDevice(uint8_t major, uint8_t minor, const char *name)
-        : FileDevice(major, minor, name)
+    BlockDevice(const char *name)
+        : FileDevice(Maj_Disk, s_next_minor++, name)
     {}
+    virtual ~BlockDevice() {}
 
-    virtual Device::Type type() const override { return Device::Type::BlockDevice; }
+    virtual Device::Type device_type() const override { return Device::Type::BlockDevice; }
+    virtual uint64_t size() const = 0;
 };
 
 class Console: public CharacterDevice
@@ -111,6 +114,7 @@ public:
     Console(): CharacterDevice(Maj_Console, s_next_minor++, "console")
     {
     }
+    virtual ~Console() {}
 
     virtual int64_t read(uint8_t*, size_t) override { return -ENOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
@@ -130,6 +134,7 @@ private:
 public:
     UART(): CharacterDevice(Maj_UART, s_next_minor++, "uart")
     {}
+    virtual ~UART() {}
 
     virtual int32_t ioctl(uint32_t request, void *argp) override;
 };
@@ -141,6 +146,7 @@ private:
 public:
     GPIOController(): CharacterDevice(Maj_GPIO, s_next_minor++, "gpio")
     {}
+    virtual ~GPIOController() {}
 
     enum class PinState { Low, High };
     enum class PullState { None, Up, Down };
@@ -177,9 +183,10 @@ private:
 public:
     RealTimeClock(): CharacterDevice(Maj_RTC, s_next_minor++, "rtc")
     {}
+    virtual ~RealTimeClock() {}
 
-    virtual int64_t read(uint8_t*, size_t) { return -ENOTSUP; } 
-    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP;}
+    virtual int64_t read(uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
 
     virtual int32_t get_time(DateTime&) = 0;

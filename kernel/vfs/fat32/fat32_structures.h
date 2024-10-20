@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace kernel::fat32 {
+namespace fat32 {
 
 static constexpr uint16_t BOOT_SIGNATURE = 0xaa55;
 

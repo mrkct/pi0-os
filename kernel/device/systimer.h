@@ -11,7 +11,7 @@ enum class SystimerChannel {
     Channel3,
 };
 
-typedef void (*SystimerCallback)(SuspendedTaskState*);
+typedef void (*SystimerCallback)(InterruptFrame*);
 
 void systimer_init();
 

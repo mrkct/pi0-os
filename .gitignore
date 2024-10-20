@@ -5,7 +5,7 @@ boot.bin
 linker.preprocessed.ld
 disks/*
 *.img
-replay.bin
+*.recording
 snapshot-drive.qcow2
 
 # Prerequisites

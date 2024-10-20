@@ -1,38 +1,148 @@
-#include <kernel/base.h>
-#include <kernel/vfs/fat32/fat32.h>
-#include <kernel/vfs/fat32/fat32_structures.h>
-#include <kernel/vfs/vfs.h>
-#include <api/files.h>
+#include "fat32.h"
+#include "fat32_structures.h"
+
+#define LOG_ENABLED
+#define LOG_TAG "[FAT32] "
+#include <kernel/log.h>
 
 
-namespace kernel {
+#undef TRY
+#define TRY(expr)       \
+    do {                \
+        rc = (expr);    \
+        if (rc != 0)    \
+            return rc;  \
+    } while(0)
+
 
 static constexpr uint32_t SECTOR_SIZE = 512;
 
-#define READ_SECTOR(fs, idx, buf) (fs).storage->read_block(*(fs).storage, (idx), (buf))
+static inline constexpr uint32_t sector(uint32_t sector_idx)
+{
+    return SECTOR_SIZE * sector_idx;
+}
 
-struct Fat32Context {
-    Storage *storage;
+static_assert(sizeof(fat32::BiosParameterBlock) == SECTOR_SIZE,
+    "BPB size must be equal to sector size");
+static_assert(sizeof(fat32::FSInfo) == SECTOR_SIZE,
+    "FSInfo size must be equal to sector size");
+
+struct Fat32FilesystemCtx {
+    BlockDevice *storage;
     fat32::BiosParameterBlock bpb;
     fat32::FSInfo info;
 };
 
-struct Fat32OpenDirectoryContext {
+struct Fat32OpenInodeCtx {
     uint32_t first_cluster;
-    uint32_t current_cluster;
-    uint32_t next_entry_index;
+    uint32_t filesize;
 };
 
-struct Fat32OpenFileContext {
-    uint32_t first_cluster;
+static int fat32_fs_on_mount(Filesystem *self, Inode *out_root);
+static int fat32_fs_open_inode(Filesystem*, Inode*);
+static int fat32_fs_close_inode(Filesystem*, Inode*);
+
+static int fat32_inode_stat(Inode *self, struct stat *st);
+
+static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
+static int64_t fat32_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
+static int32_t fat32_file_inode_ioctl(Inode *self, uint32_t request, void *argp);
+static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset);
+
+static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
+static int fat32_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
+static int fat32_dir_inode_mkdir(Inode *self, const char *name);
+static int fat32_dir_inode_rmdir(Inode *self, const char *name);
+static int fat32_dir_inode_unlink(Inode *self, const char *name);
+
+
+static struct FilesystemOps s_fat32_ops {
+    .on_mount = fat32_fs_on_mount,
+    .open_inode = fat32_fs_open_inode,
+    .close_inode = fat32_fs_close_inode,
 };
 
-struct Fat32DirectoryEntryContext {
-    uint32_t first_cluster;
+static struct InodeOps s_fat32_inode_ops {
+    .stat = fat32_inode_stat,
 };
-static_assert(
-    sizeof(Fat32DirectoryEntryContext) <= sizeof(DirectoryEntry::opaque),
-    "Fat32DirectoryEntryData is too big to fit in DirectoryEntry::opaque");
+
+static struct InodeFileOps s_fat32_inode_file_ops {
+    .read = fat32_file_inode_read,
+    .write = fat32_file_inode_write,
+    .ioctl = fat32_file_inode_ioctl,
+    .seek = fat32_file_inode_seek,
+};
+
+static struct InodeDirOps s_fat32_inode_dir_ops {
+    .lookup = fat32_dir_inode_lookup,
+    .create = fat32_dir_inode_create,
+    .mkdir = fat32_dir_inode_mkdir,
+    .rmdir = fat32_dir_inode_rmdir,
+    .unlink = fat32_dir_inode_unlink,
+};
+
+static inline constexpr uint32_t cluster_idx_to_sector(fat32::BiosParameterBlock &bpb, uint32_t cluster_idx)
+{
+    return bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 + (cluster_idx - 2) * bpb.BPB_SecPerClus;
+}
+
+static inline int read_sector(Fat32FilesystemCtx *ctx, uint64_t sector_idx, void *buffer)
+{
+    int64_t rc = ctx->storage->read(SECTOR_SIZE * sector_idx, reinterpret_cast<uint8_t*>(buffer), SECTOR_SIZE);
+    
+    if (rc == SECTOR_SIZE)
+        return 0;
+    if (rc > 0)
+        return -EIO;
+    return rc;
+}
+
+static int next_cluster(Fat32FilesystemCtx *ctx, uint32_t cluster, uint32_t& next_cluster)
+{
+    int rc = 0;
+    auto& bpb = ctx->bpb;
+    auto fat_offset = cluster * 4;
+    auto fat_sector = bpb.BPB_RsvdSecCnt + (fat_offset / SECTOR_SIZE);
+    auto fat_sector_offset = fat_offset % SECTOR_SIZE;
+
+    /**
+     * This is some very basic caching mechanism, otherwise to step a
+     * cluster chain we end up re-reading the same sector many times.
+     */
+    static uint32_t table_sector[SECTOR_SIZE / sizeof(uint32_t)];
+    static uint32_t last_cached_sector = ~0;
+    if (fat_sector != last_cached_sector) {
+        rc = ctx->storage->read(fat_sector, reinterpret_cast<uint8_t*>(&table_sector), sizeof(table_sector));
+        if (rc != 0)
+            return rc;
+        last_cached_sector = fat_sector;
+    }
+
+    next_cluster = table_sector[fat_sector_offset / sizeof(uint32_t)] & 0x0fffffff;
+    return 0;
+}
+
+static int step_cluster_chain(
+    Fat32FilesystemCtx *ctx,
+    uint32_t first_cluster,
+    uint32_t steps,
+    uint32_t& out_cluster
+)
+{
+    int rc;
+    uint32_t current = first_cluster;
+    for (uint32_t i = 0; i < steps; i++) {
+        rc = next_cluster(ctx, current, current);
+        if (rc != 0)
+            return rc;
+        
+        if (!fat32::is_valid_cluster(current))
+            break;
+    }
+
+    out_cluster = current;
+    return 0;
+}
 
 static void copy_entry_name(fat32::DirectoryEntry8_3& e, char* buf)
 {
@@ -52,217 +162,165 @@ static void copy_entry_name(fat32::DirectoryEntry8_3& e, char* buf)
     buf[name_length + extension_length + (extension_length > 0 ? 1 : 0)] = '\0';
 }
 
-static Error next_cluster(Fat32Context& ctx, uint32_t cluster, uint32_t& next_cluster)
-{
-    auto& bpb = ctx.bpb;
-    auto fat_offset = cluster * 4;
-    auto fat_sector = bpb.BPB_RsvdSecCnt + (fat_offset / SECTOR_SIZE);
-    auto fat_sector_offset = fat_offset % SECTOR_SIZE;
-
-    /**
-     * This is some very basic caching mechanism, otherwise to step a
-     * cluster chain we end up re-reading the same sector many times.
-     */
-    static uint32_t table_sector[SECTOR_SIZE / sizeof(uint32_t)];
-    static uint32_t last_cached_sector = ~0;
-    if (fat_sector != last_cached_sector) {
-        TRY(READ_SECTOR(ctx, fat_sector, reinterpret_cast<uint8_t*>(&table_sector)));
-        last_cached_sector = fat_sector;
-    }
-
-    next_cluster = table_sector[fat_sector_offset / sizeof(uint32_t)] & 0x0fffffff;
-
-    return Success;
-}
-
-static Error step_cluster_chain(Fat32Context &ctx, uint32_t first_cluster, uint32_t steps, uint32_t& out_cluster)
-{
-    uint32_t current = first_cluster;
-    for (uint32_t i = 0; i < steps; i++) {
-        TRY(next_cluster(ctx, current, current));
-        if (!fat32::is_valid_cluster(current))
-            break;
-    }
-
-    out_cluster = current;
-    return Success;
-}
-
-static uint32_t cluster_idx_to_sector(fat32::BiosParameterBlock& bpb, uint32_t cluster_idx)
-{
-    return bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 + (cluster_idx - 2) * bpb.BPB_SecPerClus;
-}
-
-static Error init(Storage &storage, Fat32Context &ctx)
-{
-    static_assert(sizeof(fat32::BiosParameterBlock) == SECTOR_SIZE, "BPB size must be equal to sector size");
-
-    ctx.storage = &storage;
-
-    TRY(READ_SECTOR(ctx, 0, reinterpret_cast<uint8_t*>(&ctx.bpb)));
-
-    if (ctx.bpb.BS_BootSig32 != fat32::BOOT_SIGNATURE) {
-        return Error {
-            .generic_error_code = GenericErrorCode::InvalidFormat,
-            .device_specific_error_code = 0,
-            .user_message = "Invalid boot signature",
-            .extra_data = nullptr
-        };
-    }
-
-    if (ctx.bpb.BPB_BytsPerSec != SECTOR_SIZE) {
-        return Error {
-            .generic_error_code = GenericErrorCode::NotSupported,
-            .device_specific_error_code = 0,
-            .user_message = "Unsupported sector size from BPB",
-            .extra_data = nullptr
-        };
-    }
-
-    fat32::FSInfo fs_info;
-    static_assert(sizeof(fs_info) == SECTOR_SIZE, "FSInfo size must be equal to sector size");
-    TRY(READ_SECTOR(ctx, ctx.bpb.BPB_FSInfo, reinterpret_cast<uint8_t*>(&fs_info)));
-    if (fs_info.FSI_LeadSig != fat32::FSINFO_LEAD_SIGNATURE || fs_info.FSI_StrucSig != fat32::FSINFO_STRUC_SIGNATURE || fs_info.FSI_TrailSig != fat32::FSINFO_TRAIL_SIGNATURE) {
-        return Error {
-            .generic_error_code = GenericErrorCode::InvalidFormat,
-            .device_specific_error_code = 0,
-            .user_message = "Invalid FSInfo signature(s)",
-            .extra_data = nullptr
-        };
-    }
-
-    ctx.info = fs_info;
-
-    return Success;
-}
-
-static Error get_root_directory(Filesystem &fs, DirectoryEntry &out_entry)
-{
-    out_entry.fs = &fs;
-    strcpy(out_entry.name, "");
-    out_entry.filetype = api::Directory;
-    out_entry.size = 0;
-
-    Fat32DirectoryEntryContext &dir_ctx = *reinterpret_cast<Fat32DirectoryEntryContext*>(out_entry.opaque);
-    dir_ctx.first_cluster = 2;
-
-    return Success;
-}
-
 template<typename HandleEntry>
-static Error foreach_8_3_directory_entry(File &directory, HandleEntry handle_entry_cb)
+static bool foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entry_cb)
 {
-    auto &ctx = *static_cast<Fat32Context*>(directory.fs->opaque);
-    auto &dirctx = *static_cast<Fat32OpenDirectoryContext*>(directory.opaque);
+    int rc;
+    kassert(dirinode->type == InodeType::Directory);
+
+    auto *fsctx = (Fat32FilesystemCtx*) dirinode->filesystem->opaque;
 
     const uint32_t DIR_ENTRIES_IN_SECTOR = SECTOR_SIZE / sizeof(fat32::DirectoryEntry);
 
     uint32_t entry_idx = 0;
-    uint32_t next_cluster_idx = dirctx.first_cluster;
+    uint32_t next_cluster_idx = dirinode->identifier;
     while (fat32::is_valid_cluster(next_cluster_idx)) {
-        uint32_t cluster_start_sector = cluster_idx_to_sector(ctx.bpb, next_cluster_idx);
-        for (uint32_t sector_idx = 0; sector_idx < ctx.bpb.BPB_SecPerClus; sector_idx++) {
+        uint32_t cluster_start_sector = cluster_idx_to_sector(fsctx->bpb, next_cluster_idx);
+        for (uint32_t sector_idx = 0; sector_idx < fsctx->bpb.BPB_SecPerClus; sector_idx++) {
             uint32_t i;
             uint8_t sector[SECTOR_SIZE];
             auto *entries = reinterpret_cast<fat32::DirectoryEntry8_3*>(sector);
 
-            TRY(READ_SECTOR(ctx, cluster_start_sector + sector_idx, sector));
+            TRY(read_sector(fsctx, cluster_start_sector + sector_idx, sector));
             for (i = 0; i < DIR_ENTRIES_IN_SECTOR; i++) {
                 if (entries[i].is_end_of_directory())
                     break;
                 if (entries[i].is_cancelled() || entries[i].DIR_Attr == fat32::DirectoryEntry8_3::ATTR_LONG_NAME)
                     continue;
 
-                if (!handle_entry_cb(entry_idx, entries[i]))
-                    return Success;
+                if (handle_entry_cb(entry_idx, entries[i])) {
+                    return 0;
+                }
 
                 entry_idx++;
             }
 
             if (i != DIR_ENTRIES_IN_SECTOR) {
+                LOGD("Reached end of directory (%u entries read)", i);
                 break;
             }
         }
 
-        TRY(next_cluster(ctx, next_cluster_idx, next_cluster_idx));
+        TRY(next_cluster(fsctx, next_cluster_idx, next_cluster_idx));
     }
 
-    return Success;
+    return -ENOENT;
 }
 
-static Error directory_file_read(File &file, uint64_t offset, uint8_t *buffer, uint32_t size, uint32_t &bytes_read)
+static struct timespec fat32_datetime_to_timespec(uint16_t date, uint16_t time)
 {
-    size = round_down<uint32_t>(size, sizeof(DirectoryEntry));
+    (void) date;
+    (void) time;
 
-    uint32_t entries_to_read = size / sizeof(DirectoryEntry);
-    uint32_t starting_from = offset / sizeof(DirectoryEntry);
-    DirectoryEntry *user_entries = (DirectoryEntry*) buffer;
+    // TODO: Actually do the conversion
+    return (struct timespec) { .tv_sec = 0, .tv_nsec = 0 };
+}
 
-    if (entries_to_read == 0) {
-        bytes_read = 0;
-        return Success;
-    }
+static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode)
+{
+    LOGI("Looking up %s in inode %lu", name, self->identifier);
+    return foreach_8_3_directory_entry(self, [&](auto, fat32::DirectoryEntry8_3 &fat_entry) {
 
-    // FIXME: This iterates over the entire directory every time...
-    return foreach_8_3_directory_entry(file, [&](auto idx, fat32::DirectoryEntry8_3 &fat_entry) {
-        if (idx < starting_from)
-            return true;
-        
-        DirectoryEntry &this_entry = user_entries[idx - starting_from];
-        auto &entry_ctx = *reinterpret_cast<Fat32DirectoryEntryContext*>(this_entry.opaque);
+        char entry_name[20];
+        copy_entry_name(fat_entry, entry_name);
+        LOGD("- %s", entry_name);
+        if (0 != strcasecmp(name, entry_name))
+            return false;
 
-        this_entry.fs = file.fs;
-        this_entry.size = fat_entry.DIR_FileSize;
-        copy_entry_name(fat_entry, this_entry.name);
-        if (fat_entry.DIR_Attr == fat32::DirectoryEntry8_3::ATTR_DIRECTORY) {
-            this_entry.filetype = api::FileType::Directory;
+        InodeType inodetype = InodeType::RegularFile;
+        mode_t mode = 0;
+        if (fat_entry.DIR_Attr & fat32::DirectoryEntry8_3::ATTR_DIRECTORY) {
+            mode |= S_IFDIR;
+            inodetype = InodeType::Directory;
         } else {
-            this_entry.filetype = api::FileType::RegularFile;
+            mode |= S_IFREG;
+            inodetype = InodeType::RegularFile;
         }
-        entry_ctx = Fat32DirectoryEntryContext {
-            .first_cluster = (
-                static_cast<uint32_t>(fat_entry.DIR_FstClusHI) << 16 | fat_entry.DIR_FstClusLO) & 0x0fffffff
+        // TODO: Figure out the mode bits
+
+        uint32_t cluster = ((uint32_t)(fat_entry.DIR_FstClusHI) << 16 | fat_entry.DIR_FstClusLO) & 0x0fffffff;
+
+        *out_inode = Inode {
+            .refcount = 0,
+            .type = inodetype,
+            .identifier = cluster,
+            .filesystem = self->filesystem,
+            .mode = 0,
+            .uid = 0,
+            .size = fat_entry.DIR_FileSize,
+            .access_time = fat32_datetime_to_timespec(fat_entry.DIR_LstAccDate, 0 /* no access time in fat32*/),
+            .creation_time = fat32_datetime_to_timespec(fat_entry.DIR_CrtDate, fat_entry.DIR_CrtTime),
+            .modification_time = fat32_datetime_to_timespec(fat_entry.DIR_WrtDate, fat_entry.DIR_WrtTime),
+            .opaque = nullptr,
+            .ops = &s_fat32_inode_ops,
+            .file_ops = nullptr, // ignore, just to silence the compiler
         };
+        if (inodetype == InodeType::RegularFile) {
+            out_inode->file_ops = &s_fat32_inode_file_ops;
+        } else {
+            out_inode->dir_ops = &s_fat32_inode_dir_ops;
+        }
 
-        bytes_read += sizeof(DirectoryEntry);
-
-        return !(idx == starting_from + entries_to_read - 1);
+        return true;
     });
 }
 
-static Error regular_file_read(File &file, uint64_t offset, uint8_t *buffer, uint32_t size, uint32_t &bytes_read)
+static int fat32_dir_inode_create(Inode*, const char*, InodeType, Inode**)
 {
-    auto &ctx = *reinterpret_cast<Fat32Context*>(file.fs->opaque);
-    auto &filectx = *reinterpret_cast<Fat32OpenFileContext*>(file.opaque);
+    return -ENOTSUP;
+}
 
-    offset = min<uint64_t>(offset, file.size);
-    size = min<uint64_t>(size, file.size - offset);
+static int fat32_dir_inode_mkdir(Inode*, const char*)
+{
+    return -ENOTSUP;
+}
+
+static int fat32_dir_inode_rmdir(Inode*, const char*)
+{
+    return -ENOTSUP;
+}
+
+static int fat32_dir_inode_unlink(Inode*, const char*)
+{
+    return -ENOTSUP;
+}
+
+static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size)
+{
+    int rc;
+    int64_t bytes_read = 0;
+    auto *ctx = (Fat32FilesystemCtx*) self->filesystem->opaque;
+    uint32_t first_cluster = self->identifier; // We use the inode's first cluster as its identifier
+
+    offset = min<uint64_t>(offset, self->size);
+    size = min<uint64_t>(size, self->size - offset);
+    LOGD("Reading %lu bytes from offset %lu in inode %lu", size, offset, self->identifier);
 
     uint32_t current_cluster;
     TRY(step_cluster_chain(ctx,
-        filectx.first_cluster,
-        offset / (ctx.bpb.BPB_SecPerClus * SECTOR_SIZE),
+        first_cluster,
+        offset / (ctx->bpb.BPB_SecPerClus * SECTOR_SIZE),
         current_cluster));
 
     auto remaining_size = size;
     auto current_offset = offset;
     while (remaining_size > 0) {
-        auto cluster_offset = current_offset % (ctx.bpb.BPB_SecPerClus * SECTOR_SIZE);
-        auto remaining_size_in_cluster = min<uint64_t>(remaining_size, ctx.bpb.BPB_SecPerClus * SECTOR_SIZE - cluster_offset);
+        auto cluster_offset = current_offset % (ctx->bpb.BPB_SecPerClus * SECTOR_SIZE);
+        auto remaining_size_in_cluster = min<uint64_t>(remaining_size, ctx->bpb.BPB_SecPerClus * SECTOR_SIZE - cluster_offset);
 
         while (remaining_size_in_cluster > 0) {
             auto sector_offset = current_offset % SECTOR_SIZE;
             auto to_read_in_sector = min<uint64_t>(remaining_size_in_cluster, SECTOR_SIZE - sector_offset);
 
-            auto sector_index = cluster_idx_to_sector(ctx.bpb, current_cluster) + cluster_offset / SECTOR_SIZE;
+            auto sector_index = cluster_idx_to_sector(ctx->bpb, current_cluster) + cluster_offset / SECTOR_SIZE;
 
             if (to_read_in_sector == SECTOR_SIZE) {
                 kassert(sector_offset == 0);
-                TRY(READ_SECTOR(ctx, sector_index, buffer));
+                TRY(read_sector(ctx, sector_index, buffer));
             } else {
                 kassert(sector_offset + to_read_in_sector <= SECTOR_SIZE);
                 uint8_t sector_buffer[SECTOR_SIZE];
-                TRY(READ_SECTOR(ctx, sector_index, sector_buffer));
+                TRY(read_sector(ctx, sector_index, sector_buffer));
                 memcpy(buffer, sector_buffer + sector_offset, to_read_in_sector);
             }
 
@@ -271,115 +329,155 @@ static Error regular_file_read(File &file, uint64_t offset, uint8_t *buffer, uin
             remaining_size_in_cluster -= to_read_in_sector;
             current_offset += to_read_in_sector;
             buffer += to_read_in_sector;
+            bytes_read += to_read_in_sector;
         }
 
         if (remaining_size > 0) {
             TRY(next_cluster(ctx, current_cluster, current_cluster));
-            if (current_cluster >= 0x0ffffff8) {
-                return Error {
-                    .generic_error_code = GenericErrorCode::InvalidFormat,
-                    .device_specific_error_code = 0,
-                    .user_message = "Unexpected end of file",
-                    .extra_data = nullptr
-                };
-            }
+            if (current_cluster >= 0x0ffffff8)
+                return -EIO;
         }
     }
 
-    bytes_read = size;
-    return Success;
+    return bytes_read;
 }
 
-static Error open_regular_file_entry(DirectoryEntry& entry, File &out_file)
+static int64_t fat32_file_inode_write(Inode *, int64_t, const uint8_t *, size_t)
 {
-    kassert(entry.filetype == api::RegularFile);
+    return -ENOTSUP;
+}
 
-    Fat32OpenFileContext *filectx;
-    TRY(kmalloc(sizeof(*filectx), filectx));
+static int32_t fat32_file_inode_ioctl(Inode*, uint32_t, void*)
+{
+    return -ENOTSUP;
+}
 
-    auto &direntctx = *reinterpret_cast<Fat32DirectoryEntryContext*>(entry.opaque);
+static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset)
+{
+    return default_checked_seek(self->size, current, whence, offset);
+}
 
-    *filectx = Fat32OpenFileContext {
-        .first_cluster = direntctx.first_cluster
-    };
-
-    out_file = File {
-        .fs = entry.fs,
+static int fat32_fs_on_mount(Filesystem *self, Inode *out_root)
+{
+    *out_root = (Inode) {
         .refcount = 0,
-        .filetype = entry.filetype,
-        .size = entry.size,
-        .opaque = filectx,
-
-        .read = regular_file_read,
-        .write = NULL,
-        .seek = normal_checked_seek,
-        .close = [](auto &file) { return kfree(file.opaque); }
+        .type = InodeType::Directory,
+        .identifier = 2,
+        .filesystem = self,
+        .mode = 0,
+        .uid = 0,
+        .size = 0,
+        .access_time = {},
+        .creation_time = {},
+        .modification_time = {},
+        .opaque = nullptr,
+        .ops = &s_fat32_inode_ops,
+        .dir_ops = &s_fat32_inode_dir_ops,
     };
 
-    return Success;
+    return 0;
 }
 
-static Error open_directory_entry(DirectoryEntry& entry, File &out_file)
+static int fat32_fs_open_inode(Filesystem*, Inode *inode)
 {
-    kassert(entry.filetype == api::Directory);
+    inode->opaque = nullptr;
+    return 0;
+}
 
-    Fat32OpenDirectoryContext *dirctx;
-    TRY(kmalloc(sizeof(*dirctx), dirctx));
+static int fat32_inode_stat(Inode *self, struct stat *st)
+{
+    auto *fsctx = (Fat32FilesystemCtx*) self->filesystem->opaque;
 
-    auto &direntctx = *reinterpret_cast<Fat32DirectoryEntryContext*>(entry.opaque);
+    uint16_t devno = (((uint16_t) fsctx->storage->major()) << 8) | fsctx->storage->minor();
+
+    st->st_dev = devno;
+    st->st_ino = self->identifier;
+    st->st_mode = self->type == InodeType::Directory ? S_IFDIR : S_IFREG;
+    st->st_nlink = 1;
+    st->st_uid = self->uid;
+    st->st_gid = self->uid;
+    st->st_rdev = 0;
+    st->st_size = self->size;
+    st->st_atim = self->access_time;
+    st->st_mtim = self->modification_time;
+    st->st_ctim = self->creation_time;
+    st->st_blksize = SECTOR_SIZE;
+    st->st_blocks = round_up<blkcnt_t>(self->size, SECTOR_SIZE) / SECTOR_SIZE;
+
+    return 0;
+}
+
+static int fat32_fs_close_inode(Filesystem*, Inode *inode)
+{
+    // TODO: Write back the inode to storage, if necessary
+    free(inode->opaque);
+    inode->opaque = nullptr;
+
+    return 0;
+}
+
+int fat32_try_create(BlockDevice &storage, Filesystem **out_fs)
+{
+    fat32::BiosParameterBlock bpb;
+    fat32::FSInfo fs_info;
+    ssize_t read;
     
-    *dirctx = {
-        .first_cluster = direntctx.first_cluster,
-        .current_cluster = direntctx.first_cluster,
-        .next_entry_index = 0
-    };
-
-    out_file = File {
-        .fs = entry.fs,
-        .refcount = 0,
-        .filetype = entry.filetype,
-        .size = entry.size,
-        .opaque = dirctx,
-
-        .read = directory_file_read,
-        .write = NULL,
-        .seek = normal_checked_seek,
-        .close = [](auto &file) { return kfree(file.opaque); }
-    };
-
-    return Success;
-}
-
-static Error open(DirectoryEntry &entry, File &out_file)
-{
-    switch (entry.filetype) {
-    case api::RegularFile:
-        return open_regular_file_entry(entry, out_file);
-    case api::Directory:
-        return open_directory_entry(entry, out_file);
-    default:
-        return NotSupported;
-    }
-}
-
-Error fat32_create(Filesystem& fs, Storage& storage)
-{
-    Fat32Context *ctx;
-    TRY(kmalloc(sizeof(*ctx), ctx));
-
-    if (auto err = init(storage, *ctx); !err.is_success()) {
-        kfree(ctx);
-        return err;
+    read = storage.read(sector(0), (uint8_t*) &bpb, sizeof(bpb));
+    if (read < 0) {
+        LOGW("Call to .read for BPB failed: %d", (int) read);
+        return (int) read;
+    } else if (read < (ssize_t) sizeof(bpb)) {
+        LOGW("Read less than expected from storage for BPB");
+        return -EINVAL;
     }
 
-    fs = {
-        .is_case_sensitive = false,
+    if (bpb.BS_BootSig32 != fat32::BOOT_SIGNATURE) {
+        LOGW("BPB signature mismatch");
+        return -EINVAL;
+    } else if (bpb.BPB_BytsPerSec != SECTOR_SIZE) {
+        LOGE("Unsupported sector size %u", (unsigned) bpb.BPB_BytsPerSec);
+        return -EINVAL;
+    }
+    
+    read = storage.read(sector(bpb.BPB_FSInfo), (uint8_t*) &fs_info, sizeof(fs_info));
+    if (read < 0) {
+        LOGW("Call to .read for FS_Info failed: %d", (int) read);
+        return (int) read;
+    } else if (read < (ssize_t) sizeof(fs_info)) {
+        LOGW("Read less than expected from storage for FS_Info");
+        return -EINVAL;
+    }
+
+    if (fs_info.FSI_LeadSig != fat32::FSINFO_LEAD_SIGNATURE ||
+        fs_info.FSI_StrucSig != fat32::FSINFO_STRUC_SIGNATURE ||
+        fs_info.FSI_TrailSig != fat32::FSINFO_TRAIL_SIGNATURE) {
+
+        LOGE("Invalid FSInfo signature(s)");
+        return -EINVAL;
+    }
+
+    uint8_t *mem = (uint8_t*) malloc(sizeof(Filesystem) + sizeof(Fat32FilesystemCtx));
+    if (!mem)
+        return -ENOMEM;
+
+    Filesystem *fs = (Filesystem*) mem;
+    Fat32FilesystemCtx *ctx = (Fat32FilesystemCtx*) (mem + sizeof(Filesystem));
+
+    *ctx = Fat32FilesystemCtx {
+        .storage = &storage,
+        .bpb = bpb,
+        .info = fs_info,
+    };
+
+    *fs = Filesystem {
+        .ops = &s_fat32_ops,
+        .icache = {},
+        .root = 2, // cluster of the root directory
         .opaque = ctx,
-        .root_directory = get_root_directory,
-        .open = open
     };
+    // FIXME: We should handle this, but the init's impl always succeeds anyway
+    kassert(0 == inode_cache_init(&fs->icache));
 
-    return Success;
-}
-
+    *out_fs = fs;
+    return 0;
 }

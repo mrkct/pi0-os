@@ -55,12 +55,12 @@ void register_test(const char *name, testcase function)
     test_count++;
 }
 
-static void run_test(test_t const *test)
+static void run_test(test_t const *test, bool run_in_forked_thread)
 {
-    int pid;
+    int pid = 0;
     int status;
 
-    if ((pid = fork()) < 0) {
+    if (run_in_forked_thread && (pid = fork()) < 0) {
         perror("Fork failed");
         exit(1);
     }
@@ -84,13 +84,10 @@ static void run_test(test_t const *test)
 
 void run_tests(int argc, char **argv)
 {
-    int pid;
-    int status;
-
     if (argc == 2) {
         for (int i = 0; i < test_count; i++) {
             if (strcmp(tests[i].name, argv[1]) == 0) {
-                run_test(&tests[i]);
+                run_test(&tests[i], false);
                 return;
             }
         }
@@ -99,7 +96,7 @@ void run_tests(int argc, char **argv)
     }
 
     for (int i = 0; i < test_count; i++) {
-        run_test(&tests[i]);
+        run_test(&tests[i], true);
     }
     free(tests);
     tests = NULL;
@@ -116,6 +113,16 @@ static void ASSERT_EQUAL_INT(T expected, T actual)
         exit(EXIT_FAILURE);
     }
 }
+
+
+
+#define ASSERT_FAIL(format, ...) \
+    do { \
+        fprintf(stderr, "Assertion failed: "); \
+        fprintf(stderr, format, ##__VA_ARGS__); \
+        fprintf(stderr, "\n"); \
+        exit(EXIT_FAILURE); \
+    } while (0)
 
 # define ASSERT_EQUAL_STR(expected, actual) \
     for (int i = 0; expected[i]; i++) { \
