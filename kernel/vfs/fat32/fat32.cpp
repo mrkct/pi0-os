@@ -16,11 +16,7 @@
 
 
 static constexpr uint32_t SECTOR_SIZE = 512;
-
-static inline constexpr uint32_t sector(uint32_t sector_idx)
-{
-    return SECTOR_SIZE * sector_idx;
-}
+static constexpr uint32_t INVALID_SECTOR = 0xffffffff;
 
 static_assert(sizeof(fat32::BiosParameterBlock) == SECTOR_SIZE,
     "BPB size must be equal to sector size");
@@ -31,6 +27,12 @@ struct Fat32FilesystemCtx {
     BlockDevice *storage;
     fat32::BiosParameterBlock bpb;
     fat32::FSInfo info;
+    uint64_t sector_size;
+
+    struct {
+        uint32_t sector_idx;
+        uint8_t buffer[SECTOR_SIZE];
+    } fatcache;
 };
 
 struct Fat32OpenInodeCtx {
@@ -88,37 +90,37 @@ static inline constexpr uint32_t cluster_idx_to_sector(fat32::BiosParameterBlock
 
 static inline int read_sector(Fat32FilesystemCtx *ctx, uint64_t sector_idx, void *buffer)
 {
-    int64_t rc = ctx->storage->read(SECTOR_SIZE * sector_idx, reinterpret_cast<uint8_t*>(buffer), SECTOR_SIZE);
+    int64_t rc = ctx->storage->read(ctx->sector_size * sector_idx, reinterpret_cast<uint8_t*>(buffer), ctx->sector_size);
     
-    if (rc == SECTOR_SIZE)
+    if (rc == (int64_t) ctx->sector_size)
         return 0;
-    if (rc > 0)
+    else if (rc > 0)
         return -EIO;
+
     return rc;
 }
 
 static int next_cluster(Fat32FilesystemCtx *ctx, uint32_t cluster, uint32_t& next_cluster)
 {
-    int rc = 0;
+    ssize_t rc = 0;
     auto& bpb = ctx->bpb;
     auto fat_offset = cluster * 4;
     auto fat_sector = bpb.BPB_RsvdSecCnt + (fat_offset / SECTOR_SIZE);
     auto fat_sector_offset = fat_offset % SECTOR_SIZE;
 
-    /**
-     * This is some very basic caching mechanism, otherwise to step a
-     * cluster chain we end up re-reading the same sector many times.
-     */
-    static uint32_t table_sector[SECTOR_SIZE / sizeof(uint32_t)];
-    static uint32_t last_cached_sector = ~0;
-    if (fat_sector != last_cached_sector) {
-        rc = ctx->storage->read(fat_sector, reinterpret_cast<uint8_t*>(&table_sector), sizeof(table_sector));
-        if (rc != 0)
-            return rc;
-        last_cached_sector = fat_sector;
+    if (ctx->fatcache.sector_idx != fat_sector) {
+        // Because the underlying storage might trash the buffer if it fails to read
+        ctx->fatcache.sector_idx = INVALID_SECTOR;
+        rc = read_sector(ctx, fat_sector, ctx->fatcache.buffer);
+        if (rc < 0) {
+            return (int) rc;
+        }
+
+        ctx->fatcache.sector_idx = fat_sector;
     }
 
-    next_cluster = table_sector[fat_sector_offset / sizeof(uint32_t)] & 0x0fffffff;
+    uint32_t *p = reinterpret_cast<uint32_t*>(ctx->fatcache.buffer + fat_sector_offset);
+    next_cluster = (*p) & 0x0fffffff;
     return 0;
 }
 
@@ -170,7 +172,7 @@ static bool foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entr
 
     auto *fsctx = (Fat32FilesystemCtx*) dirinode->filesystem->opaque;
 
-    const uint32_t DIR_ENTRIES_IN_SECTOR = SECTOR_SIZE / sizeof(fat32::DirectoryEntry);
+    const uint32_t DIR_ENTRIES_IN_SECTOR = fsctx->sector_size / sizeof(fat32::DirectoryEntry);
 
     uint32_t entry_idx = 0;
     uint32_t next_cluster_idx = dirinode->identifier;
@@ -294,47 +296,38 @@ static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffe
 
     offset = min<uint64_t>(offset, self->size);
     size = min<uint64_t>(size, self->size - offset);
-    LOGD("Reading %lu bytes from offset %lu in inode %lu", size, offset, self->identifier);
 
     uint32_t current_cluster;
     TRY(step_cluster_chain(ctx,
         first_cluster,
-        offset / (ctx->bpb.BPB_SecPerClus * SECTOR_SIZE),
+        offset / (ctx->bpb.BPB_SecPerClus * ctx->sector_size),
         current_cluster));
 
     auto remaining_size = size;
     auto current_offset = offset;
     while (remaining_size > 0) {
-        auto cluster_offset = current_offset % (ctx->bpb.BPB_SecPerClus * SECTOR_SIZE);
-        auto remaining_size_in_cluster = min<uint64_t>(remaining_size, ctx->bpb.BPB_SecPerClus * SECTOR_SIZE - cluster_offset);
+        auto offset_in_cluster = current_offset % (ctx->bpb.BPB_SecPerClus * ctx->sector_size);
+        auto remaining_size_in_cluster = min<uint64_t>(remaining_size, ctx->bpb.BPB_SecPerClus * ctx->sector_size - offset_in_cluster);
 
-        while (remaining_size_in_cluster > 0) {
-            auto sector_offset = current_offset % SECTOR_SIZE;
-            auto to_read_in_sector = min<uint64_t>(remaining_size_in_cluster, SECTOR_SIZE - sector_offset);
+        uint64_t diskoff = ctx->sector_size * cluster_idx_to_sector(ctx->bpb, current_cluster) + offset_in_cluster;
 
-            auto sector_index = cluster_idx_to_sector(ctx->bpb, current_cluster) + cluster_offset / SECTOR_SIZE;
-
-            if (to_read_in_sector == SECTOR_SIZE) {
-                kassert(sector_offset == 0);
-                TRY(read_sector(ctx, sector_index, buffer));
-            } else {
-                kassert(sector_offset + to_read_in_sector <= SECTOR_SIZE);
-                uint8_t sector_buffer[SECTOR_SIZE];
-                TRY(read_sector(ctx, sector_index, sector_buffer));
-                memcpy(buffer, sector_buffer + sector_offset, to_read_in_sector);
-            }
-
-            cluster_offset += to_read_in_sector;
-            remaining_size -= to_read_in_sector;
-            remaining_size_in_cluster -= to_read_in_sector;
-            current_offset += to_read_in_sector;
-            buffer += to_read_in_sector;
-            bytes_read += to_read_in_sector;
+        ssize_t read = ctx->storage->read(diskoff, buffer, remaining_size_in_cluster);
+        if (read < 0) {
+            LOGW("Storage read returned an error: %d", (int) read);
+            return (int) read;
+        } else if ((uint64_t) read != remaining_size_in_cluster) {
+            LOGW("Storage read returned %lu bytes, expected %lu bytes", read, remaining_size_in_cluster);
+            return -EIO;
         }
+
+        bytes_read += read;
+        remaining_size -= read;
+        current_offset += read;
+        buffer += read;
 
         if (remaining_size > 0) {
             TRY(next_cluster(ctx, current_cluster, current_cluster));
-            if (current_cluster >= 0x0ffffff8)
+            if (current_cluster >= 0x0ffffff8 || current_cluster < 2)
                 return -EIO;
         }
     }
@@ -422,7 +415,7 @@ int fat32_try_create(BlockDevice &storage, Filesystem **out_fs)
     fat32::FSInfo fs_info;
     ssize_t read;
     
-    read = storage.read(sector(0), (uint8_t*) &bpb, sizeof(bpb));
+    read = storage.read(0, (uint8_t*) &bpb, sizeof(bpb));
     if (read < 0) {
         LOGW("Call to .read for BPB failed: %d", (int) read);
         return (int) read;
@@ -439,7 +432,7 @@ int fat32_try_create(BlockDevice &storage, Filesystem **out_fs)
         return -EINVAL;
     }
     
-    read = storage.read(sector(bpb.BPB_FSInfo), (uint8_t*) &fs_info, sizeof(fs_info));
+    read = storage.read(bpb.BPB_BytsPerSec * bpb.BPB_FSInfo, (uint8_t*) &fs_info, sizeof(fs_info));
     if (read < 0) {
         LOGW("Call to .read for FS_Info failed: %d", (int) read);
         return (int) read;
@@ -467,6 +460,11 @@ int fat32_try_create(BlockDevice &storage, Filesystem **out_fs)
         .storage = &storage,
         .bpb = bpb,
         .info = fs_info,
+        .sector_size = bpb.BPB_BytsPerSec,
+        .fatcache = {
+            .sector_idx = INVALID_SECTOR,
+            .buffer = {0},
+        },
     };
 
     *fs = Filesystem {

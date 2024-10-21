@@ -89,7 +89,7 @@ static_assert(sizeof(DirectoryEntry) == 32, "DirectoryEntry size must be 32 byte
 
 static inline bool is_valid_cluster(uint32_t cluster)
 {
-    return cluster < 0x0ffffff8;
+    return cluster < 0x0ffffff8 && cluster >= 2;
 }
 
 }
