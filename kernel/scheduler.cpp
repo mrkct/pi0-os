@@ -8,13 +8,9 @@
 
 #include "scheduler.h"
 
-
-// #define SCHEDULER_LOG_ENABLED
-#ifdef SCHEDULER_LOG_ENABLED
-#define LOG(fmt, ...) kprintf(fmt, __VA_ARGS__)
-#else
-#define LOG(fmt, ...) (fmt, __VA_ARGS__)
-#endif
+// #define LOG_ENABLED
+#define LOG_TAG "[SCHED] "
+#include <kernel/log.h>
 
 
 int s_next_available_pid = 0;
@@ -129,7 +125,7 @@ Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged)
     strcpy(const_cast<char*>(new_process->name), name);
     
     if (!vm_create_address_space(new_process->address_space).is_success()) {
-        kprintf("Failed to create address space for new process %s\n", name);
+        LOGE("Failed to create address space for new process %s\n", name);
         goto cleanup;
     }
 
@@ -142,13 +138,13 @@ Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged)
     first_thread->process = new_process;
     first_thread->kernel_stack_ptr = alloc_kernel_stack();
     if (first_thread->kernel_stack_ptr == nullptr) {
-        kprintf("Failed to allocate kernel stack for first thread of new process %s\n", name);
+        LOGE("Failed to allocate kernel stack for first thread of new process %s\n", name);
         goto cleanup;
     }
     first_thread->state = ThreadState::Suspended;
     user_stack = alloc_thread_user_stack(&new_process->address_space, 0);
     if (user_stack == nullptr) {
-        kprintf("Failed to allocate user stack for first thread of new process %s\n", name);
+        LOGE("Failed to allocate user stack for first thread of new process %s\n", name);
         goto cleanup;
     }
 
@@ -204,8 +200,8 @@ void scheduler_start()
             }
 
             kassert(thread->state == ThreadState::Runnable);
-            LOG("[SCHED]: Context switching to %s[%d/%d]\n", thread->process->name, thread->process->pid, thread->tid);
-            
+            LOGD("[SCHED]: Context switching to %s[%d/%d]", thread->process->name, thread->process->pid, thread->tid);
+
             // This should be protected someway if we want to support multicore
             // otherwise 2 cores could end up scheduling the same thread using the same kernel stack
             vm_switch_address_space(thread->process->address_space);
@@ -225,6 +221,8 @@ int sys$fork()
 {
     auto *current_process = cpu_current_process();
     auto *current_thread = cpu_current_thread();
+
+    LOGI("Forking %s[%d/%d]\n", current_process->name, current_process->pid, current_thread->tid);
 
     // entrypoint and priviledged don't matter, we're going to copy the other process state anyway
     Process *forked = alloc_process(current_process->name, NULL, false);

@@ -5,7 +5,6 @@
 #include <kernel/irq.h>
 #include <kernel/memory/vm.h>
 #include <kernel/arch/arch.h>
-#include <kernel/file.h>
 #include <include/api/syscalls.h>
 
 
@@ -56,7 +55,7 @@ public:
     virtual void start(uint64_t ticks, SystemTimerCallback, void *arg) = 0;
 };
 
-class FileDevice: public Device, public File
+class FileDevice: public Device
 {
 public:
     FileDevice(uint8_t major, uint8_t minor, const char *name);
