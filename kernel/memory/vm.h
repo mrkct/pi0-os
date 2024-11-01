@@ -23,6 +23,8 @@ void vm_init();
 
 void *ioremap(uintptr_t phys_addr, size_t size);
 
+void iounmap(void *addr, size_t size);
+
 struct AddressSpace& vm_current_address_space();
 
 struct AddressSpace& vm_kernel_address_space();
@@ -38,7 +40,7 @@ Error vm_map(struct AddressSpace&, struct PhysicalPage*, uintptr_t, PageAccessPe
 
 Error vm_map_mmio(struct AddressSpace&, uintptr_t phys_addr, uintptr_t virt_addr, size_t size);
 
-Error vm_unmap(struct AddressSpace&, uintptr_t, struct PhysicalPage*&);
+Error vm_unmap(struct AddressSpace&, uintptr_t, uintptr_t&);
 
 Error vm_copy_from_user(struct AddressSpace&, void* dest, uintptr_t src, size_t len);
 

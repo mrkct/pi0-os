@@ -32,8 +32,10 @@ static Error brk(uintptr_t new_brk)
 
         for (size_t i = 0; i < chunks_to_remove; i++) {
             struct PhysicalPage* to_free;
+            uintptr_t previously_mapped_physical_address = 0;
 
-            MUST(vm_unmap(vm_current_address_space(), g_last_mapped_chunk, to_free));
+            MUST(vm_unmap(vm_current_address_space(), g_last_mapped_chunk, previously_mapped_physical_address));
+            to_free = addr2page(previously_mapped_physical_address);
             MUST(physical_page_free(to_free, PageOrder::_4KB));
 
             g_last_mapped_chunk -= CHUNK_SIZE;

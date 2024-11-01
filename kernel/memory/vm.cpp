@@ -7,7 +7,10 @@ static constexpr size_t LVL2_ENTRIES = _1KB / sizeof(SecondLevelEntry);
 
 static AddressSpace g_kernel_address_space;
 static AddressSpace g_current_address_space;
-static uintptr_t s_ioremap_next_available_address = areas::peripherals.start;
+static struct {
+    // TODO: Use a bitmap instead of an array
+    uint8_t used[areas::peripherals.size() / _4KB];
+} s_ioremap;
 static struct {
     uintptr_t phys_start_addr;
     uint32_t size;
@@ -49,6 +52,43 @@ void vm_init()
     s_init_state = InitState::Completed;
 }
 
+static uintptr_t ioremap_bitmap_alloc(size_t size)
+{
+    kassert(size % _4KB == 0);
+    size_t count = size / _4KB;
+
+    for (size_t i = 0; i < array_size(s_ioremap.used); i++) {
+        if (s_ioremap.used[i])
+            continue;
+
+        size_t j;
+        for (j = i + 1; j < array_size(s_ioremap.used); j++) {
+            if (s_ioremap.used[j] || j - i == count)
+                break;
+        }
+
+        if (j - i == count) {
+            memset(s_ioremap.used + i, 1, count);
+            return areas::peripherals.start + i * _4KB;
+        }
+    }
+
+    return 0;
+}
+
+static void ioremap_bitmap_free(uintptr_t startaddr, size_t size)
+{
+    kassert(startaddr >= areas::peripherals.start);
+    kassert(startaddr < areas::peripherals.end);
+    kassert(startaddr % _4KB == 0);
+    kassert(size % _4KB == 0);
+
+    size_t start = (startaddr - areas::peripherals.start) / _4KB;
+    size_t count = size / _4KB;
+    memset(s_ioremap.used + start, 0, count);
+}
+
+
 /**
  * @brief A simplified version of \ref ioremap that can be used when only vm_init_early was called
 */
@@ -59,11 +99,11 @@ static void *ioremap_early(uintptr_t phys_addr, size_t size)
     uintptr_t aligned_phys_addr = round_down<uintptr_t>(phys_addr, _1MB);
     uintptr_t aligned_size = round_up<uintptr_t>(phys_addr + size, _1MB) - aligned_phys_addr;
 
-    uintptr_t start_of_mapping = s_ioremap_next_available_address;
-    s_ioremap_next_available_address += aligned_size;
+    uintptr_t start_of_mapping = ioremap_bitmap_alloc(aligned_size);
+    if (!start_of_mapping)
+        panic_no_print("Failed to allocate early ioremap space");
 
     auto *table = reinterpret_cast<FirstLevelEntry*>(phys2virt(vm_read_current_ttbr0()));
-    kprintf("Table: %p\n", table);
     for (uintptr_t i = 0; i < aligned_size; i += _1MB) {
         table[lvl1_index(start_of_mapping + i)].section = SectionEntry::make_entry(aligned_phys_addr + i, PageAccessPermissions::PriviledgedOnly);
         invalidate_tlb_entry(start_of_mapping + i);
@@ -77,16 +117,35 @@ void *ioremap(uintptr_t phys_addr, size_t size)
     if (s_init_state == InitState::Early)
         return ioremap_early(phys_addr, size);
     
-    size = round_up<uintptr_t>(size, 4096);
-    uintptr_t start_of_mapping = s_ioremap_next_available_address;
-    kassert(start_of_mapping % 4*_1KB == 0);
-    kassert(start_of_mapping + size <= areas::peripherals.end);
+    uintptr_t aligned_phys_addr = round_down<uintptr_t>(phys_addr, _4KB);
+    uintptr_t aligned_size = round_up<uintptr_t>(phys_addr + size, _4KB) - aligned_phys_addr;
 
-    s_ioremap_next_available_address += size;
+    uintptr_t start_of_mapping = ioremap_bitmap_alloc(aligned_size);
+    if (!start_of_mapping)
+        return nullptr;
 
-    MUST(vm_map_mmio(vm_current_address_space(), phys_addr, start_of_mapping, size));
+    MUST(vm_map_mmio(vm_current_address_space(), aligned_phys_addr, start_of_mapping, size));
 
-    return reinterpret_cast<void*>(start_of_mapping);
+    return reinterpret_cast<void*>(start_of_mapping + phys_addr % _4KB);
+}
+
+void iounmap(void *addr, size_t size)
+{
+    kassert(s_init_state == InitState::Completed);
+    
+    uintptr_t virt_addr = reinterpret_cast<uintptr_t>(addr);
+    kassert(areas::peripherals.contains(virt_addr));
+
+    uintptr_t start_of_mapping = round_down<uintptr_t>(virt_addr, _4KB);
+    uintptr_t aligned_size = round_up<uintptr_t>(virt_addr + size, _4KB) - start_of_mapping;
+
+    ioremap_bitmap_free(start_of_mapping, aligned_size);
+
+    for (uintptr_t i = start_of_mapping; i < start_of_mapping + aligned_size; i += _4KB) {
+        uintptr_t previously_mapped_address = 0;
+        vm_unmap(vm_current_address_space(), i, previously_mapped_address);
+        kassert(previously_mapped_address != 0);
+    }
 }
 
 struct AddressSpace& vm_current_address_space()
@@ -246,7 +305,7 @@ static Error vm_unmap_page(FirstLevelEntry* root_table, uintptr_t virt_addr, uin
         return Success;
     }
 
-    previously_mapped_physical_address = lvl2_entry.small_page.base_address() << 12;
+    previously_mapped_physical_address = lvl2_entry.small_page.base_address();
     lvl2_entry.raw = 0;
     invalidate_tlb_entry(virt_addr);
 
@@ -282,13 +341,9 @@ static Error vm_unmap_page(struct AddressSpace& as, uintptr_t virt_addr, uintptr
     return Success;
 }
 
-Error vm_unmap(struct AddressSpace& as, uintptr_t virt_addr, struct PhysicalPage*& previously_mapped_page)
+Error vm_unmap(struct AddressSpace& as, uintptr_t virt_addr, uintptr_t &previously_mapped_physical_address)
 {
-    uintptr_t previously_mapped_physical_address;
-
     TRY(vm_unmap_page(as, virt_addr, previously_mapped_physical_address));
-    previously_mapped_page = addr2page(previously_mapped_physical_address);
-
     return Success;
 }
 
