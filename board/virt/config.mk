@@ -1,6 +1,9 @@
 export LOAD_ADDRESS := 0x40000000
 export ARCH := ARMV7
-QEMU_CFG_FLAGS := -M virt -smp 1 -serial stdio
+QEMU_CFG_FLAGS := -M virt -smp 1 -serial stdio \
+	-global virtio-mmio.force-legacy=false \
+	-device virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1 -drive id=hd,if=none,file=$(DISK)
+
 
 RECORDING_FILENAME:=virt.recording
 

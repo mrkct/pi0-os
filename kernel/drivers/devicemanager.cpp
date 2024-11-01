@@ -2,6 +2,8 @@
 
 #include "devicemanager.h"
 
+#include "block/virtioblk.h"
+
 #include "char/bcm2835_aux_uart.h"
 #include "char/bcm2835_gpio.h"
 #include "char/pl011.h"
@@ -54,6 +56,7 @@ static constexpr Driver s_drivers[] = {
     basic_init<BCM2835SystemTimer>("brcm,bcm2835-system-timer"),
     basic_init<ARMv7Timer>("arm,armv7-timer"),
     basic_init<PL031>("arm,pl031"),
+    basic_init<VirtioBlockDevice>("virtio,mmio"),
 };
 
 static Driver const *find_driver(const char *compatible)
@@ -276,5 +279,29 @@ static void virt_load_peripherals()
     DateTime now;
     if (0 == rtc->get_time(now)) {
         kprintf("Current time: %d-%d-%d %d:%d:%d\n", now.year, now.month, now.day, now.hour, now.minute, now.second);
+    }
+
+    constexpr uintptr_t VIRTIO_MMIO_FIRST_ADDR = 0xa000000;
+    constexpr uint32_t VIRTIO_MMIO_FIRST_IRQ = 0x10;
+    Driver const *virtio_drv = find_driver("virtio,mmio");
+    for (int32_t i = 0; i < 30; i++) {
+        uintptr_t virtio_mmio_addr = VIRTIO_MMIO_FIRST_ADDR + 0x200 * i;
+        VirtioBlockDevice::Config config = {
+            .address = virtio_mmio_addr,
+            .irq = VIRTIO_MMIO_FIRST_IRQ + i,
+        };
+
+        if (!VirtioBlockDevice::probe(virtio_mmio_addr))
+            continue;
+
+        kprintf("Initializing virtio-mmio device @ %p...\n", virtio_mmio_addr);
+        auto *virtio_mmio_dev = reinterpret_cast<VirtioBlockDevice*>(
+            virtio_drv->load("virtio,mmio", mustmalloc(virtio_drv->required_space), &config)
+        );
+        rc = virtio_mmio_dev->init();
+        if (rc != 0)
+            panic("Failed to initialize virtio-mmio device @ %p: %d\n", virtio_mmio_addr, rc);
+        
+        register_device(virtio_mmio_dev);
     }
 }

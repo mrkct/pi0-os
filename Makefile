@@ -3,6 +3,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 export BOARD ?= virt
 export RECORD ?= 0
 export REPLAY ?= 0
+export DISK ?= $(ROOT_DIR)/_disk_image.bin
 
 include board/$(BOARD)/config.mk
 

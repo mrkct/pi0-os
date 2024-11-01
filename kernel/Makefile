@@ -29,6 +29,7 @@ SOURCES=\
 	kernel/drivers/char/pl011.cpp \
 	kernel/drivers/char/pl031.cpp \
 	kernel/drivers/block/ramdisk.cpp \
+	kernel/drivers/block/virtioblk.cpp \
 	kernel/drivers/irqc/bcm2835_irqc.cpp \
 	kernel/drivers/irqc/gic2.cpp \
 	kernel/drivers/timer/armv7timer.cpp \
