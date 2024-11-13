@@ -21,11 +21,11 @@ size_t kprintf(char const* format, ...)
     va_end(args);
 
     if (s_putchar) {
-        take(s_lock);
+        spinlock_take(s_lock);
         for (size_t i = 0; i < written; i++) {
             s_putchar((unsigned char) buffer[i]);
         }
-        release(s_lock);
+        spinlock_release(s_lock);
     }
 
     return written;

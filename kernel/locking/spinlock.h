@@ -6,13 +6,14 @@
 
 typedef struct {
     uint32_t is_taken;
-    bool need_reenable_interrupts;
 } Spinlock;
 
-static constexpr Spinlock SPINLOCK_START = { 0, false };
+static constexpr Spinlock SPINLOCK_START = { 0 };
 
-void take(Spinlock&);
+void spinlock_take(Spinlock&);
 
-bool is_taken(Spinlock& lock);
+int spinlock_take_with_timeout(Spinlock&, uint32_t timeout_ms);
 
-void release(Spinlock&);
+bool spinlock_is_taken(Spinlock& lock);
+
+void spinlock_release(Spinlock&);
