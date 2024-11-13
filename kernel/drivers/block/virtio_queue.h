@@ -6,6 +6,7 @@
 typedef uint64_t le64;
 typedef uint32_t le32;
 typedef uint16_t le16;
+typedef uint8_t  u8;
 
 /* An interface for efficient virtio implementation.
  *
@@ -126,4 +127,28 @@ static inline le16 *virtq_avail_event(struct virtq *vq)
         /* For backwards compat, avail event index is at *end* of used ring. */
         return (le16 *)&vq->used->ring[vq->num];
 }
+
+/* Block device (adapted) */
+
+struct virtio_blk_req_header {
+#define VIRTIO_BLK_T_IN 0
+#define VIRTIO_BLK_T_OUT 1
+#define VIRTIO_BLK_T_FLUSH 4
+#define VIRTIO_BLK_T_DISCARD 11
+#define VIRTIO_BLK_T_WRITE_ZEROES 13
+        le32 type;
+        le32 reserved;
+        le64 sector;
+} __attribute__((packed));
+static_assert(sizeof(struct virtio_blk_req_header) == 16);
+
+struct virtio_blk_req_footer {
+#define VIRTIO_BLK_S_OK 0
+#define VIRTIO_BLK_S_IOERR 1
+#define VIRTIO_BLK_S_UNSUPP 2
+        u8 status;
+} __attribute__((packed));
+static_assert(sizeof(struct virtio_blk_req_footer) == 1);
+
+
 #endif /* VIRTQUEUE_H */

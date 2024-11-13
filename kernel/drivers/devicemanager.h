@@ -11,3 +11,5 @@ CharacterDevice *devicemanager_get_kernel_log_device();
 InterruptController *devicemanager_get_interrupt_controller_device();
 
 SystemTimer *devicemanager_get_system_timer_device();
+
+BlockDevice *devicemanager_get_root_block_device();

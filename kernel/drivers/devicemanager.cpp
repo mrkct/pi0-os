@@ -131,6 +131,8 @@ InterruptController *devicemanager_get_interrupt_controller_device() { return s_
 
 SystemTimer *devicemanager_get_system_timer_device() { return s_defaults.systimer; }
 
+BlockDevice *devicemanager_get_root_block_device() { return s_defaults.storage; }
+
 /////////////////////////////// RASPBERRY PI 0 ////////////////////////////////
 
 static constexpr uintptr_t RASPI0_IOBASE = 0x20000000;
@@ -288,7 +290,7 @@ static void virt_load_peripherals()
         uintptr_t virtio_mmio_addr = VIRTIO_MMIO_FIRST_ADDR + 0x200 * i;
         VirtioBlockDevice::Config config = {
             .address = virtio_mmio_addr,
-            .irq = VIRTIO_MMIO_FIRST_IRQ + i,
+            .irq = 32 + VIRTIO_MMIO_FIRST_IRQ + i,
         };
 
         if (!VirtioBlockDevice::probe(virtio_mmio_addr))
@@ -303,5 +305,7 @@ static void virt_load_peripherals()
             panic("Failed to initialize virtio-mmio device @ %p: %d\n", virtio_mmio_addr, rc);
         
         register_device(virtio_mmio_dev);
+        if (s_defaults.storage == nullptr)
+            s_defaults.storage = virtio_mmio_dev;
     }
 }
