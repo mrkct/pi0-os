@@ -3,7 +3,7 @@
 #include <kernel/kprintf.h>
 #include <kernel/scheduler.h>
 #include <kernel/timer.h>
-
+#include <kernel/vfs/vfs.h>
 
 
 static void proc1();
@@ -11,6 +11,8 @@ static void proc1();
 
 extern "C" void kernel_main(BootParams const *boot_params)
 {
+    int rc = 0;
+
     vm_early_init(boot_params);
     devicemanager_init_kernel_log_device(boot_params);
     kprintf_set_putchar_func([](char c) {
@@ -43,6 +45,19 @@ extern "C" void kernel_main(BootParams const *boot_params)
     kprintf("Initializing timer subsystem...\n");
     timer_init();
 
+    kprintf("Mounting root filesystem...\n");
+    auto *root_device = devicemanager_get_root_block_device();
+    kassert(root_device != nullptr);
+
+    auto *root_filesystem = fs_detect_and_create(*root_device);
+    kassert(root_filesystem != nullptr);
+
+    rc = vfs_mount("/", *root_filesystem);
+    if (rc < 0) {
+        panic("Failed to mount root filesystem: %d\n", rc);
+    }
+
+    kprintf("Running the first process...\n");
     create_first_process(proc1);
     scheduler_start();
 }

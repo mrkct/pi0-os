@@ -7,6 +7,7 @@
 void irq_init()
 {
     arch_irq_init();
+    irq_enable();
 }
 
 void irq_install(uint32_t irq, InterruptHandler handler, void *arg)

@@ -1,4 +1,9 @@
 #include "fs.h"
+#include "fat32/fat32.h"
+
+#define LOG_ENABLED
+#define LOG_TAG "[FS] "
+#include <kernel/log.h>
 
 
 uint64_t default_checked_seek(uint64_t filesize, uint64_t current, int whence, int32_t offset)
@@ -17,4 +22,19 @@ uint64_t default_checked_seek(uint64_t filesize, uint64_t current, int whence, i
         break;
     }
     return clamp<uint64_t>(0, newoff, filesize);
+}
+
+Filesystem *fs_detect_and_create(BlockDevice &device)
+{
+    int rc;
+    Filesystem *fs = nullptr;
+    
+    rc = fat32_try_create(device, &fs);
+    if (rc < 0 && rc != -EINVAL) {
+        LOGE("Device '%s' is detected as FAT32, but failed to mount: %d\n", device.name(), rc);
+        return nullptr;
+    }
+
+    LOGE("Failed to find a compatible filesystem on device '%s'\n", device.name());
+    return nullptr;
 }

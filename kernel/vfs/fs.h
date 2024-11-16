@@ -1,6 +1,7 @@
 #pragma once
 
 #include <kernel/base.h>
+#include <kernel/drivers/device.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -99,3 +100,5 @@ static inline int inode_cache_init(InodeCache *icache) { icache->list = {nullptr
 static inline void inode_cache_free(InodeCache*) { TODO(); }
 
 uint64_t default_checked_seek(uint64_t filesize, uint64_t current, int whence, int32_t offset);
+
+Filesystem *fs_detect_and_create(BlockDevice&);
