@@ -26,20 +26,23 @@
 
     // Stack alignment: The stack pointer must be 8-byte aligned before calling the handler.
     // We need to save whatever alignment correction we do here so we can undo it after the handler returns.
-    and r0, sp, #4
+    and r0, sp, #7
     sub sp, sp, r0
     push {r0}
+    push {r0}   // twice because otherwise we'd be unaligned with just 1 push :^)
 
     // 2nd argument of the handler: The address at where the InterruptFrame starts
     mov r1, sp
     add r1, r1, r0                      // Stack alignment correction
-    add r1, r1, #4                      // Because we pushed the alignment correction on the stack
+    add r1, r1, #8                      // Because we pushed the alignment correction on the stack
 
     mov r0, \vector_offset
 
     bl irq_and_exception_handler
     
     // Restore stack alignment
+
+    pop     {r1}
     pop     {r1}
     add     sp, sp, r1
     b pop_iframe_and_return
