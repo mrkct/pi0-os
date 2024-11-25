@@ -108,11 +108,11 @@ static Inode *icache_lookup(InodeCache *icache, InodeIdentifier identifier)
         return entry->identifier == identifier;
     });
     if (entry == nullptr) {
-        LOGD("Looking up inode %lu in icache ... failed", identifier);
+        LOGD("Looking up inode %" PRIu64 " in icache ... failed", identifier);
         return nullptr;
     }
 
-    LOGD("Looking up inode %lu in icache ... found (refcoubt: %d)", identifier, entry->inode->refcount);
+    LOGD("Looking up inode %" PRIu64 " in icache ... found (refcount: %d)", identifier, entry->inode->refcount);
     return entry->inode;
 }
 
@@ -132,7 +132,7 @@ static int icache_insert(InodeCache *icache, InodeIdentifier identifier, Inode *
     };
     icache->list.add(entry);
 
-    LOGD("Inserting inode %lu into icache", identifier);
+    LOGD("Inserting inode %" PRIu64 " into icache", identifier);
     return 0;
 }
 
@@ -155,15 +155,15 @@ static int open_inode(Inode *inode)
 {
     if (inode->refcount > 0) {
         inode->refcount++;
-        LOGI("Opening inode %lu (increasing refcount to %d)", inode->identifier, inode->refcount);
+        LOGI("Opening inode %" PRIu64 " (increasing refcount to %d)", inode->identifier, inode->refcount);
         return 0;
     }
 
     auto *fs = inode->filesystem;
-    LOGI("Opening inode %lu", inode->identifier);
+    LOGI("Opening inode %" PRIu64, inode->identifier);
     int rc = fs->ops->open_inode(fs, inode);
     if (rc != 0) {
-        LOGE("Failed to open inode %lu: %d", inode->identifier, rc);
+        LOGE("Failed to open inode " PRIu64 ": %d", inode->identifier, rc);
         return rc;
     }
 
@@ -212,10 +212,10 @@ static int lookup_inode(Inode *parent, const char *name, Inode **out_inode)
     int rc;
     Inode temp = {};
 
-    LOGI("Looking up inode %s in %lu", name, parent->identifier);
+    LOGI("Looking up inode %s in %" PRIu64, name, parent->identifier);
     rc = parent->dir_ops->lookup(parent, name, &temp);
     if (rc != 0) {
-        LOGE("Failed to lookup entry '%s' in inode %lu", name, parent->identifier);
+        LOGE("Failed to lookup entry '%s' in inode %" PRIu64, name, parent->identifier);
         return rc;
     }
     LOGI("Found");
@@ -429,7 +429,7 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
     if (custody->inode->type == InodeType::Directory)
         return -EISDIR;
 
-    LOGI("vfs_read(%u bytes, custody offset @ %u)", size, custody->offset);
+    LOGI("vfs_read(%" PRIu32 " bytes, custody offset @ %" PRIu64 ")", size, custody->offset);
     auto *inode = custody->inode;
     ssize_t rc = inode->file_ops->read(inode, custody->offset, buffer, size);
     if (rc > 0)
@@ -451,11 +451,14 @@ ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
     return rc;
 }
 
-int vfs_seek(FileCustody *custody, int whence, int32_t offset)
+ssize_t vfs_seek(FileCustody *custody, int whence, int32_t offset)
 {
     auto *inode = custody->inode;
-    custody->offset = inode->file_ops->seek(inode, custody->offset, whence, offset);
-    return 0;
+    ssize_t new_seek = inode->file_ops->seek(inode, custody->offset, whence, offset);
+    if (new_seek < 0)
+        return new_seek;
+    custody->offset = new_seek;
+    return custody->offset;
 }
 
 int vfs_close(FileCustody *custody)

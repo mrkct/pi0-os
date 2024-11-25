@@ -12,13 +12,13 @@ struct FileCustody {
 
 int vfs_mount(const char *path, Filesystem&);
 
-int vfs_open(const char *path, uint32_t flags, FileCustody* &);
+int vfs_open(const char *path, uint32_t flags, FileCustody** );
 
 ssize_t vfs_read(FileCustody*, uint8_t *buffer, uint32_t size);
 
 ssize_t vfs_write(FileCustody*, uint8_t const *buffer, uint32_t size);
 
-int vfs_seek(FileCustody*, int whence, int32_t);
+ssize_t vfs_seek(FileCustody*, int whence, int32_t);
 
 int vfs_close(FileCustody*);
 

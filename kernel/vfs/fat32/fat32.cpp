@@ -198,7 +198,7 @@ static bool foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entr
             }
 
             if (i != DIR_ENTRIES_IN_SECTOR) {
-                LOGD("Reached end of directory (%u entries read)", i);
+                LOGD("Reached end of directory (%" PRIu32 " entries read)", i);
                 break;
             }
         }
@@ -220,7 +220,7 @@ static struct timespec fat32_datetime_to_timespec(uint16_t date, uint16_t time)
 
 static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode)
 {
-    LOGI("Looking up %s in inode %lu", name, self->identifier);
+    LOGI("Looking up %s in inode %" PRIu64, name, self->identifier);
     return foreach_8_3_directory_entry(self, [&](auto, fat32::DirectoryEntry8_3 &fat_entry) {
 
         char entry_name[20];
@@ -311,12 +311,12 @@ static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffe
 
         uint64_t diskoff = ctx->sector_size * cluster_idx_to_sector(ctx->bpb, current_cluster) + offset_in_cluster;
 
-        ssize_t read = ctx->storage->read(diskoff, buffer, remaining_size_in_cluster);
+        int64_t read = ctx->storage->read(diskoff, buffer, remaining_size_in_cluster);
         if (read < 0) {
             LOGW("Storage read returned an error: %d", (int) read);
             return (int) read;
         } else if ((uint64_t) read != remaining_size_in_cluster) {
-            LOGW("Storage read returned %lu bytes, expected %lu bytes", read, remaining_size_in_cluster);
+            LOGW("Storage read returned %" PRId64 " bytes, expected %" PRIu64 " bytes", read, remaining_size_in_cluster);
             return -EIO;
         }
 
