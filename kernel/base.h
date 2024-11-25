@@ -1,5 +1,9 @@
 #pragma once
 
+#define __int64_t_defined 1
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
