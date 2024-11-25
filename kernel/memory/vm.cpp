@@ -15,9 +15,11 @@ static struct {
     uintptr_t phys_start_addr;
     uint32_t size;
 } s_ram;
-static enum class InitState {
+
+enum class InitState {
     None, Early, Completed
-} s_init_state = InitState::None;
+};
+static InitState s_init_state = InitState::None;
 
 void vm_early_init(BootParams const *boot_params)
 {
