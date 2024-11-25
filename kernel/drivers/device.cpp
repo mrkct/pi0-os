@@ -24,7 +24,7 @@ int64_t SimpleBlockDevice::read(int64_t offset, uint8_t *buffer, size_t size)
     int64_t rc = 0;
     uint8_t *temp_buffer = nullptr;
 
-    LOGI("Reading %d bytes from offset %d", size, offset);
+    LOGI("Reading %d bytes from offset %" PRId64, size, offset);
 
     offset = clamp<int64_t>(0, offset, this->size());
     size = clamp<int64_t>(0, size, this->size() - offset);

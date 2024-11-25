@@ -466,7 +466,7 @@ int64_t VirtioBlockDevice::read_sector(int64_t sector_idx, uint8_t *buffer)
     int rc = 0;
     VirtioBlockRequest req;
 
-    LOGI("Reading sector %lld", sector_idx);
+    LOGI("Reading sector %" PRId64, sector_idx);
     rc = enqueue_block_request(VIRTIO_BLK_T_IN, sector_idx, buffer, &req);
     if (rc != 0) {
         LOGE("Failed to enqueue block request: %d", rc);

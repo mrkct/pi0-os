@@ -57,6 +57,9 @@ Error vm_fork(AddressSpace&, AddressSpace&);
 template<typename Callback>
 auto vm_using_address_space(struct AddressSpace& as, Callback c)
 {
+    if (as.ttbr0_page == vm_current_address_space().ttbr0_page)
+        return c();
+
     auto previous = vm_current_address_space();
     vm_switch_address_space(as);
     auto result = c();
