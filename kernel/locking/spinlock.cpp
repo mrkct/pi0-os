@@ -13,9 +13,9 @@ void spinlock_take(Spinlock& lock)
 
 int spinlock_take_with_timeout(Spinlock &lock, uint32_t timeout_ms)
 {
-    uint32_t start = get_ticks();
+    uint32_t start = get_ticks_ms();
     while (!try_acquire(&lock.is_taken)) {
-        if (get_ticks() - start > timeout_ms)
+        if (get_ticks_ms() - start > timeout_ms)
             return -ETIMEDOUT;
         cpu_relax();
     }
