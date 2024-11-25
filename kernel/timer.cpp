@@ -107,6 +107,15 @@ void timer_install_scheduler_callback(uint64_t ms, void (*callback)(InterruptFra
 uint64_t get_ticks()
 {
     auto *systimer = devicemanager_get_system_timer_device();
-    kassert(systimer != nullptr);
+    if (systimer == nullptr)
+        return 0;
     return systimer->ticks();
+}
+
+uint32_t get_ticks_ms()
+{
+    auto *systimer = devicemanager_get_system_timer_device();
+    if (systimer == nullptr)
+        return 0;
+    return (uint32_t) (systimer->ticks() / systimer->ticks_per_ms());
 }

@@ -18,7 +18,6 @@ size_t kprintf(char const* format, ...)
     va_start(args, format);
     char buffer[1024];
     size_t written = vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
 
     if (s_putchar) {
         spinlock_take(s_lock);
@@ -28,5 +27,6 @@ size_t kprintf(char const* format, ...)
         spinlock_release(s_lock);
     }
 
+    va_end(args);
     return written;
 }

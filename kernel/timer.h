@@ -16,3 +16,4 @@ void timer_install_scheduler_callback(uint64_t ms, void (*callback)(InterruptFra
 
 uint64_t get_ticks();
 
+uint32_t get_ticks_ms();
