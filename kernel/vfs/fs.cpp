@@ -30,11 +30,14 @@ Filesystem *fs_detect_and_create(BlockDevice &device)
     Filesystem *fs = nullptr;
     
     rc = fat32_try_create(device, &fs);
-    if (rc < 0 && rc != -EINVAL) {
-        LOGE("Device '%s' is detected as FAT32, but failed to mount: %d\n", device.name(), rc);
+    if (rc == 0) {
+        LOGI("Device '%s' is detected as FAT32", device.name());
+        return fs;
+    } else if (rc < 0 && rc != -EINVAL) {
+        LOGE("Device '%s' is detected as FAT32, but failed to mount: %d", device.name(), rc);
         return nullptr;
     }
 
-    LOGE("Failed to find a compatible filesystem on device '%s'\n", device.name());
+    LOGE("Failed to find a compatible filesystem on device '%s'", device.name());
     return nullptr;
 }
