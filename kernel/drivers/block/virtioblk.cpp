@@ -322,6 +322,7 @@ int32_t VirtioBlockDevice::block_device_init()
 
     // 1. The device size can be read from capacity.
     m_capacity = ioread32(&r->block.capacity);
+    m_capacity *= 512;
 
     // NOTE: All the steps after are related to optional features,
     //       and therefore skippable

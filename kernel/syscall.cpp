@@ -9,6 +9,9 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     sysarg_t arg4, sysarg_t arg5, sysarg_t arg6)
 {
     int rc;
+
+    irq_enable();
+
     switch (syscall) {
     case SYS_Yield:
         rc = sys$yield();

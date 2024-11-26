@@ -303,7 +303,6 @@ static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_
         LOGD("lookup for '%s'", path);
         rc = lookup_inode(parent, path, &inode);
         if (rc != 0) {
-            LOGE("lookup failed");
             rc = -ENOENT;
             // do not 'break', we want to know if this was the last component below
         }
