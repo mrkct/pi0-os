@@ -3,7 +3,7 @@
 #include "armv7timer.h"
 
 #define LOG_ENABLED
-#define LOG_TAG "[A_TIM] "
+#define LOG_TAG "ARM7TIM"
 #include <kernel/log.h>
 
 

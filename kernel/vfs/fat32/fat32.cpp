@@ -1,8 +1,8 @@
 #include "fat32.h"
 #include "fat32_structures.h"
 
-#define LOG_ENABLED
-#define LOG_TAG "[FAT32] "
+// #define LOG_ENABLED
+#define LOG_TAG "FAT32"
 #include <kernel/log.h>
 
 
@@ -225,7 +225,7 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
 
         char entry_name[20];
         copy_entry_name(fat_entry, entry_name);
-        LOGD("- %s", entry_name);
+        LOGD("- %s (%" PRIu32 " b)", entry_name, fat_entry.DIR_FileSize);
         if (0 != strcasecmp(name, entry_name))
             return false;
 
@@ -247,7 +247,7 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
             .type = inodetype,
             .identifier = cluster,
             .filesystem = self->filesystem,
-            .mode = 0,
+            .mode = mode,
             .uid = 0,
             .size = fat_entry.DIR_FileSize,
             .access_time = fat32_datetime_to_timespec(fat_entry.DIR_LstAccDate, 0 /* no access time in fat32*/),
@@ -262,6 +262,7 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
         } else {
             out_inode->dir_ops = &s_fat32_inode_dir_ops;
         }
+        LOGI("Opened inode %" PRIu64 " for path %s, has size: %" PRIu64, out_inode->identifier, name, out_inode->size);
 
         return true;
     });

@@ -5,6 +5,10 @@
 #include <kernel/memory/vm.h>
 
 
+// #define LOG_ENABLED
+#define LOG_TAG "BRK"
+#include <kernel/log.h>
+
 static uintptr_t g_last_mapped_chunk = areas::kernel_heap.start;
 static uintptr_t g_brk = areas::kernel_heap.start;
 
@@ -12,6 +16,7 @@ static size_t CHUNK_SIZE = 4 * _1KB;
 
 static Error brk(uintptr_t new_brk)
 {
+    LOGD("Moving brk from %p to brk: %p", g_brk, new_brk);
     if (new_brk < areas::kernel_heap.start || new_brk > areas::kernel_heap.end)
         return BadParameters;
 

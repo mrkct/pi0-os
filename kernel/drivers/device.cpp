@@ -1,7 +1,7 @@
 #include "device.h"
 
 #define LOG_ENABLED
-#define LOG_TAG "[DEV ] "
+#define LOG_TAG "DEVICE"
 #include <kernel/log.h>
 
 

@@ -22,10 +22,10 @@
 extern uint32_t get_ticks_ms();
 #endif
 
-#define LOGD(format, ...) kprintf("% 8" PRIu32 " - " LOG_TAG ANSI_COLOR_MAGENTA "DBUG: " format ANSI_COLOR_RESET "\n",get_ticks_ms(), ## __VA_ARGS__)
-#define LOGI(format, ...) kprintf("% 8" PRIu32 " - " LOG_TAG ANSI_COLOR_GREEN "INFO: " format ANSI_COLOR_RESET "\n",  get_ticks_ms(), ## __VA_ARGS__)
-#define LOGW(format, ...) kprintf("% 8" PRIu32 " - " LOG_TAG ANSI_COLOR_YELLOW "WARN: " format ANSI_COLOR_RESET "\n", get_ticks_ms(), ## __VA_ARGS__)
-#define LOGE(format, ...) kprintf("% 8" PRIu32 " - " LOG_TAG ANSI_COLOR_RED "ERR:  " format ANSI_COLOR_RESET "\n",    get_ticks_ms(), ## __VA_ARGS__)
+#define LOGD(format, ...) kprintf("% 8" PRIu32 " - [% 8s] " ANSI_COLOR_MAGENTA "DBUG: " format ANSI_COLOR_RESET "\n",get_ticks_ms(), LOG_TAG, ## __VA_ARGS__)
+#define LOGI(format, ...) kprintf("% 8" PRIu32 " - [% 8s] " ANSI_COLOR_GREEN "INFO: " format ANSI_COLOR_RESET "\n",  get_ticks_ms(), LOG_TAG, ## __VA_ARGS__)
+#define LOGW(format, ...) kprintf("% 8" PRIu32 " - [% 8s] " ANSI_COLOR_YELLOW "WARN: " format ANSI_COLOR_RESET "\n", get_ticks_ms(), LOG_TAG, ## __VA_ARGS__)
+#define LOGE(format, ...) kprintf("% 8" PRIu32 " - [% 8s] " ANSI_COLOR_RED "ERR:  " format ANSI_COLOR_RESET "\n",    get_ticks_ms(), LOG_TAG, ## __VA_ARGS__)
 
 #else
 

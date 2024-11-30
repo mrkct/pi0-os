@@ -9,7 +9,7 @@
 #include "scheduler.h"
 
 // #define LOG_ENABLED
-#define LOG_TAG "[SCHED] "
+#define LOG_TAG "SCHED"
 #include <kernel/log.h>
 
 

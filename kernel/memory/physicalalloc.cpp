@@ -3,6 +3,10 @@
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
 
+// #define LOG_ENABLED
+#define LOG_TAG "PGALLOC"
+#include <kernel/log.h>
+
 
 struct {
     PhysicalPage* data;
@@ -194,6 +198,7 @@ Error physical_page_alloc(PageOrder order, PhysicalPage*& out_page)
 {
     TRY(_physical_page_alloc(order, out_page));
     out_page->ref_count = 1;
+    LOGD("Allocated page %p", page2addr(out_page));
 
     return Success;
 }
@@ -201,6 +206,7 @@ Error physical_page_alloc(PageOrder order, PhysicalPage*& out_page)
 static Error _physical_page_free(PhysicalPage* page, PageOrder order)
 {
     kassert(page != nullptr);
+    LOGD("Freeing page %p", page2addr(page));
 
     if (order == PageOrder::_16KB) {
         append_page_to_free_pages_list(page, PageOrder::_16KB);
@@ -252,6 +258,7 @@ Error physical_page_free(PhysicalPage* page, PageOrder order)
 {
     kassert(page->ref_count > 0);
     page->ref_count--;
+    LOGD("Decrementing refcount for physical page %p (new refcount: %" PRId32 ")\n", page2addr(page), page->ref_count);
 
     if (page->ref_count == 0) {
         TRY(_physical_page_free(page, order));

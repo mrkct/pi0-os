@@ -2,7 +2,7 @@
 #include "fat32/fat32.h"
 
 #define LOG_ENABLED
-#define LOG_TAG "[FS] "
+#define LOG_TAG "FS"
 #include <kernel/log.h>
 
 
