@@ -28,6 +28,7 @@ static Error brk(uintptr_t new_brk)
             struct PhysicalPage* page;
 
             MUST(physical_page_alloc(PageOrder::_4KB, page));
+            LOGD("Mapping page %p at %p", page2addr(page), g_last_mapped_chunk + CHUNK_SIZE);
             MUST(vm_map(vm_current_address_space(), page, g_last_mapped_chunk + CHUNK_SIZE, PageAccessPermissions::PriviledgedOnly));
 
             g_last_mapped_chunk += CHUNK_SIZE;
@@ -42,6 +43,7 @@ static Error brk(uintptr_t new_brk)
             MUST(vm_unmap(vm_current_address_space(), g_last_mapped_chunk, previously_mapped_physical_address));
             to_free = addr2page(previously_mapped_physical_address);
             MUST(physical_page_free(to_free, PageOrder::_4KB));
+            LOGD("Unmapping page %p from %p", previously_mapped_physical_address, g_last_mapped_chunk);
 
             g_last_mapped_chunk -= CHUNK_SIZE;
         }
