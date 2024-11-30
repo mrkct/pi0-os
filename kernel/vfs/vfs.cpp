@@ -1,6 +1,6 @@
 #include "vfs.h"
 
-#define LOG_ENABLED
+// #define LOG_ENABLED
 #define LOG_TAG "VFS"
 #include <kernel/log.h>
 

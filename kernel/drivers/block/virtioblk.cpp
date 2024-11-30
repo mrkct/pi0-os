@@ -2,7 +2,7 @@
 #include <kernel/lib/arrayutils.h>
 #include <kernel/locking/irqlock.h>
 
-#define LOG_ENABLED
+// #define LOG_ENABLED
 #define LOG_TAG "VBLK"
 #include <kernel/log.h>
 
