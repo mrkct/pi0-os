@@ -304,6 +304,8 @@ int32_t VirtioBlockDevice::init_virtqueue(uint32_t index, uint32_t size)
     // 7. Write 0x1 to QueueReady
     iowrite32(&r->QueueReady, 1);
 
+    return rc;
+
 failed:
     iowrite32(&r->Status, ioread32(&r->Status) | VirtioDeviceStatus::Failed);
     virtq_free(q);
@@ -346,6 +348,13 @@ int VirtioBlockDevice::enqueue_block_request(uint32_t type, uint32_t sector, uin
     int header_idx = 0;
     int body_idx = 0;
     int status_idx = 0;
+
+    // The output buffer must not cross a page boundary, see the comment in 'read_sector' for why
+    {
+        uintptr_t pageidx1 = (uintptr_t) buffer >> 12;
+        uintptr_t pageidx2 = ((uintptr_t) buffer + 512 - 1) >> 12;
+        kassert(pageidx1 == pageidx2);
+    }
 
     header_idx = virtq_alloc_desc(q);
     body_idx = virtq_alloc_desc(q);
@@ -398,9 +407,10 @@ int VirtioBlockDevice::enqueue_block_request(uint32_t type, uint32_t sector, uin
     q->desc_table[status_idx].flags = VIRTQ_DESC_F_WRITE;
     q->desc_table[status_idx].next = 0;
 
-    q->avail->ring[q->avail->idx] = (le16) header_idx;
+    LOGD("q->avail->ring[%d] = %d", (int) q->avail->idx, header_idx);
+    q->avail->ring[q->avail->idx % q->size] = (le16) header_idx;
     memory_barrier();
-    q->avail->idx += 1;
+    q->avail->idx = q->avail->idx + 1;
     memory_barrier();
     iowrite32(&r->QueueNotify, m_vqueue->idx);
 
@@ -462,28 +472,46 @@ void VirtioBlockDevice::handle_irq()
     iowrite32(&r->InterruptAck, 0b11);
 }
 
+static Spinlock s_read_tempbuffer_lock = SPINLOCK_START;
+static uint8_t s_read_tempbuffer[512]
+__attribute__((aligned(512)));
+
 int64_t VirtioBlockDevice::read_sector(int64_t sector_idx, uint8_t *buffer)
 {
     int rc = 0;
     VirtioBlockRequest req;
 
+    spinlock_take(s_read_tempbuffer_lock);
+
     LOGI("Reading sector %" PRId64, sector_idx);
-    rc = enqueue_block_request(VIRTIO_BLK_T_IN, sector_idx, buffer, &req);
+    rc = enqueue_block_request(VIRTIO_BLK_T_IN, sector_idx, s_read_tempbuffer, &req);
     if (rc != 0) {
         LOGE("Failed to enqueue block request: %d", rc);
         goto cleanup;
     }
-    rc = spinlock_take_with_timeout(req.completed, 10000);
+    rc = spinlock_take_with_timeout(req.completed, 100);
     if (rc != 0) {
         LOGE("Timed out waiting for request to complete");
         rc = -ETIMEDOUT;
     } else if (req.req.footer.status != 0) {
         rc = -EIO;
-        LOGE("Failed to read sector %lld: virtio returned status %d", sector_idx, (int) req.req.footer.status);
+        LOGE("Failed to read sector %" PRId64 ": virtio returned status %d", sector_idx, req.req.footer.status);
+    } else {
+        /**
+         * Unfortunately we cannot pass the user's buffer to virtio directly because
+         * if the buffer crosses between 2 pages then it's not guaranteed that the
+         * buffer was virtually-mapped to those 2 consecutive pages.
+         * 
+         * Ideally we would split virtio's body descriptor into 2 parts for the 
+         * 2 different pages if we detect that the buffer crosses between 2 pages.
+         * This is not yet implemented though, so the slow CPU copy will do.
+         */
+        memcpy(buffer, s_read_tempbuffer, 512);
     }
 
 cleanup:
     cleanup_block_request(&req);
+    spinlock_release(s_read_tempbuffer_lock);
     return rc;
 }
 
