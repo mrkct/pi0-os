@@ -7,7 +7,6 @@ BSP_HERE := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 CFLAGS := -g -Wall -Wextra \
 	-fno-unwind-tables \
 	-T $(BSP_HERE)/bsp/linker.ld \
-	-mcpu=arm1176jzf-s \
 	-nostdlib \
 	--freestanding \
 	-static \
@@ -16,6 +15,12 @@ CFLAGS := -g -Wall -Wextra \
 	-I$(BSP_HERE)/libs \
 	-L$(BSP_HERE)/libs \
 	-L$(BSP_HERE)/bsp/newlib \
+
+ifeq ($(ARCH), ARMV6)
+	CFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
+else
+	CFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
+endif
 
 include $(BSP_HERE)/bsp/objects.mk
 BSP_OBJECTS:=$(addprefix $(BSP_HERE)/bsp/, $(BSP_OBJECTS))

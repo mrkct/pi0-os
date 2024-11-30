@@ -7,18 +7,18 @@
 #include <sys/time.h>
 
 
-
 typedef enum SyscallIdentifiers {
     SYS_Yield = 1,
     SYS_Exit = 2,
     SYS_DebugLog = 3,
     SYS_GetProcessInfo = 4,
     SYS_Fork = 5,
+    SYS_Execve = 6,
 
-    SYS_OpenFile = 10,
-    SYS_ReadFile = 11,
-    SYS_WriteFile = 12,
-    SYS_CloseFile = 13,
+    SYS_Open = 10,
+    SYS_Read = 11,
+    SYS_Write = 12,
+    SYS_Close = 13,
     SYS_Stat = 14,
     SYS_Seek = 15,
     SYS_CreatePipe = 16,
@@ -54,6 +54,8 @@ typedef enum MajorDeviceNumber {
     Maj_GPIO = 7,
     Maj_RTC = 8,
 } MajorDeviceNumber;
+
+#include "arm/syscall.h"
 
 // #include "files.h"
 // #include "process.h"

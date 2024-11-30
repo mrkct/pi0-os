@@ -3,7 +3,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 export BOARD ?= virt
 export RECORD ?= 0
 export REPLAY ?= 0
-export DISK ?= $(ROOT_DIR)/_disk_image.bin
+export DISK ?= $(ROOT_DIR)/userland/_disk_image.qcow2
 
 include board/$(BOARD)/config.mk
 
@@ -24,7 +24,7 @@ kernel:
 	$(MAKE) -e -C kernel
 
 userland:
-	# $(MAKE) -e -C userland
+	$(MAKE) -e -C userland
 
 qemu: all $(QEMU_BOARD_SPECIFIC_TARGETS)
 	$(QEMU) $(QEMU_FLAGS)
@@ -35,4 +35,4 @@ qemu-gdb: all $(QEMU_BOARD_SPECIFIC_TARGETS)
 
 clean:
 	$(MAKE) -e -C kernel clean
-	# $(MAKE) -e -C userland clean
+	$(MAKE) -e -C userland clean

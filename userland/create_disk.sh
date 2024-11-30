@@ -11,7 +11,7 @@ make -C libs libapp.a
 TO_INSTALL="init"
 for software in $TO_INSTALL; do
     echo "Installing '$software'..."
-    sudo MOUNT_POINT=$DIR make -C $software install
+    MOUNT_POINT=$DIR make -C $software install
 done
 
 rm -r _disk_image.img

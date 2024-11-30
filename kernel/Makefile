@@ -43,6 +43,7 @@ SOURCES=\
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \
+	kernel/task/elfloader.cpp \
 	kernel/vfs/fat32/fat32.cpp \
 	kernel/vfs/fs.cpp \
 	kernel/vfs/vfs.cpp \

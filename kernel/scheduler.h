@@ -4,6 +4,7 @@
 #include <kernel/arch/arch.h>
 #include <kernel/memory/vm.h>
 #include <kernel/lib/intrusivelinkedlist.h>
+#include <kernel/vfs/vfs.h>
 
 
 enum class ThreadState {
@@ -32,7 +33,8 @@ struct Process {
     int exit_code;
     const char name[64];
     AddressSpace address_space;
-    
+    FileCustody *openfiles[16];
+
     struct {
         Thread **data;
         size_t allocated;
@@ -63,6 +65,18 @@ Thread *cpu_current_thread();
 */
 Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged);
 
+int sys$exit(int exit_code);
+
 int sys$yield();
 
 int sys$fork();
+
+int sys$execve(const char *path, char *const argv[], char *const envp[]);
+
+int sys$open(const char *path, int flags, int mode);
+
+int sys$read(int fd, void *buf, size_t count);
+
+int sys$write(int fd, const void *buf, size_t count);
+
+int sys$close(int fd);

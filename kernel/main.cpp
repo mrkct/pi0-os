@@ -72,26 +72,37 @@ static int fork()
     return syscall(SYS_Fork, 0, 0, 0, 0, 0, 0);
 }
 
+static int execve(const char *path, char *const argv[], char *const envp[])
+{
+    return syscall(SYS_Execve, (uintptr_t) path, (uintptr_t) argv, (uintptr_t) envp, 0, 0, 0);
+}
+
 static void wait(int secs)
 {
     auto *timer = devicemanager_get_system_timer_device();
     uint64_t last = timer->ticks();
     
     while (timer->ticks() - last < (secs * 1000 *timer->ticks_per_ms())) {
+        cpu_relax();
         yield();
     }
 }
 
 static void proc1()
 {
+    int rc = 0;
+    char *argv[] = { "/bina/init", nullptr };
+    char *envp[] = { nullptr };
+
     kprintf("I am main\n");
 
     int pid = fork();
     if (pid == 0) {
+        rc = execve("/bina/init", argv, envp);
+        kprintf("something went wrong with execve: %d\n", rc);
         while (true) {
-            kprintf("I am child\n");
-            wait(3);
-        }        
+            wait(1);
+        }
     } else {
         while (true) {
             kprintf("I am main with child %d\n", pid);
