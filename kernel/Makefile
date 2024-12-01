@@ -38,6 +38,7 @@ SOURCES=\
 	kernel/drivers/devicemanager.cpp \
 	kernel/lib/more_time.c \
 	kernel/locking/irqlock.cpp \
+	kernel/locking/mutex.cpp \
 	kernel/locking/spinlock.cpp \
 	kernel/memory/bootalloc.cpp \
 	kernel/memory/kheap.cpp \
