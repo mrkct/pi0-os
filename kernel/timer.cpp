@@ -42,7 +42,7 @@ void timer_init()
                 
                 if (timer->type == TimerType::OneShot) {
                     s_timers.remove(timer);
-                    kfree(&timer);
+                    kfree(timer);
                 } else {
                     timer->start_time = systimer.ticks();
                 }
