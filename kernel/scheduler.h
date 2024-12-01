@@ -80,3 +80,5 @@ int sys$read(int fd, void *buf, size_t count);
 int sys$write(int fd, const void *buf, size_t count);
 
 int sys$close(int fd);
+
+int sys$millisleep(int ms);

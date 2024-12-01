@@ -29,7 +29,7 @@ typedef enum SyscallIdentifiers {
     SYS_ReadDirEntry = 21,
 
     SYS_GetDateTime = 30,
-    SYS_Sleep = 31,
+    SYS_MilliSleep = 31,
 
     SYS_Poll = 40,
     SYS_Send = 41,

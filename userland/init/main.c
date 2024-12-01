@@ -4,7 +4,7 @@
 
 void wait(int seconds)
 {
-    syscall(SYS_Sleep, seconds, 0, 0, 0, 0, 0);    
+    syscall(SYS_MilliSleep, 1000 * seconds, 0, 0, 0, 0, 0);    
 }
 
 int main(int argc, char **argv)

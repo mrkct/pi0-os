@@ -3,6 +3,7 @@
 #include <kernel/memory/vm.h>
 #include <kernel/timer.h>
 #include <kernel/locking/irqlock.h>
+#include <kernel/locking/mutex.h>
 #include <kernel/lib/arrayutils.h>
 #include <kernel/lib/intrusivelinkedlist.h>
 #include <kernel/task/elfloader.h>
@@ -388,4 +389,26 @@ int sys$close(int fd)
     current_process->openfiles[fd] = nullptr;
 
     return rc;
+}
+
+int sys$millisleep(int ms)
+{
+    auto *current_thread = cpu_current_thread();
+    Mutex lock;
+
+    LOGI("%s[%d] going to sleep for %d ms", current_thread->process->name, current_thread->tid, ms);
+    if (ms < 0)
+        return -EINVAL;
+    else if (ms == 0)
+        return 0;
+
+    mutex_init(lock, MutexInitialState::Locked);
+    timer_exec_once(ms, [](void *lock) { 
+        LOGI("Sleep timer expired");
+        mutex_release(*(Mutex*) lock);
+    }, &lock);
+    mutex_take(lock);
+    LOGI("%s[%d] woke up", current_thread->process->name, current_thread->tid);
+
+    return 0;
 }

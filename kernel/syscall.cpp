@@ -37,6 +37,9 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_Close:
         rc = sys$close((int) arg1);
         break;
+    case SYS_MilliSleep:
+        rc = sys$millisleep((int) arg1);
+        break;
     default:
         kprintf("Unknown syscall %d\n", syscall);
         rc = -ENOSYS;
