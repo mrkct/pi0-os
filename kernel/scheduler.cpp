@@ -8,6 +8,8 @@
 #include <kernel/lib/intrusivelinkedlist.h>
 #include <kernel/task/elfloader.h>
 
+#include <api/arm/crt0util.h>
+
 #include "scheduler.h"
 
 #define LOG_ENABLED
@@ -89,6 +91,73 @@ static void *alloc_thread_user_stack(AddressSpace *address_space, int tid)
     release(lock);
 
     return reinterpret_cast<void*>(startaddr - 8);
+}
+
+/**
+ * Pushes on the argument stack an array of string, including an extra '\0' terminator,
+ * plus also an array of pointers to the strings on the stack.
+ * In the last argument, this function stores the stack address at which the array of
+ * strings was placed.
+ * 
+ * This function moves the stack pointer and also aligns it to the ARCH_STACK_ALIGNMENT
+ * boundary.
+ */
+static uint8_t *push_string_array_to_stack(
+    uint8_t *userstack,
+    char const* const array[],
+    uintptr_t *out_array_start_addr,
+    size_t *out_array_size
+)
+{
+    const char **user_array = nullptr;
+    const char *next_string = (const char *) userstack;
+    size_t array_size = 0;
+
+    // First we copy all the strings, one after the other
+    for (size_t i = 0; array[i] != nullptr; i++, array_size++) {
+        size_t len = strlen(array[i]) + 1;
+        userstack -= len;
+        memcpy(userstack, array[i], len);
+    }
+    userstack -= 1;
+    *userstack = '\0';
+    userstack = (uint8_t*) round_down((uintptr_t) userstack, ARCH_STACK_ALIGNMENT);
+
+    // Then we iterate back to build the array
+    userstack -= sizeof(uintptr_t) * (array_size + 1);
+    user_array = (const char**) userstack;
+    for (size_t i = 0; i < array_size + 1; i++) {
+        user_array[i] = next_string;
+        next_string += strlen(next_string) + 1;
+    }
+
+    *out_array_start_addr = (uintptr_t) userstack;
+    *out_array_size = array_size;
+    
+    userstack = (uint8_t*) round_down((uintptr_t) userstack, ARCH_STACK_ALIGNMENT);
+    return userstack;
+}
+
+static uint8_t *push_process_args(uint8_t *userstack, char *const argv[], char *const envp[])
+{
+    size_t argc, envc = 0;
+    uintptr_t user_argv, user_envp;
+
+    userstack = push_string_array_to_stack(userstack, argv, &user_argv, &argc);
+    userstack = push_string_array_to_stack(userstack, envp, &user_envp, &envc);
+
+    userstack -= sizeof(ArmCrt0InitialStackState);
+    ArmCrt0InitialStackState *state = (ArmCrt0InitialStackState*) userstack;
+    *state = (ArmCrt0InitialStackState) {
+        .argc = argc,
+        .argv = (char**) user_argv,
+        .envc = envc,
+        .envp = (char**) user_envp,
+    };
+
+    userstack = (uint8_t*) round_down((uintptr_t) userstack, ARCH_STACK_ALIGNMENT);
+
+    return userstack;
 }
 
 static void register_thread(Thread *thread)
@@ -286,8 +355,7 @@ int sys$execve(const char *path, char *const argv[], char *const envp[])
         rc = -ENOMEM;
         goto cleanup;
     }
-    // TODO: Place args and envp on the user stack
-    
+    userstack = push_process_args(userstack, argv, envp);
 
     // NOTE: We're going to use the same kernel stack, but we
     // don't need to do anything because the used page is used
@@ -304,8 +372,8 @@ int sys$execve(const char *path, char *const argv[], char *const envp[])
     vm_switch_address_space(current_process->address_space);
     vm_free(old_as);
 
-    current_thread->iframe->lr = entrypoint;
-    current_thread->iframe->user_sp = (uintptr_t) userstack;
+    kassert((uintptr_t) userstack % ARCH_STACK_ALIGNMENT == 0);
+    current_thread->iframe->set_thread_start_values(entrypoint, (uintptr_t) userstack);
 
     return 0;
 

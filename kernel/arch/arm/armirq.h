@@ -12,6 +12,11 @@ struct InterruptFrame {
     uint32_t spsr;              // "Saved Program Status Register", pushed immediately at trap entrys
 
     void set_syscall_return_value(uint32_t value) { r[0] = value; }
+    void set_thread_start_values(uintptr_t entrypoint, uintptr_t userstack)
+    {
+        this->lr = entrypoint;
+        this->user_sp = userstack;
+    }
 };
 
 struct ContextSwitchFrame {

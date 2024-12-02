@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "armirq.h"
 
+#define ARCH_STACK_ALIGNMENT 8
 
 static inline void memory_barrier()
 {

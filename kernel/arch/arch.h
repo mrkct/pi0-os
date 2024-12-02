@@ -6,6 +6,8 @@
 
 #else
 
+#define ARCH_STACK_ALIGNMENT 16
+
 struct InterruptFrame {
     int useless;
 };
