@@ -3,6 +3,7 @@
 #include <kernel/kprintf.h>
 #include <kernel/scheduler.h>
 #include <kernel/timer.h>
+#include <kernel/vfs/devfs/devfs.h>
 #include <kernel/vfs/vfs.h>
 
 
@@ -56,6 +57,13 @@ extern "C" void kernel_main(BootParams const *boot_params)
     if (rc < 0) {
         panic("Failed to mount root filesystem: %d\n", rc);
     }
+
+    Filesystem *devfs;
+    rc = devfs_create(&devfs);
+    if (rc < 0) {
+        panic("Failed to create devfs: %d\n", rc);
+    }
+    rc = vfs_mount("/dev/", *devfs);
 
     kprintf("Running the first process...\n");
     create_first_process(proc1);

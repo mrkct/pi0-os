@@ -125,6 +125,35 @@ void devicemanager_load_available_peripherals(BootParams const *boot_params)
     }
 }
 
+Device *devicemanager_get_by_name(const char *name)
+{
+    if (0 == strcmp(name, "kernel_log"))
+        return s_defaults.kernel_log;
+
+    for (size_t i = 0; i < array_size(s_devices); i++) {
+        if (s_devices[i] != nullptr && strcmp(s_devices[i]->name(), name) == 0) {
+            return s_devices[i];
+        }
+    }
+    return nullptr;
+}
+
+Device *devicemanager_get_by_devid(uint16_t devid)
+{
+    FileDevice *device = nullptr;
+
+    for (size_t i = 0; i < array_size(s_devices); i++) {
+        if (s_devices[i] == nullptr || !s_devices[i]->is_mountable())
+            continue;
+        
+        device = reinterpret_cast<FileDevice*>(s_devices[i]);
+        if (device->dev_id() == devid)
+            return device;
+    }
+
+    return nullptr;
+}
+
 CharacterDevice *devicemanager_get_kernel_log_device() { return s_defaults.kernel_log; }
 
 InterruptController *devicemanager_get_interrupt_controller_device() { return s_defaults.irqc; }
