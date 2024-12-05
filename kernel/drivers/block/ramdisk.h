@@ -7,7 +7,7 @@ class RamDisk: public BlockDevice
 {
 public:
     RamDisk(uint8_t *start, int64_t size, bool readonly):
-        BlockDevice("ram"),
+        BlockDevice(512, "ram"),
         m_start(start), m_size(size), m_readonly(readonly) {}
 
     virtual int32_t init() override { return 0; }

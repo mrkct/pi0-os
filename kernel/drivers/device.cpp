@@ -23,55 +23,56 @@ int64_t SimpleBlockDevice::read(int64_t offset, uint8_t *buffer, size_t size)
     int64_t read = 0, to_read = 0;
     int64_t rc = 0;
     uint8_t *temp_buffer = nullptr;
+    int64_t sector_size = block_size();
 
     LOGI("Reading %d bytes from offset %" PRId64, size, offset);
 
     offset = clamp<int64_t>(0, offset, this->size());
     size = clamp<int64_t>(0, size, this->size() - offset);
 
-    if (offset % m_sector_size != 0) {
-        temp_buffer = (uint8_t*) malloc(m_sector_size);
+    if (offset % sector_size != 0) {
+        temp_buffer = (uint8_t*) malloc(sector_size);
         if (temp_buffer == nullptr) {
             rc = -ENOMEM;
             goto cleanup;
         }
 
-        rc = read_sector(offset / m_sector_size, temp_buffer);
+        rc = read_sector(offset / sector_size, temp_buffer);
         if (rc != 0)
             goto cleanup;
         
-        to_read = min<int64_t>(size, m_sector_size - (offset % m_sector_size));
-        memcpy(buffer, &temp_buffer[offset % m_sector_size], to_read);
+        to_read = min<int64_t>(size, sector_size - (offset % sector_size));
+        memcpy(buffer, &temp_buffer[offset % sector_size], to_read);
         read += to_read;
         offset += to_read;
         buffer += to_read;
         size -= to_read;
     }
 
-    kassert(offset % m_sector_size == 0);
-    while (size >= m_sector_size) {
-        rc = read_sector(offset / m_sector_size, buffer);
+    kassert(offset % sector_size == 0);
+    while (size >= sector_size) {
+        rc = read_sector(offset / sector_size, buffer);
         if (rc != 0)
             goto cleanup;
 
-        read += m_sector_size;
-        offset += m_sector_size;
-        buffer += m_sector_size;
-        size -= m_sector_size;
+        read += sector_size;
+        offset += sector_size;
+        buffer += sector_size;
+        size -= sector_size;
     }
 
-    kassert(size < m_sector_size);
-    kassert(offset % m_sector_size == 0);
+    kassert(size < sector_size);
+    kassert(offset % sector_size == 0);
     if (size > 0) {
         if (temp_buffer == nullptr) {
-            temp_buffer = (uint8_t*) malloc(m_sector_size);
+            temp_buffer = (uint8_t*) malloc(sector_size);
             if (temp_buffer == nullptr) {
                 rc = -ENOMEM;
                 goto cleanup;
             }
         }
 
-        rc = read_sector(offset / m_sector_size, temp_buffer);
+        rc = read_sector(offset / sector_size, temp_buffer);
         if (rc != 0)
             goto cleanup;
         memcpy(buffer, temp_buffer, size);
@@ -97,25 +98,26 @@ int64_t SimpleBlockDevice::write(int64_t offset, const uint8_t *buffer, size_t s
     int64_t written = 0, to_write = 0;
     int64_t rc = 0;
     uint8_t *temp_buffer = nullptr;
+    int64_t sector_size = block_size(); 
 
     offset = clamp<int64_t>(0, offset, this->size());
     size = clamp<int64_t>(0, size, this->size() - offset);
 
-    if (offset % m_sector_size != 0) {
-        temp_buffer = (uint8_t*) malloc(m_sector_size);
+    if (offset % sector_size != 0) {
+        temp_buffer = (uint8_t*) malloc(sector_size);
         if (temp_buffer == nullptr) {
             rc = -ENOMEM;
             goto cleanup;
         }
 
-        rc = read_sector(offset / m_sector_size, temp_buffer);
+        rc = read_sector(offset / sector_size, temp_buffer);
         if (rc != 0)
             goto cleanup;
         
-        to_write = min<int64_t>(size, m_sector_size - (offset % m_sector_size));
-        memcpy(&temp_buffer[offset % m_sector_size], buffer, to_write);
+        to_write = min<int64_t>(size, sector_size - (offset % sector_size));
+        memcpy(&temp_buffer[offset % sector_size], buffer, to_write);
 
-        rc = write_sector(offset / m_sector_size, temp_buffer);
+        rc = write_sector(offset / sector_size, temp_buffer);
         if (rc != 0)
             goto cleanup;
 
@@ -125,35 +127,35 @@ int64_t SimpleBlockDevice::write(int64_t offset, const uint8_t *buffer, size_t s
         size -= to_write;
     }
 
-    kassert(offset % m_sector_size == 0);
-    while (size >= m_sector_size) {
-        rc = write_sector(offset / m_sector_size, buffer);
+    kassert(offset % sector_size == 0);
+    while (size >= sector_size) {
+        rc = write_sector(offset / sector_size, buffer);
         if (rc != 0)
             goto cleanup;
 
-        written += m_sector_size;
-        offset += m_sector_size;
-        buffer += m_sector_size;
-        size -= m_sector_size;
+        written += sector_size;
+        offset += sector_size;
+        buffer += sector_size;
+        size -= sector_size;
     }
 
-    kassert(size < m_sector_size);
-    kassert(offset % m_sector_size == 0);
+    kassert(size < sector_size);
+    kassert(offset % sector_size == 0);
     if (size > 0) {
         if (temp_buffer == nullptr) {
-            temp_buffer = (uint8_t*) malloc(m_sector_size);
+            temp_buffer = (uint8_t*) malloc(sector_size);
             if (temp_buffer == nullptr) {
                 rc = -ENOMEM;
                 goto cleanup;
             }
         }
 
-        rc = read_sector(offset / m_sector_size, temp_buffer);
+        rc = read_sector(offset / sector_size, temp_buffer);
         if (rc != 0)
             goto cleanup;
         memcpy(temp_buffer, buffer, size);
 
-        rc = write_sector(offset / m_sector_size, temp_buffer);
+        rc = write_sector(offset / sector_size, temp_buffer);
         if (rc != 0)
             goto cleanup;
 

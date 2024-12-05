@@ -19,6 +19,7 @@ public:
     };
     virtual ~Device() {}
 
+    virtual bool is_mountable() const { return false; }
     virtual const char *name() const = 0;
     virtual Device::Type device_type() const = 0;
     virtual int32_t init_for_early_boot() { return -ENOTSUP; }
@@ -61,6 +62,8 @@ public:
     FileDevice(uint8_t major, uint8_t minor, const char *name);
     virtual ~FileDevice() {}
 
+    virtual bool is_mountable() const override final { return true; }
+    uint16_t dev_id() const { return (m_major << 8) | m_minor; }
     virtual uint8_t major() const { return m_major; }
     virtual uint8_t minor() const { return m_minor; }
     virtual const char *name() const override { return m_name; }
@@ -96,26 +99,29 @@ class BlockDevice: public FileDevice
 private:
     static uint8_t s_next_minor;
 public:
-    BlockDevice(const char *name)
-        : FileDevice(Maj_Disk, s_next_minor++, name)
+    BlockDevice(int64_t block_size, const char *name)
+        : FileDevice(Maj_Disk, s_next_minor++, name), m_block_size(block_size)
     {}
     virtual ~BlockDevice() {}
 
+    virtual int64_t block_size() const { return m_block_size; }
     virtual Device::Type device_type() const override { return Device::Type::BlockDevice; }
     virtual uint64_t size() const = 0;
+
+private:
+    int64_t m_block_size;
 };
 
 class SimpleBlockDevice: public BlockDevice
 {
 public:
-    SimpleBlockDevice(int64_t sector_size, const char *name)
-        : BlockDevice(name), m_sector_size{sector_size}
+    SimpleBlockDevice(int64_t block_size, const char *name)
+        : BlockDevice(block_size, name)
     {}
     virtual ~SimpleBlockDevice() {}
     
     virtual int64_t read(int64_t, uint8_t *buffer, size_t size) override;
     virtual int64_t write(int64_t, const uint8_t *buffer, size_t size) override;
-    int64_t sector_size() const { return m_sector_size; }
 
 protected:
     virtual int64_t read_sector(int64_t sector_idx, uint8_t *buffer) = 0;
@@ -123,7 +129,6 @@ protected:
     virtual bool is_read_only() const { return false; }
 
 private:
-    int64_t m_sector_size;
     uint8_t *m_temp_buffer;
 };
 
