@@ -23,3 +23,5 @@ ssize_t vfs_seek(FileCustody*, int whence, int32_t);
 int vfs_close(FileCustody*);
 
 int vfs_stat(const char *path, struct stat*);
+
+FileCustody* vfs_duplicate(FileCustody*);

@@ -1,6 +1,6 @@
 #include "vfs.h"
 
-// #define LOG_ENABLED
+#define LOG_ENABLED
 #define LOG_TAG "VFS"
 #include <kernel/log.h>
 
@@ -22,10 +22,29 @@ struct MountPoint {
     INTRUSIVE_LINKED_LIST_HEADER(MountPoint);
     Filesystem *fs;
     char *path;
+    uint32_t path_skip;
 };
 
 static IntrusiveLinkedList<MountPoint> s_mountpoints;
 
+static const char* log_canonicalized_path(const char *path)
+{
+    static char buf[256];
+    size_t i = 0;
+    for (i = 0; path[i] != '\0' || path[i+1] != '\0'; i++) {
+        buf[i] = path[i] == '\0' ? '/' : path[i];
+    }
+    buf[i] = '\0';
+    return buf;
+}
+
+static size_t canonicalized_path_strlen(const char *path)
+{
+    size_t len = 0;
+    while (path[len] != '\0' || path[len+1] != '\0')
+        len++;
+    return len;
+}
 
 /**
  * Creates a canonicalized path from a string.
@@ -163,7 +182,7 @@ static int open_inode(Inode *inode)
     LOGI("Opening inode %" PRIu64, inode->identifier);
     int rc = fs->ops->open_inode(fs, inode);
     if (rc != 0) {
-        LOGE("Failed to open inode " PRIu64 ": %d", inode->identifier, rc);
+        LOGE("Failed to open inode %" PRIu64 ": %d", inode->identifier, rc);
         return rc;
     }
 
@@ -289,6 +308,7 @@ static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_
         return rc;
     }
 
+    LOGD("traversing path '%s'", fs_relative_canonicalized_path);
     while (rc == 0 && *path) {
         close_inode(parent);
         parent = inode;
@@ -332,21 +352,22 @@ static int traverse(const char *path, Inode **out_parent, Inode **out_inode)
 {
     int rc;
     char *cpath = canonicalize_path(path);
+    const char *relative_path = nullptr;
     if (cpath == nullptr)
         return -ENOMEM;
 
-    LOGI("lookup for '%s' (canonicalized to '%s')", path, cpath);
+    LOGI("Lookup for '%s' (canonicalized to: '%s')", path, log_canonicalized_path(cpath));
 
     // NOTE: This assumes that the paths in the mountpoints are ordered by length descending
     auto *mp = s_mountpoints.find_first([&](MountPoint *mp) {
         return startswith(cpath, mp->path);
     });
     if (mp == nullptr) {
-        LOGW("no mountpoint found");
+        LOGW("Mo mountpoint found");
         rc = -ENOENT;
     } else {
-        LOGI("found mountpoint '%s'", mp->path);
-        rc = traverse_in_fs(mp->fs, cpath + strlen(mp->path), out_parent, out_inode);
+        LOGI("Found mountpoint at '%s'", log_canonicalized_path(mp->path));
+        rc = traverse_in_fs(mp->fs, cpath + mp->path_skip, out_parent, out_inode);
     }
 
     free(cpath);
@@ -405,6 +426,10 @@ int vfs_mount(const char *path, Filesystem &fs)
     
     mp->path = cpath;
     mp->fs = &fs;
+    mp->path_skip = canonicalized_path_strlen(cpath);
+    if (mp->path_skip > 0)
+        mp->path_skip += 1;
+    LOGD("Mountpoint %s ('%s') has path skip %" PRIu32, path, log_canonicalized_path(mp->path), mp->path_skip);
 
     auto *after = s_mountpoints.find_first([&](MountPoint *mp) {
         return strlen(mp->path) < strlen(cpath);
@@ -480,4 +505,16 @@ int vfs_stat(const char *path, struct stat *stat)
     close_inode(parent);
     close_inode(inode);
     return rc;
+}
+
+FileCustody* vfs_duplicate(FileCustody *custody)
+{
+    auto *dup = (FileCustody*) malloc(sizeof(FileCustody));
+    if (dup == nullptr)
+        return nullptr;
+    
+    *dup = *custody;
+    dup->inode->refcount++;
+
+    return dup;
 }
