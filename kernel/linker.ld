@@ -1,81 +1,51 @@
 ENTRY(_start)
 
+
 SECTIONS
 {
-    .text.start :
-    {
-        . = 0x8000;
-        KEEP(*(.text.start.boot))
-        KEEP(*(.text.start))
-    }
+    . = 0xc0000000;
 
-    .rodata.start :
+    .text :
     {
-        KEEP(*(.rodata.start))
-    }
-
-    .text (0xe0100000) : AT(ADDR(.text) - 0xe0000000)
-    {
-        __higher_half_start = .;
-        __kernel_start = .;
         __text_start = .;
-
-        *(.text)
-
+        KEEP(*(.text.entry))
+        KEEP(*(.text))
         __text_end = .;
-        . = ALIGN(4);
     }
-    
-    .rodata ALIGN(4K) : AT(ADDR(.rodata) - 0xe0000000)
+
+    .rodata :
     {
-        . = ALIGN(4);
         __rodata_start = .;
-
-        *(.rodata)
-        *(.rodata*)
-
-        . = ALIGN(4);
+        KEEP(*(.rodata))
         __rodata_end = .;
     }
-    
-    .data ALIGN(4K) : AT(ADDR(.data) - 0xe0000000)
+
+    .data :
     {
-        . = ALIGN(4);
         __data_start = .;
-
-        *(.data)
-
-        . = ALIGN(4);
+        KEEP(*(.data))
         __data_end = .;
     }
-    
-    .bss ALIGN(4K) : AT(ADDR(.bss) - 0xe0000000)
+
+    .bss :
     {
-        . = ALIGN(4);
         __bss_start = .;
-
-        bss = .;
-        *(.bss)
-        *(.bss*)
-        *(COMMON)
-
-        . = ALIGN(4);
+        KEEP(*(.bss))
+        . = ALIGN(64);
         __bss_end = .;
-        __bss_size = __bss_end - __bss_start;
     }
 
-    .ramdisk ALIGN(4K) : AT(ADDR(.ramdisk) - 0xe0000000)
+    /*
+        This extra section at the end is important!
+
+        The bootloader doesn't include an ELF loader, it just loads the .bin
+        created with objcopy. The bootloader must also map memory for the
+        .bss, but objcopy rightfully strips it away if its possible.
+        
+        This dummy value at the end forces objcopy to keep the .bss.
+    */
+    .bootloaderhack :
     {
-        __start_of_ramdisk = .;
-        KEEP(*(.ramdisk));
-        KEEP(*(.ramdisk.*));
-        __end_of_ramdisk = .;
+        LONG(1234);
     }
-
-    
-    /* This alignment is required due to the current implementation of the physical page allocator */
-    . = ALIGN(1M);
-
-    __kernel_end = .;
-    __heap_start = .;
 }

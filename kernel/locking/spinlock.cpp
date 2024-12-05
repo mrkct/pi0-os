@@ -1,40 +1,33 @@
-#include <kernel/locking/spinlock.h>
-#include <kernel/task/scheduler.h>
+#include <kernel/irq.h>
+#include <kernel/timer.h>
+#include <errno.h>
+#include "spinlock.h"
 
-namespace kernel {
 
-static bool try_acquire(Spinlock& lock)
+void spinlock_take(Spinlock& lock)
 {
-    uint32_t old_value = 0;
-    asm volatile(
-        "mov r0, #1\n"
-        "swp %0, r0, [%1]\n"
-        : "=r&"(old_value)
-        : "r"(&lock.is_taken)
-        : "r0");
-
-    return old_value == 0;
-}
-
-void take(Spinlock& lock)
-{
-    while (!try_acquire(lock)) {
-        asm volatile("wfe");
+    while (!try_acquire(&lock.is_taken)) {
+        cpu_relax();
     }
-    lock.need_reenable_interrupts = interrupt_are_enabled();
-    interrupt_disable();
 }
 
-void release(Spinlock& lock)
+int spinlock_take_with_timeout(Spinlock &lock, uint32_t timeout_ms)
+{
+    uint32_t start = get_ticks_ms();
+    while (!try_acquire(&lock.is_taken)) {
+        if (get_ticks_ms() - start > timeout_ms)
+            return -ETIMEDOUT;
+        cpu_relax();
+    }
+    return 0;
+}
+
+void spinlock_release(Spinlock& lock)
 {
     lock.is_taken = 0;
-    if (lock.need_reenable_interrupts)
-        interrupt_enable();
 }
 
-bool is_taken(Spinlock& lock)
+bool spinlock_is_taken(Spinlock& lock)
 {
     return lock.is_taken != 0;
-}
-
 }

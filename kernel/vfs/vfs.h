@@ -1,41 +1,27 @@
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
-#include <api/files.h>
-#include <kernel/error.h>
-#include "filesystem.h"
+#include <kernel/base.h>
+#include "fs.h"
 
-
-namespace kernel {
 
 struct FileCustody {
-    File *file;
-
+    Inode *inode;
     uint32_t flags;
-    uint64_t seek_position;
+    uint64_t offset;
 };
 
-Error vfs_mount(const char *path, Filesystem*);
+int vfs_mount(const char *path, Filesystem&);
 
-Error vfs_open(const char *path, uint32_t flags, FileCustody&);
+int vfs_open(const char *path, uint32_t flags, FileCustody** );
 
-Error vfs_read(FileCustody&, uint8_t *buffer, uint32_t size, uint32_t&);
+ssize_t vfs_read(FileCustody*, uint8_t *buffer, uint32_t size);
 
-Error vfs_write(FileCustody&, uint8_t const *buffer, uint32_t size, uint32_t&);
+ssize_t vfs_write(FileCustody*, uint8_t const *buffer, uint32_t size);
 
-Error vfs_seek(FileCustody&, api::FileSeekMode, int32_t);
+ssize_t vfs_seek(FileCustody*, int whence, int32_t);
 
-Error vfs_close(FileCustody&);
+int vfs_close(FileCustody*);
 
-Error vfs_stat(const char *path, api::Stat&);
+int vfs_stat(const char *path, struct stat*);
 
-bool vfs_can_read_data(FileCustody &custody);
-
-Error vfs_duplicate_custody(FileCustody&, FileCustody&);
-
-Error vfs_init();
-
-void vfs_get_default_stdin_stdout_stderr(FileCustody &fc_stdin, FileCustody &fc_stdout, FileCustody &fc_stderr);
-
-}
+FileCustody* vfs_duplicate(FileCustody*);

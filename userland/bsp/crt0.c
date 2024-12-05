@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <api/arm/crt0util.h>
 
 
 extern void __libc_init_array(void);
@@ -20,14 +21,8 @@ asm (
     "  b _cstart \n"
 );
 
-void _cstart(void *sp)
+void _cstart(ArmCrt0InitialStackState *sp)
 {
-    int argc = *(int32_t*)sp;
-    sp += sizeof(int32_t);
-
-    const char **argv = *(const char ***)sp;
-
     __libc_init_array();
-
-    exit(main(argc, argv));
+    exit(main(sp->argc, sp->argv));
 }

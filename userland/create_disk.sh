@@ -1,20 +1,22 @@
 #!/bin/sh
 
-rm -r disk.img
-dd if=/dev/zero of=disk.img bs=1M count=16
-mkfs.fat -F 32 disk.img
+DIR=/tmp/myos-disk-image-temp-storage
 
-mkdir -p mp
-sudo mount disk.img mp
-sudo cp -r base/* mp/
+rm -rf $DIR
+mkdir -p $DIR
+cp -r base/* $DIR
 
 make -C libs libapp.a
 
-TO_INSTALL="clock crash echo hello shell term yes cowsay doomgeneric/doomgeneric"
+TO_INSTALL="init"
 for software in $TO_INSTALL; do
-    echo "Installing $software..."
-    sudo MOUNT_POINT=$(pwd)/mp make -C $software install
+    echo "Installing '$software'..."
+    MOUNT_POINT=$DIR make -C $software install
 done
 
-sudo umount mp
-rm -r mp
+rm -r _disk_image.img
+dd if=/dev/zero of=_disk_image.img bs=1M count=16
+mkfs.fat -F 32 _disk_image.img
+mcopy -i _disk_image.img $DIR/* ::/
+qemu-img convert -p -O qcow2 _disk_image.img _disk_image.qcow2
+rm -rf $DIR

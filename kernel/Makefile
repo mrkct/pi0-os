@@ -3,76 +3,62 @@ SOURCES_ROOT=../
 CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
 
-CXXFLAGS=-fpic -nostdlib -lgcc -lc -lg -lgcc -lm
+CXXFLAGS=-fpic -nostdlib -lgcc -lc -lg -lgcc -lstdc++ -lm
 CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT) -I../include
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
-BOARD:=raspi0
-ifeq ($(BOARD), raspi0)
-	CXXFLAGS+=-mcpu=arm1176jzf-s
+ifeq ($(ARCH), ARMV6)
+	CXXFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
 else
-	CXXFLAGS+=-mcpu=cortex-a7 -DBOARD_RASPI2
+	CXXFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
 endif
 
-ifdef RAMDISK
-	CXXFLAGS+=-DRAMDISK_FILE=$(RAMDISK)
-endif
-
-QEMU:=qemu-system-arm
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -M $(BOARD) -serial null -serial stdio -kernel Kernel
-QEMU_REPLAY_FILENAME:=replay.bin
-QEMU_RECORD_FLAGS:=\
-	-icount shift=auto,rr=record,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
-	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
-QEMU_REPLAY_FLAGS:=\
-	-icount shift=auto,rr=replay,rrfile=$(QEMU_REPLAY_FILENAME),rrsnapshot=start \
-	-device sd-card,drive=snapshot-drive -drive id=snapshot-drive,if=none,file=snapshot-drive.qcow2
-ifdef SD_IMAGE
-QEMU_SD_FLAGS+=-sd $(SD_IMAGE)
-else
-QEMU_SD_FLAGS:=
-endif
+ARCH_SOURCES=\
+	kernel/arch/arm/start.S 	 	\
+	kernel/arch/arm/armirq.cpp   	\
+	kernel/arch/arm/armv6mmu.cpp 	\
+	kernel/arch/arm/irq.S
 
 SOURCES=\
-	kernel/datetime.cpp \
-	kernel/device/gpio.cpp \
-	kernel/device/framebuffer.cpp \
-	kernel/device/aux.cpp \
-	kernel/device/ramdisk.cpp \
-	kernel/device/sd.cpp \
-	kernel/device/systimer.cpp \
-	kernel/device/uart.cpp \
-	kernel/device/videocore.cpp \
-	kernel/input/keyboard.cpp \
-	kernel/input/miniuart_keyboard.cpp \
-	kernel/input/virtinput_keyboard.cpp \
-	kernel/interrupt.cpp \
+	$(ARCH_SOURCES) \
 	kernel/kprintf.cpp \
-	kernel/locking/reentrant.cpp \
+	kernel/main.cpp \
+	kernel/drivers/char/bcm2835_aux_uart.cpp \
+	kernel/drivers/char/bcm2835_gpio.cpp \
+	kernel/drivers/char/pl011.cpp \
+	kernel/drivers/char/pl031.cpp \
+	kernel/drivers/block/ramdisk.cpp \
+	kernel/drivers/block/virtioblk.cpp \
+	kernel/drivers/irqc/bcm2835_irqc.cpp \
+	kernel/drivers/irqc/gic2.cpp \
+	kernel/drivers/timer/armv7timer.cpp \
+	kernel/drivers/timer/bcm2835_systimer.cpp \
+	kernel/drivers/device.cpp \
+	kernel/drivers/devicemanager.cpp \
+	kernel/lib/more_time.c \
+	kernel/locking/irqlock.cpp \
+	kernel/locking/mutex.cpp \
 	kernel/locking/spinlock.cpp \
-	kernel/memory/armv6mmu.cpp \
+	kernel/memory/bootalloc.cpp \
 	kernel/memory/kheap.cpp \
 	kernel/memory/physicalalloc.cpp \
 	kernel/memory/vm.cpp \
-	kernel/newlib.cpp \
-	kernel/prekernel/early.cpp \
-	kernel/prekernel/main.cpp \
-	kernel/prekernel/start.S \
-	kernel/prekernel/vector_table.S \
-	kernel/syscall/syscalls.cpp \
-	kernel/task/elf_loader.cpp \
-	kernel/task/scheduler.cpp \
-	kernel/timer.cpp \
+	kernel/task/elfloader.cpp \
+	kernel/vfs/devfs/devfs.cpp \
 	kernel/vfs/fat32/fat32.cpp \
-	kernel/vfs/filesystem.cpp \
-	kernel/vfs/sysfs/sysfs.cpp \
-	kernel/vfs/path.cpp \
-	kernel/vfs/pipe.cpp \
+	kernel/vfs/fs.cpp \
 	kernel/vfs/vfs.cpp \
-	kernel/windowmanager/main.cpp \
+	kernel/irq.cpp \
+	kernel/newlib.cpp \
+	kernel/timer.cpp \
+	kernel/scheduler.cpp \
+	kernel/syscall.cpp \
+
+
 
 DEPENDS:=$(patsubst %.cpp, %.cpp.d, $(SOURCES))
+DEPENDS:=$(patsubst %.c, %.c.d, $(DEPENDS))
 DEPENDS:=$(patsubst %.S, %.S.d, $(DEPENDS))
 DEPENDS:=$(DEPENDS) linker.ld 
 DEPENDS:= $(addprefix $(SOURCES_ROOT), $(DEPENDS))
@@ -81,37 +67,21 @@ OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 
 .PHONY: all clean qemu qemu-gdb 
 
-all: Kernel
+all: kernel.elf bootloader 
 
-snapshot-drive.qcow2:
-	qemu-img create -f qcow2 snapshot-drive.qcow2 4G
+bootloader: kernel.elf
+	$(OBJCOPY) kernel.elf -O binary kernel.bin
+	$(MAKE) -e -C boot
 
-qemu: Kernel
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS)
-
-qemu-record: Kernel snapshot-drive.qcow2
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_RECORD_FLAGS)
-
-qemu-gdb: Kernel
-	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_SD_FLAGS) -s -S
-
-qemu-gdb-replay: Kernel snapshot-drive.qcow2
-	@echo "Run 'gdb' in another terminal and type 'target remote localhost:1234'"
-	$(QEMU) $(QEMU_FLAGS) -s -S $(QEMU_REPLAY_FLAGS)
-
-kernel.img: Kernel
-	$(OBJCOPY) Kernel -O binary _kernel.img
-	# Note that the RPi loads the binary at 0x8000,
-	# so we need to trim the first 0x8000 bytes from the binary
-	dd if=_kernel.img of=kernel.img bs=1024 skip=32
-
-Kernel: $(OBJS)
-	$(CXX) -T linker.ld -o Kernel $(OBJS) $(CXXFLAGS) -lgcc
+kernel.elf: $(OBJS)
+	$(CXX) -T linker.ld -o kernel.elf $(OBJS) $(CXXFLAGS) -lgcc
 
 -include $(DEPENDS)
 
 %.cpp.o: %.cpp Makefile
+	$(CXX) $< -c -o $@ $(CXXFLAGS)
+
+%.c.o: %.c Makefile
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
 %.S.o: %.S Makefile
@@ -119,5 +89,6 @@ Kernel: $(OBJS)
 
 clean:
 	$(RM) -f $(OBJS) $(DEPENDS)
-	$(RM) -f Kernel
-	$(RM) -f kernel7.img
+	$(RM) -f kernel.elf
+	$(RM) -f kernel.bin
+	$(MAKE) -e -C boot clean

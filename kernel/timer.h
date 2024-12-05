@@ -1,13 +1,19 @@
 #pragma once
 
-#include <kernel/error.h>
+#include <kernel/base.h>
+#include <kernel/lib/intrusivelinkedlist.h>
 
-namespace kernel {
+
+typedef void (*TimerCallback)(void*);
 
 void timer_init();
 
-uint64_t timer_time_passed_since_boot_in_ms();
+void timer_exec_once(uint64_t ms, TimerCallback callback, void *arg);
 
-Error timer_exec_after(uint32_t ms, void (*callback)(void*), void*);
+void timer_exec_periodic(uint64_t ms, TimerCallback callback, void *arg);
 
-}
+void timer_install_scheduler_callback(uint64_t ms, void (*callback)(InterruptFrame*));
+
+uint64_t get_ticks();
+
+uint32_t get_ticks_ms();

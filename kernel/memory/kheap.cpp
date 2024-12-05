@@ -4,16 +4,20 @@
 #include <kernel/memory/physicalalloc.h>
 #include <kernel/memory/vm.h>
 
-namespace kernel {
 
-static uintptr_t g_last_mapped_chunk = areas::heap.start;
-static uintptr_t g_brk = areas::heap.start;
+// #define LOG_ENABLED
+#define LOG_TAG "BRK"
+#include <kernel/log.h>
+
+static uintptr_t g_last_mapped_chunk = areas::kernel_heap.start;
+static uintptr_t g_brk = areas::kernel_heap.start;
 
 static size_t CHUNK_SIZE = 4 * _1KB;
 
 static Error brk(uintptr_t new_brk)
 {
-    if (new_brk < areas::heap.start || new_brk > areas::heap.end)
+    LOGD("Moving brk from %p to brk: %p", g_brk, new_brk);
+    if (new_brk < areas::kernel_heap.start || new_brk > areas::kernel_heap.end)
         return BadParameters;
 
     auto must_be_mapped_up_to = round_down<uintptr_t>(new_brk, CHUNK_SIZE);
@@ -24,6 +28,7 @@ static Error brk(uintptr_t new_brk)
             struct PhysicalPage* page;
 
             MUST(physical_page_alloc(PageOrder::_4KB, page));
+            LOGD("Mapping page %p at %p", page2addr(page), g_last_mapped_chunk + CHUNK_SIZE);
             MUST(vm_map(vm_current_address_space(), page, g_last_mapped_chunk + CHUNK_SIZE, PageAccessPermissions::PriviledgedOnly));
 
             g_last_mapped_chunk += CHUNK_SIZE;
@@ -33,9 +38,12 @@ static Error brk(uintptr_t new_brk)
 
         for (size_t i = 0; i < chunks_to_remove; i++) {
             struct PhysicalPage* to_free;
+            uintptr_t previously_mapped_physical_address = 0;
 
-            MUST(vm_unmap(vm_current_address_space(), g_last_mapped_chunk, to_free));
+            MUST(vm_unmap(vm_current_address_space(), g_last_mapped_chunk, previously_mapped_physical_address));
+            to_free = addr2page(previously_mapped_physical_address);
             MUST(physical_page_free(to_free, PageOrder::_4KB));
+            LOGD("Unmapping page %p from %p", previously_mapped_physical_address, g_last_mapped_chunk);
 
             g_last_mapped_chunk -= CHUNK_SIZE;
         }
@@ -48,7 +56,7 @@ static Error brk(uintptr_t new_brk)
 
 static Error sbrk(size_t size, uintptr_t& address)
 {
-    if (g_brk > areas::heap.end - size)
+    if (g_brk > areas::kernel_heap.end - size)
         return OutOfMemory;
 
     auto old_brk = g_brk;
@@ -102,6 +110,4 @@ Error krealloc(void*& addr, size_t size)
         return OutOfMemory;
     addr = a;
     return Success;
-}
-
 }

@@ -1,36 +1,18 @@
 #pragma once
 
-#include <kernel/sizes.h>
-#include <stddef.h>
-#include <stdint.h>
+#include <kernel/base.h>
 
-namespace kernel {
-
-struct Area {
-    uintptr_t start;
-    uintptr_t end;
-
-    constexpr bool contains(uintptr_t ptr) const
-    {
-        return start <= ptr && ptr < end;
-    }
-};
 
 namespace areas {
 
-static constexpr Area higher_half = { 0xe0000000, 0xffffffff };
+// These are defined by the bootloader
+static constexpr uintptr_t KERNEL_VIRT_START_ADDR = 0xc0000000;
+static constexpr uintptr_t PHYS_MEM_START_ADDR =    0xe0000000;
 
-extern "C" uint8_t _kernel_stack_start[];
-extern "C" uint8_t _kernel_stack_end[];
-static Area const kernel_stack = { reinterpret_cast<uintptr_t>(_kernel_stack_start), reinterpret_cast<uintptr_t>(_kernel_stack_end) };
-
-static constexpr Area user_stack = { 0xdfffe000 - (16 * _4KB), 0xdfffe000 };
-static constexpr Area kernel = { 0xe0000000, 0xe2000000 };
-static constexpr Area peripherals = { 0xe2000000, 0xe3000000 };
-static constexpr Area framebuffer = { 0xe3000000, 0xe4000000 };
-static constexpr Area temp_mappings = { 0xe4000000, 0xe4100000 };
-static constexpr Area heap = { 0xe4100000, 0xffffffff };
-
-}
+static constexpr Range kernel_area = { KERNEL_VIRT_START_ADDR, 0xffffffff };
+static constexpr Range kernel_code = Range::from_start_and_size(kernel_area.start, 16 * _1MB);
+static constexpr Range peripherals = Range::from_start_and_size(kernel_code.end, 32 * _1MB);
+static constexpr Range kernel_heap = Range {peripherals.end, PHYS_MEM_START_ADDR};
+static constexpr Range physical_mem = Range::from_start_and_size(PHYS_MEM_START_ADDR, 512 * _1MB);
 
 }

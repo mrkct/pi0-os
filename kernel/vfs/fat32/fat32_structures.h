@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace kernel::fat32 {
+namespace fat32 {
 
 static constexpr uint16_t BOOT_SIGNATURE = 0xaa55;
 
@@ -89,7 +89,7 @@ static_assert(sizeof(DirectoryEntry) == 32, "DirectoryEntry size must be 32 byte
 
 static inline bool is_valid_cluster(uint32_t cluster)
 {
-    return cluster < 0x0ffffff8;
+    return cluster < 0x0ffffff8 && cluster >= 2;
 }
 
 }

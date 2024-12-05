@@ -1,7 +1,12 @@
-Kernel
+kernel.elf
+kernel.bin
+boot.elf
+boot.bin
+linker.preprocessed.ld
 disks/*
 *.img
-replay.bin
+_disk_image.bin
+*.recording
 snapshot-drive.qcow2
 
 # Prerequisites

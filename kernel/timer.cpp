@@ -1,79 +1,121 @@
-#include <kernel/device/systimer.h>
+#include <kernel/drivers/devicemanager.h>
 #include <kernel/memory/kheap.h>
+#include <kernel/locking/irqlock.h>
 
-namespace kernel {
+#include "timer.h"
 
-constexpr uint32_t MS_BETWEEN_INTERRUPTS = 75;
 
-struct TimerEvent {
-    int64_t time_to_exec;
-    void (*callback)(void*);
-    void* data;
-
-    TimerEvent* next;
+enum class TimerType {
+    Periodic,
+    OneShot,
 };
 
-static uint64_t g_time_passed_since_boot_in_ms = 0;
-static TimerEvent* g_active_timer_events = nullptr;
+struct Timer {
+    INTRUSIVE_LINKED_LIST_HEADER(Timer);
 
-static void systimer_callback()
-{
-    g_time_passed_since_boot_in_ms += MS_BETWEEN_INTERRUPTS;
+    TimerType type;
+    TimerCallback callback;
+    void *arg;
 
-    TimerEvent* prev = nullptr;
-    TimerEvent* event = g_active_timer_events;
+    uint64_t start_time;
+    uint64_t period;
+};
 
-    // kprintf("------\n");
-    while (event) {
-        event->time_to_exec -= MS_BETWEEN_INTERRUPTS;
-        // kprintf("Time to exec: %d\n", (int) event->time_to_exec);
 
-        if (event->time_to_exec <= 0) {
-            event->callback(event->data);
-
-            if (prev) {
-                prev->next = event->next;
-            } else {
-                g_active_timer_events = event->next;
-            }
-
-            kfree(event);
-            event = prev ? prev->next : g_active_timer_events;
-        } else {
-            prev = event;
-            event = event->next;
-        }
-    }
-}
+static IntrusiveLinkedList<Timer> s_timers;
+static struct {
+    void (*callback)(InterruptFrame*) = [](InterruptFrame*) {};
+    uint64_t next_deadline = 0;
+    uint64_t period = 0;
+} s_scheduler;
 
 void timer_init()
 {
-    MUST(systimer_install_handler(SystimerChannel::Channel1, [](auto*) {
-        systimer_callback();
-        systimer_trigger(SystimerChannel::Channel1, systimer_ms_to_ticks(MS_BETWEEN_INTERRUPTS));
-    }));
-    systimer_trigger(SystimerChannel::Channel1, systimer_ms_to_ticks(MS_BETWEEN_INTERRUPTS));
+    auto *systimer = devicemanager_get_system_timer_device();
+    kassert(systimer != nullptr);
+
+    uint64_t period = 5 * systimer->ticks_per_ms();
+    systimer->start(period, [](InterruptFrame *iframe, SystemTimer &systimer, uint64_t, void*) {
+        s_timers.foreach([&](Timer *timer) {
+            if (timer->start_time + timer->period <= systimer.ticks()) {
+                timer->callback(timer->arg);
+                
+                if (timer->type == TimerType::OneShot) {
+                    s_timers.remove(timer);
+                    kfree(timer);
+                } else {
+                    timer->start_time = systimer.ticks();
+                }
+            }
+        });
+
+        if (s_scheduler.next_deadline <= systimer.ticks()) {
+            s_scheduler.callback(iframe);
+            s_scheduler.next_deadline = systimer.ticks() + s_scheduler.period;
+        }
+    }, nullptr);
 }
 
-uint64_t timer_time_passed_since_boot_in_ms()
+static void schedule_timer(Timer *timer, uint64_t ms)
 {
-    return g_time_passed_since_boot_in_ms;
+    auto *systimer = devicemanager_get_system_timer_device();
+    kassert(systimer != nullptr);
+
+    auto lock = irq_lock();
+    {
+        timer->start_time = systimer->ticks();
+        timer->period = ms * systimer->ticks_per_ms();
+        s_timers.add(timer);
+    }
+    release(lock);
 }
 
-Error timer_exec_after(uint32_t ms, void (*callback)(void*), void* data)
+void timer_exec_once(uint64_t ms, TimerCallback callback, void *arg)
 {
-    TimerEvent* event;
+    Timer *timer = reinterpret_cast<Timer*>(mustmalloc(sizeof(Timer)));
+    timer->type = TimerType::OneShot;
+    timer->callback = callback;
+    timer->arg = arg;
 
-    TRY(kmalloc(sizeof(*event), event));
-    *event = TimerEvent {
-        .time_to_exec = ms,
-        .callback = callback,
-        .data = data,
-        .next = g_active_timer_events,
-    };
-    g_active_timer_events = event;
-
-    return Success;
+    schedule_timer(timer, ms);
 }
 
+void timer_exec_periodic(uint64_t ms, TimerCallback callback, void *arg)
+{
+    Timer *timer = reinterpret_cast<Timer*>(mustmalloc(sizeof(Timer)));
+    timer->type = TimerType::Periodic;
+    timer->callback = callback;
+    timer->arg = arg;
+    
+    schedule_timer(timer, ms);
+}
+
+void timer_install_scheduler_callback(uint64_t ms, void (*callback)(InterruptFrame*))
+{
+    auto *systimer = devicemanager_get_system_timer_device();
+    kassert(systimer != nullptr);
+
+    auto lock = irq_lock();
+    {
+        s_scheduler.period = systimer->ticks_per_ms() * ms;
+        s_scheduler.next_deadline = systimer->ticks() + s_scheduler.period;
+        s_scheduler.callback = callback;
+    }
+    release(lock);
+}
+
+uint64_t get_ticks()
+{
+    auto *systimer = devicemanager_get_system_timer_device();
+    if (systimer == nullptr)
+        return 0;
+    return systimer->ticks();
+}
+
+uint32_t get_ticks_ms()
+{
+    auto *systimer = devicemanager_get_system_timer_device();
+    if (systimer == nullptr)
+        return 0;
+    return (uint32_t) (systimer->ticks() / systimer->ticks_per_ms());
 }
