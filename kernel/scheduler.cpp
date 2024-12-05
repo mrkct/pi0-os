@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <kernel/arch/arch.h>
 #include <kernel/memory/areas.h>
 #include <kernel/memory/vm.h>
@@ -194,6 +195,8 @@ Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged)
     new_process->threads.allocated = 1;
     new_process->threads.count = 1;
     new_process->threads.data[0] = first_thread;
+    for (size_t i = 0; i < array_size(new_process->openfiles); i++)
+        new_process->openfiles[i] = nullptr;
 
     first_thread->tid = new_process->next_available_tid++;
     first_thread->process = new_process;
@@ -239,9 +242,24 @@ Process *cpu_current_process()   { return cpu_current_thread()->process; }
 
 void create_first_process(void (*entrypoint)(void))
 {
+    int rc;
+    FileCustody *temp;
     Process *stage2 = alloc_process("kernel", entrypoint, true);
     kassert(stage2 != nullptr);
     Thread *thread = stage2->threads.data[0];
+
+    rc = vfs_open("/dev/kernel_log", O_RDONLY, &temp);
+    kassert(rc == 0);
+    stage2->openfiles[STDIN_FILENO] = temp;
+    
+    rc = vfs_open("/dev/kernel_log", O_WRONLY, &temp);
+    kassert(rc == 0);
+    stage2->openfiles[STDOUT_FILENO] = temp;
+
+    rc = vfs_open("/dev/kernel_log", O_WRONLY, &temp);
+    kassert(rc == 0);
+    stage2->openfiles[STDERR_FILENO] = temp;
+
     thread->state = ThreadState::Runnable;
     s_current_thread = thread;
 }
@@ -299,20 +317,41 @@ int sys$yield()
 
 int sys$fork()
 {
+    int rc = 0;
+    FileCustody *custody = nullptr;
+    Process *forked = nullptr;
+    Thread *forked_thread = nullptr;
     auto *current_process = cpu_current_process();
     auto *current_thread = cpu_current_thread();
 
     LOGI("Forking %s[%d/%d]", current_process->name, current_process->pid, current_thread->tid);
 
     // entrypoint and priviledged don't matter, we're going to copy the other process state anyway
-    Process *forked = alloc_process(current_process->name, NULL, false);
-    if (forked == nullptr)
-        return -ENOMEM;
+    forked = alloc_process(current_process->name, NULL, false);
+    if (forked == nullptr) {
+        LOGE("Failed to allocate memory to fork process");
+        rc = -ENOMEM;
+        goto failed;
+    }
+    
+    for (size_t i = 0; i < array_size(current_process->openfiles); i++) {
+        custody = current_process->openfiles[i];
+        if (custody == nullptr)
+            continue;
 
-    Thread *forked_thread = forked->threads.data[0];
+        forked->openfiles[i] = vfs_duplicate(custody);
+        if (forked->openfiles[i] == nullptr) {
+            LOGE("Failed to duplicate open file");
+            rc = -ENOMEM;
+            goto failed;
+        }
+    }
+
+    forked_thread = forked->threads.data[0];
     if (Error err = vm_fork(current_process->address_space, forked->address_space); !err.is_success()) {
-        free_process(forked);
-        return -ENOMEM;
+        LOGE("Failed to fork address space");
+        rc = -ENOMEM;
+        goto failed;
     }
 
     *(forked_thread->iframe) = *(current_thread->iframe);
@@ -320,6 +359,10 @@ int sys$fork()
 
     forked_thread->state = ThreadState::Runnable;
     return forked->pid;
+
+failed:
+    free_process(forked);
+    return rc;
 }
 
 int sys$execve(const char *path, char *const argv[], char *const envp[])
@@ -423,7 +466,7 @@ int sys$read(int fd, void *buf, size_t count)
     if (file == nullptr)
         return -EBADF;
     
-    return vfs_write(file, (const uint8_t*) buf, count);
+    return vfs_read(file, (uint8_t*) buf, count);
 }
 
 int sys$write(int fd, const void *buf, size_t count)
@@ -438,7 +481,7 @@ int sys$write(int fd, const void *buf, size_t count)
     if (file == nullptr)
         return -EBADF;
     
-    return vfs_read(file, (uint8_t*) buf, count);
+    return vfs_write(file, (const uint8_t*) buf, count);
 }
 
 int sys$close(int fd)
