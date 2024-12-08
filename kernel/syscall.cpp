@@ -40,6 +40,12 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_MilliSleep:
         rc = sys$millisleep((int) arg1);
         break;
+    case SYS_FStat:
+        rc = sys$fstat((int) arg1, (struct stat*) arg2);
+        break;
+    case SYS_GetPid:
+        rc = sys$getpid();
+        break;
     default:
         kprintf("Unknown syscall %d\n", syscall);
         rc = -ENOSYS;

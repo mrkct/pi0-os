@@ -8,7 +8,7 @@ cp -r base/* $DIR
 
 make -C libs libapp.a
 
-TO_INSTALL="init"
+TO_INSTALL="init shell"
 for software in $TO_INSTALL; do
     echo "Installing '$software'..."
     MOUNT_POINT=$DIR make -C $software install

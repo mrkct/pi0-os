@@ -5,15 +5,18 @@
 #include <stdint.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <sys/fcntl.h>
 
 
 typedef enum SyscallIdentifiers {
     SYS_Yield = 1,
     SYS_Exit = 2,
     SYS_DebugLog = 3,
-    SYS_GetProcessInfo = 4,
+    SYS_GetPid = 4,
     SYS_Fork = 5,
     SYS_Execve = 6,
+    SYS_WaitPid = 7,
+    SYS_Kill = 8,
 
     SYS_Open = 10,
     SYS_Read = 11,
@@ -24,29 +27,20 @@ typedef enum SyscallIdentifiers {
     SYS_CreatePipe = 16,
     SYS_Dup2 = 17,
     SYS_Select = 18,
-
+    SYS_FStat = 19,
     SYS_MakeDirectory = 20,
-    SYS_ReadDirEntry = 21,
+    SYS_RemoveDirectory = 21,
+    SYS_Link = 22,
+    SYS_Unlink = 23,
 
     SYS_GetDateTime = 30,
     SYS_MilliSleep = 31,
-
-    SYS_Poll = 40,
-    SYS_Send = 41,
-
-    SYS_SpawnProcess = 50,
-    SYS_AwaitProcess = 51,
-
-    SYS_GetBrk = 60,
-    SYS_SetBrk = 61,
-
-    SYS_CreateWindow = 80,
-    SYS_UpdateWindow = 81,
 } SyscallIdentifiers;
 
 
 
 typedef enum MajorDeviceNumber {
+    Maj_Reserved = 0,
     Maj_Disk = 3,
     Maj_TTY = 4,
     Maj_Console = 5,
@@ -57,7 +51,7 @@ typedef enum MajorDeviceNumber {
 
 #include "arm/syscall.h"
 
-// #include "files.h"
+#include "files.h"
 // #include "process.h"
 // #include "input.h"
 #include "time.h"

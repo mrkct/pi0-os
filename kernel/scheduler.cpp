@@ -523,3 +523,25 @@ int sys$millisleep(int ms)
 
     return 0;
 }
+
+int sys$fstat(int fd, struct stat *stat)
+{
+    auto *current_process = cpu_current_process();
+    FileCustody *file = nullptr;
+
+    if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
+        return -EBADF;
+    
+    file = current_process->openfiles[fd];
+    if (file == nullptr)
+        return -EBADF;
+    
+    return vfs_fstat(file, stat);
+}
+
+int sys$getpid()
+{
+    return cpu_current_process()->pid;
+}
+
+

@@ -24,4 +24,6 @@ int vfs_close(FileCustody*);
 
 int vfs_stat(const char *path, struct stat*);
 
+int vfs_fstat(FileCustody *custody, struct stat *stat);
+
 FileCustody* vfs_duplicate(FileCustody*);

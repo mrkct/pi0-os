@@ -507,6 +507,11 @@ int vfs_stat(const char *path, struct stat *stat)
     return rc;
 }
 
+int vfs_fstat(FileCustody *custody, struct stat *stat)
+{
+    return custody->inode->ops->stat(custody->inode, stat);
+}
+
 FileCustody* vfs_duplicate(FileCustody *custody)
 {
     auto *dup = (FileCustody*) malloc(sizeof(FileCustody));

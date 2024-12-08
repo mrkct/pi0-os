@@ -6,6 +6,7 @@ linker.preprocessed.ld
 disks/*
 *.img
 _disk_image.bin
+_disk_image.qcow2
 *.recording
 snapshot-drive.qcow2
 

@@ -3,6 +3,7 @@
 all:
 	#$(MAKE) -C libs libapp.a
 	$(MAKE) -C init init
+	$(MAKE) -C shell shell
 	#$(MAKE) -C hello hello
 	#$(MAKE) -C clock clock
 	./create_disk.sh

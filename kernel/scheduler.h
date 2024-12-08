@@ -82,3 +82,7 @@ int sys$write(int fd, const void *buf, size_t count);
 int sys$close(int fd);
 
 int sys$millisleep(int ms);
+
+int sys$fstat(int fd, struct stat *stat);
+
+int sys$getpid();

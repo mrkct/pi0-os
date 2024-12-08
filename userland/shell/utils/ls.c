@@ -1,35 +1,36 @@
 #include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include "api/files.h"
+#include <stdlib.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 
 int ls_main(int argc, const char *argv[])
 {
+    struct DIR *dir;
+    struct dirent *entry;
+
     if (argc != 2) {
-        printf("ls: Invalid number of arguments.\n");
+        fprintf(stderr, "ls: Invalid number of arguments.\n");
         return -1;
     }
 
-    int fd = open(argv[1], 0, O_RDONLY);
-    if (fd < 0) {
-        fprintf(stderr, "ls: Could not open %s\n", argv[1]);
-        return -1;
+    dir = opendir(argv[1]);
+    if (dir == NULL) {
+        perror("opendir");
+        exit(EXIT_FAILURE);
     }
 
-    DirectoryEntry dirent;
-    while (sys_read_direntry(fd, &dirent, 1) > 0) {
-        char ctype;
-        switch (dirent.filetype) {
-        case RegularFile: ctype = 'f'; break;
-        case Directory: ctype = 'd'; break;
-        case CharacterDevice: ctype = 'c'; break;
-        case Pipe: ctype = 'p'; break;
-        default: ctype = '?'; break;
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip the "." and ".." entries
+        if (entry->d_name[0] == '.' && 
+            (entry->d_name[1] == '\0' || (entry->d_name[1] == '.' && entry->d_name[2] == '\0'))) {
+            continue;
         }
-        printf("[%c] %s %llu\n", ctype, dirent.name, dirent.size);
+
+        printf("%s\n", entry->d_name);
     }
+
+    closedir(dir);
 
     return 0;
 }

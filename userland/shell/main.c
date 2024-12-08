@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <sys/wait.h>
 #include <api/syscalls.h>
 #include "libsstring.h"
 
@@ -13,11 +15,14 @@ extern int cat_main(int argc, const char *argv[]);
 extern int cd_main(int argc, const char *argv[]);
 extern int pwd_main(int argc, const char *argv[]);
 extern int mkdir_main(int argc, const char *argv[]);
+extern int rm_main(int argc, const char *argv[]);
 
 static struct { const char *name; int (*main)(int argc, const char *argv[]); } builtins[] = {
+    { "cat", cat_main },
     { "echo", echo_main },
     { "ls", ls_main },
-    { "cat", cat_main },
+    { "mkdir", mkdir_main },
+    { "rm", rm_main },
 };
 
 static char *read_line(const char *prompt);
@@ -87,7 +92,7 @@ static size_t argv_from_tokenized_line(const char *tokenized_line,
         argv[i] = tokenized_line;
         tokenized_line += strlen(tokenized_line) + 1;
     }
-    argv[argc] = "\0";
+    argv[argc] = NULL;
 
     return argc;
 }
@@ -109,21 +114,23 @@ static int run_builtin_command(const char *command, size_t argc, const char *arg
 
 static int run_program(size_t argc, const char *argv[])
 {
-    PID pid;
-    int32_t fds[] = {0, 1, 2}; // Inherit stdin, stdout and stderr
-    SpawnProcessConfig cfg = {
-        .args = argv,
-        .args_len = argc,
-        .descriptors = fds,
-        .descriptors_len = 3,
-        .flags = 0
-    };
+    char * const emptyenv[] = { NULL };
+    int pid, status;
+    (void) argc;
 
-    if (spawn_process(argv[0], &cfg, &pid) != 0)
+    pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "fork() failed: %d\n", pid);
         return -1;
+    }
 
-    await_process(pid);
-
+    if (pid == 0) {
+        execve(argv[0], (char *const *) argv, emptyenv);
+        fprintf(stderr, "execv() failed: %d\n", pid);
+        exit(-1);
+    } 
+    
+    waitpid(pid, &status, WNOHANG);
     return 0;
 }
 
