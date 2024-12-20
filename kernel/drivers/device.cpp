@@ -216,3 +216,39 @@ int32_t RealTimeClock::ioctl(uint32_t request, void*)
 
     return rc;
 }
+
+int64_t InputDevice::read(uint8_t *buffer, size_t size)
+{
+    size_t elements = size / sizeof(api::InputEvent);
+    api::InputEvent *out_events = (api::InputEvent*) buffer;
+
+    for (size_t i = 0; i < elements; i++) {
+        get_next_event(out_events[i]);
+    }
+
+    return elements * sizeof(api::InputEvent);
+}
+
+void InputDevice::notify_event(api::InputEvent event)
+{
+    mutex_take(this->m_events.lock);
+    this->m_events.events.push(event);
+    mutex_release(this->m_events.lock);
+}
+
+void InputDevice::get_next_event(api::InputEvent& event)
+{
+    while (true) {
+        while (this->m_events.events.is_empty()) {
+            cpu_relax();
+        }
+        mutex_take(this->m_events.lock);
+        if (this->m_events.events.is_empty()) {
+            mutex_release(this->m_events.lock);
+            continue;
+        }
+        this->m_events.events.pop(event);
+        mutex_release(this->m_events.lock);
+        break;
+    }
+}

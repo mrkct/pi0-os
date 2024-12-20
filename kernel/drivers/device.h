@@ -5,7 +5,9 @@
 #include <kernel/irq.h>
 #include <kernel/memory/vm.h>
 #include <kernel/arch/arch.h>
+#include <kernel/lib/ringbuffer.h>
 #include <include/api/syscalls.h>
+#include <include/api/input.h>
 
 
 class Device
@@ -217,4 +219,32 @@ public:
 
     virtual int32_t get_time(DateTime&) = 0;
     virtual int32_t set_time(const DateTime) = 0;
+};
+
+class InputDevice: public CharacterDevice
+{
+private:
+    static uint8_t s_next_minor;
+public:
+    InputDevice(uint8_t major, uint8_t minor, const char *name)
+        : CharacterDevice(major, minor, name)
+    {
+        mutex_init(this->m_events.lock, MutexInitialState::Unlocked);
+    }
+
+    virtual ~InputDevice() {};
+
+    virtual int64_t read(uint8_t *buffer, size_t size) override;
+    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP; }
+
+protected:
+    void notify_event(api::InputEvent);
+
+private:
+    void get_next_event(api::InputEvent&);
+
+    struct {
+        Mutex lock;
+        RingBuffer<32, api::InputEvent> events;
+    } m_events;
 };
