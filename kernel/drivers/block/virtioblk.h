@@ -27,8 +27,6 @@ public:
         uint32_t irq;
     };
 
-    static bool probe(uintptr_t address);
-
     VirtioBlockDevice(Config const *config)
         : SimpleBlockDevice(512, "virtioblk"), m_config(*config) 
     {}

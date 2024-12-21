@@ -56,7 +56,10 @@ static constexpr Driver s_drivers[] = {
     basic_init<BCM2835SystemTimer>("brcm,bcm2835-system-timer"),
     basic_init<ARMv7Timer>("arm,armv7-timer"),
     basic_init<PL031>("arm,pl031"),
-    basic_init<VirtioBlockDevice>("virtio,mmio"),
+
+    // This is not right: the compatible should be "virtio,mmio" which handles
+    // all virtio devices, not separate compatibles for each device class
+    basic_init<VirtioBlockDevice>("virtioblk,mmio"),
 };
 
 static Driver const *find_driver(const char *compatible)
@@ -314,27 +317,39 @@ static void virt_load_peripherals()
 
     constexpr uintptr_t VIRTIO_MMIO_FIRST_ADDR = 0xa000000;
     constexpr uint32_t VIRTIO_MMIO_FIRST_IRQ = 0x10;
-    Driver const *virtio_drv = find_driver("virtio,mmio");
     for (int32_t i = 0; i < 30; i++) {
         uintptr_t virtio_mmio_addr = VIRTIO_MMIO_FIRST_ADDR + 0x200 * i;
-        VirtioBlockDevice::Config config = {
-            .address = virtio_mmio_addr,
-            .irq = 32 + VIRTIO_MMIO_FIRST_IRQ + i,
-        };
+        uint32_t virtio_irq = 32 + VIRTIO_MMIO_FIRST_IRQ + i;
 
-        if (!VirtioBlockDevice::probe(virtio_mmio_addr))
-            continue;
-
-        kprintf("Initializing virtio-mmio device @ %p...\n", virtio_mmio_addr);
-        auto *virtio_mmio_dev = reinterpret_cast<VirtioBlockDevice*>(
-            virtio_drv->load("virtio,mmio", mustmalloc(virtio_drv->required_space), &config)
-        );
-        rc = virtio_mmio_dev->init();
-        if (rc != 0)
-            panic("Failed to initialize virtio-mmio device @ %p: %d\n", virtio_mmio_addr, rc);
+        switch (virtio_util_probe(virtio_mmio_addr)) {
+            case VirtioDeviceID::BlockDevice: {
+                Driver const *virtio_drv = find_driver("virtioblk,mmio");
+                kassert(virtio_drv != nullptr);
+    
+                auto config = VirtioBlockDevice::Config {
+                    .address = virtio_mmio_addr,
+                    .irq = virtio_irq
+                };
+                kprintf("Initializing %s device @ %p...\n", virtio_drv->compatible, virtio_mmio_addr);
+                auto *virtio_mmio_dev = reinterpret_cast<VirtioBlockDevice*>(
+                    virtio_drv->load(virtio_drv->compatible, mustmalloc(virtio_drv->required_space), &config)
+                );
+                rc = virtio_mmio_dev->init();
+                if (rc != 0)
+                    panic("Failed to initialize %s device @ %p: %d\n", virtio_drv->compatible, virtio_mmio_addr, rc);
         
-        register_device(virtio_mmio_dev);
-        if (s_defaults.storage == nullptr)
-            s_defaults.storage = virtio_mmio_dev;
+                register_device(virtio_mmio_dev);
+                if (s_defaults.storage == nullptr)
+                    s_defaults.storage = virtio_mmio_dev;
+
+                break;
+            }
+
+            case VirtioDeviceID::Unsupported:
+            case VirtioDeviceID::Invalid:
+            default:
+                continue;
+        }
+
     }
 }

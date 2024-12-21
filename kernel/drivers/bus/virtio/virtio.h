@@ -105,7 +105,7 @@ static_assert(offsetof(VirtioRegisterMap, block) == 0x100);
 
 VirtioDeviceID virtio_util_probe(uintptr_t address);
 
-int32_t virtio_util_do_generic_unit_step(
+int32_t virtio_util_do_generic_init_step(
     VirtioRegisterMap volatile *r,
     VirtioDeviceID expected_device_class,
     uint32_t supported_features

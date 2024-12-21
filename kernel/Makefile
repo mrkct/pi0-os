@@ -24,6 +24,7 @@ SOURCES=\
 	$(ARCH_SOURCES) \
 	kernel/kprintf.cpp \
 	kernel/main.cpp \
+	kernel/drivers/bus/virtio/virtio.cpp \
 	kernel/drivers/char/bcm2835_aux_uart.cpp \
 	kernel/drivers/char/bcm2835_gpio.cpp \
 	kernel/drivers/char/pl011.cpp \

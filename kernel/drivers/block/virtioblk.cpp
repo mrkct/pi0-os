@@ -17,15 +17,9 @@ static constexpr uint32_t VIRTIO_SUPPORTED_FEATURES = 0;
 static constexpr uint32_t BLOCK_DEVICE_SUPPORTED_FEATURES = VirtioBlockDeviceFeatures::ReadOnly;
 
 
-bool VirtioBlockDevice::probe(uintptr_t address)
-{
-    return virtio_util_probe(address) == VirtioDeviceID::BlockDevice;
-}
-
 int32_t VirtioBlockDevice::init()
 {
     int32_t rc = 0;
-    uint32_t features = 0;
 
     r = static_cast<VirtioRegisterMap volatile*>(ioremap(m_config.address, sizeof(VirtioRegisterMap)));
     if (!r) {
@@ -34,7 +28,7 @@ int32_t VirtioBlockDevice::init()
     }
     LOGD("Registers are mapped at 0x%p", r);
 
-    rc = virtio_util_do_generic_unit_step(r, VirtioDeviceID::BlockDevice, BLOCK_DEVICE_SUPPORTED_FEATURES);
+    rc = virtio_util_do_generic_init_step(r, VirtioDeviceID::BlockDevice, BLOCK_DEVICE_SUPPORTED_FEATURES);
     if (rc != 0) {
         LOGE("Failed virtio generic init step: %" PRId32);
         goto failed;

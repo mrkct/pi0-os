@@ -49,6 +49,7 @@ typedef enum MajorDeviceNumber {
     Maj_RTC = 8,
     Maj_Keyboard = 9,
     Maj_Mouse = 10,
+    Maj_Input = 11,
 } MajorDeviceNumber;
 
 #include "arm/syscall.h"
