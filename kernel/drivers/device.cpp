@@ -10,6 +10,7 @@ uint8_t Console::s_next_minor = 0;
 uint8_t UART::s_next_minor = 0;
 uint8_t GPIOController::s_next_minor = 0;
 uint8_t RealTimeClock::s_next_minor = 0;
+uint8_t InputDevice::s_next_minor = 0;
 
 
 FileDevice::FileDevice(uint8_t major, uint8_t minor, char const* name)

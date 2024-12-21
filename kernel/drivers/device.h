@@ -226,8 +226,8 @@ class InputDevice: public CharacterDevice
 private:
     static uint8_t s_next_minor;
 public:
-    InputDevice(uint8_t major, uint8_t minor, const char *name)
-        : CharacterDevice(major, minor, name)
+    InputDevice()
+        : CharacterDevice(Maj_Input, s_next_minor++, "input")
     {
         mutex_init(this->m_events.lock, MutexInitialState::Unlocked);
     }

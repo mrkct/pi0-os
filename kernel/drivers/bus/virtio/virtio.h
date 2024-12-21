@@ -2,8 +2,27 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <kernel/memory/physicalalloc.h>
 #include "virtio_queue.h"
 
+
+enum class VirtioDeviceID: uint32_t {
+    Invalid,
+    BlockDevice = 2,
+    Unsupported = 0xffffffff
+};
+
+struct SplitVirtQueue {
+    size_t idx;
+    size_t size;
+    PhysicalPage *alloc_page;
+    uint16_t first_free_desc_idx;
+    uint16_t last_seen_used_idx;
+
+    volatile struct virtq_desc *desc_table;
+    volatile struct virtq_avail *avail;
+    volatile struct virtq_used *used;
+};
 
 struct VirtioRegisterMap {
     uint32_t MagicValue;
@@ -83,3 +102,31 @@ static_assert(offsetof(VirtioRegisterMap, QueueDescLow) == 0x80);
 static_assert(offsetof(VirtioRegisterMap, QueueDeviceLow) == 0xa0);
 static_assert(offsetof(VirtioRegisterMap, ConfigGeneration) == 0xfc);
 static_assert(offsetof(VirtioRegisterMap, block) == 0x100);
+
+VirtioDeviceID virtio_util_probe(uintptr_t address);
+
+int32_t virtio_util_do_generic_unit_step(
+    VirtioRegisterMap volatile *r,
+    VirtioDeviceID expected_device_class,
+    uint32_t supported_features
+);
+
+int32_t virtio_util_complete_init_step(VirtioRegisterMap volatile *r);
+
+int32_t virtio_util_init_failure(VirtioRegisterMap volatile *r);
+
+int32_t virtio_util_setup_virtq(
+    VirtioRegisterMap volatile *r,
+    uint32_t index,
+    uint32_t size,
+    SplitVirtQueue **out_q
+);
+
+int virtio_virtq_alloc_desc(SplitVirtQueue *q);
+
+void virtio_virtq_free_desc(SplitVirtQueue *q, int desc_idx);
+
+void virtio_virtq_enqueue_desc(
+    VirtioRegisterMap volatile *r,
+    SplitVirtQueue *q, int desc_idx
+);

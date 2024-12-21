@@ -2,20 +2,8 @@
 
 #include <kernel/drivers/device.h>
 #include <kernel/locking/spinlock.h>
-#include "virtio.h"
+#include <kernel/drivers/bus/virtio/virtio.h>
 
-
-struct SplitVirtQueue {
-    size_t idx;
-    size_t size;
-    PhysicalPage *alloc_page;
-    uint16_t first_free_desc_idx;
-    uint16_t last_seen_used_idx;
-
-    volatile struct virtq_desc *desc_table;
-    volatile struct virtq_avail *avail;
-    volatile struct virtq_used *used;
-};
 
 struct VirtioBlockRequest {
     INTRUSIVE_LINKED_LIST_HEADER(VirtioBlockRequest);
