@@ -39,3 +39,13 @@ extern "C" int strncasecmp(const char s1[], const char s2[], size_t n)
 
     return 0;
 }
+
+extern "C" char *strdup(const char *s)
+{
+    size_t len = strlen(s);
+    char *dup = (char*) malloc(len + 1);
+    if (dup == nullptr)
+        return nullptr;
+    memcpy(dup, s, len + 1);
+    return dup;
+}

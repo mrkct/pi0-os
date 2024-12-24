@@ -352,7 +352,6 @@ static int traverse(const char *path, Inode **out_parent, Inode **out_inode)
 {
     int rc;
     char *cpath = canonicalize_path(path);
-    const char *relative_path = nullptr;
     if (cpath == nullptr)
         return -ENOMEM;
 

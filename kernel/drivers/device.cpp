@@ -253,3 +253,13 @@ void InputDevice::get_next_event(api::InputEvent& event)
         break;
     }
 }
+
+int32_t InputDevice::ioctl(uint32_t request, void *argp)
+{
+    (void) argp;
+
+    switch (request) {
+        default:
+            return -ENOTSUP;
+    }
+}

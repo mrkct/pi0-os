@@ -236,6 +236,7 @@ public:
 
     virtual int64_t read(uint8_t *buffer, size_t size) override;
     virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int32_t ioctl(uint32_t request, void *argp) override;
 
 protected:
     void notify_event(api::InputEvent);
