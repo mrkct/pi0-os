@@ -3,6 +3,10 @@
 
 static constexpr uint32_t RXINTR_MASK = 1 << 4;
 
+// In "Flag register, UARTFR"
+// RXFE: Receive FIFO Empty
+static constexpr uint32_t RXFE_MASK = 1 << 4;
+
 PL011UART::PL011UART(Config const *config)
     :   UART(), m_config(*config)
 {
@@ -103,7 +107,8 @@ int32_t PL011UART::ioctl(uint32_t, void*)
 void PL011UART::irq_handler()
 {
     if (ioread32(&r->RIS) & RXINTR_MASK) {
-        while (uint8_t data = (ioread32(&r->DR) & 0xff)) {
+        while (!(ioread32(&r->FR) & RXFE_MASK)) {
+            uint8_t data = ioread32(&r->DR) & 0xff;
             kprintf("'%c'\n", data);
         }
         iowrite32(&r->ICR, RXINTR_MASK);
