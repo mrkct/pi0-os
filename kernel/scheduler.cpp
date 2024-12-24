@@ -95,6 +95,78 @@ static void *alloc_thread_user_stack(AddressSpace *address_space, int tid)
 }
 
 /**
+ * Clones a NULL-terminated array of NULL-terminated strings coming from userspace
+ * into a heap-allocated array of heap-allocated strings.
+ * 
+ */
+static int clone_user_array_of_strings(char const *const user_array[], char ***out_array, size_t *out_array_size)
+{
+    constexpr size_t MAX_STRING_SIZE = 256;
+    constexpr size_t MAX_ARRAY_SIZE = 128;
+
+    int rc = 0;
+    char **array = nullptr;
+    size_t array_size = 0;
+
+    while (user_array[array_size] != nullptr && array_size < MAX_ARRAY_SIZE)
+        array_size++;
+    if (array_size == MAX_ARRAY_SIZE) {
+        LOGE("Too many string arguments");
+        return -E2BIG;
+    }
+
+    array = (char**) malloc(array_size * sizeof(char*));
+    if (array == nullptr) {
+        LOGE("Failed to allocate array of strings");
+        rc = -ENOMEM;
+        goto failed;
+    }
+
+    for (size_t i = 0; i < array_size; i++) {
+        size_t len = strnlen(user_array[i], MAX_STRING_SIZE);
+        if (len == MAX_STRING_SIZE) {
+            LOGE("String too long");
+            rc = -E2BIG;
+            goto failed;
+        }
+
+        array[i] = strdup(user_array[i]);
+        if (array[i] == nullptr) {
+            LOGE("Failed to allocate string");
+            rc = -ENOMEM;
+            goto failed;
+        }
+    }
+
+    *out_array = array;
+    *out_array_size = array_size;
+    return 0;
+
+failed:
+    if (array != nullptr) {
+        for (size_t i = 0; i < array_size; i++) {
+            free(array[i]);
+        }
+        free(array);
+    }
+
+    return rc;
+}
+
+/**
+ * Frees an array of strings allocated by clone_user_array_of_strings()
+ */
+static void free_array_of_strings(char *const *array, size_t array_size)
+{
+    if (array) {
+        for (size_t i = 0; i < array_size; i++) {
+            free((void*) array[i]);
+        }
+        free((void*) array);
+    }
+}
+
+/**
  * Pushes on the argument stack an array of string, including an extra '\0' terminator,
  * plus also an array of pointers to the strings on the stack.
  * In the last argument, this function stores the stack address at which the array of
@@ -119,15 +191,16 @@ static uint8_t *push_string_array_to_stack(
         size_t len = strlen(array[i]) + 1;
         userstack -= len;
         memcpy(userstack, array[i], len);
+        LOGI("String '%s' stack-placed at %p", array[i], userstack);
     }
-    userstack -= 1;
-    *userstack = '\0';
-    userstack = (uint8_t*) round_down((uintptr_t) userstack, ARCH_STACK_ALIGNMENT);
 
     // Then we iterate back to build the array
+    next_string = (const char *) userstack;
+    userstack = (uint8_t*) round_down((uintptr_t) userstack, ARCH_STACK_ALIGNMENT);
     userstack -= sizeof(uintptr_t) * (array_size + 1);
     user_array = (const char**) userstack;
-    for (size_t i = 0; i < array_size + 1; i++) {
+    for (ssize_t i = array_size - 1; i >= 0; i--) {
+        LOGI("String '%s' taken from stack at %p", next_string, next_string);
         user_array[i] = next_string;
         next_string += strlen(next_string) + 1;
     }
@@ -365,17 +438,29 @@ failed:
     return rc;
 }
 
-int sys$execve(const char *path, char *const argv[], char *const envp[])
+int sys$execve(const char *path, char *const user_argv[], char *const user_envp[])
 {
-    (void)argv;
-    (void)envp;
-
     int rc = 0;
     uintptr_t entrypoint;
     uint8_t *userstack = nullptr;
     auto *current_process = cpu_current_process();
     auto *current_thread = cpu_current_thread();
     AddressSpace old_as, new_as;
+    char **argv = nullptr;
+    size_t argc = 0;
+    char **envp = nullptr;
+    size_t envc = 0;
+
+    rc = clone_user_array_of_strings(user_argv, &argv, &argc);
+    if (rc != 0) {
+        LOGE("Failed to clone user argv");
+        goto cleanup;
+    }
+    rc = clone_user_array_of_strings(user_envp, &envp, &envc);
+    if (rc != 0) {
+        LOGE("Failed to clone user envp");
+        goto cleanup;
+    }
 
     LOGI("execve %s[%d/%d](%s)", current_process->name, current_process->pid, current_thread->tid, path);
     
@@ -398,7 +483,8 @@ int sys$execve(const char *path, char *const argv[], char *const envp[])
         rc = -ENOMEM;
         goto cleanup;
     }
-    userstack = push_process_args(userstack, argv, envp);
+    // NOTE: We're still running with the old address space, pushing
+    // to the userstack here won't put the data on the right stack!
 
     // NOTE: We're going to use the same kernel stack, but we
     // don't need to do anything because the used page is used
@@ -415,12 +501,15 @@ int sys$execve(const char *path, char *const argv[], char *const envp[])
     vm_switch_address_space(current_process->address_space);
     vm_free(old_as);
 
+    userstack = push_process_args(userstack, argv, envp);
     kassert((uintptr_t) userstack % ARCH_STACK_ALIGNMENT == 0);
     current_thread->iframe->set_thread_start_values(entrypoint, (uintptr_t) userstack);
 
     return 0;
 
 cleanup:
+    free_array_of_strings(argv, argc);
+    free_array_of_strings(envp, envc);
     vm_free(new_as);
     return rc;
 }
