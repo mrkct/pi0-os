@@ -8,6 +8,7 @@
 #include "char/bcm2835_gpio.h"
 #include "char/pl011.h"
 #include "char/pl031.h"
+#include "char/virtioinput.h"
 
 #include "irqc/bcm2835_irqc.h"
 #include "irqc/gic2.h"
@@ -60,6 +61,7 @@ static constexpr Driver s_drivers[] = {
     // This is not right: the compatible should be "virtio,mmio" which handles
     // all virtio devices, not separate compatibles for each device class
     basic_init<VirtioBlockDevice>("virtioblk,mmio"),
+    basic_init<VirtioInputDevice>("virtioinput,mmio"),
 };
 
 static Driver const *find_driver(const char *compatible)
@@ -342,6 +344,26 @@ static void virt_load_peripherals()
                 if (s_defaults.storage == nullptr)
                     s_defaults.storage = virtio_mmio_dev;
 
+                break;
+            }
+
+            case VirtioDeviceID::InputDevice: {
+                Driver const *virtio_drv = find_driver("virtioinput,mmio");
+                kassert(virtio_drv != nullptr);
+    
+                auto config = VirtioInputDevice::Config {
+                    .address = virtio_mmio_addr,
+                    .irq = virtio_irq
+                };
+                kprintf("Initializing %s device @ %p...\n", virtio_drv->compatible, virtio_mmio_addr);
+                auto *virtio_mmio_dev = reinterpret_cast<VirtioInputDevice*>(
+                    virtio_drv->load(virtio_drv->compatible, mustmalloc(virtio_drv->required_space), &config)
+                );
+                rc = virtio_mmio_dev->init();
+                if (rc != 0)
+                    panic("Failed to initialize %s device @ %p: %d\n", virtio_drv->compatible, virtio_mmio_addr, rc);
+        
+                register_device(virtio_mmio_dev);
                 break;
             }
 

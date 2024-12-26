@@ -9,6 +9,7 @@
 enum class VirtioDeviceID: uint32_t {
     Invalid,
     BlockDevice = 2,
+    InputDevice = 18,
     Unsupported = 0xffffffff
 };
 
@@ -22,6 +23,15 @@ struct SplitVirtQueue {
     volatile struct virtq_desc *desc_table;
     volatile struct virtq_avail *avail;
     volatile struct virtq_used *used;
+
+    template<typename F>
+    void foreach_used_descriptor(F func) {
+        uint16_t used = this->used->idx % this->size;
+        for (uint16_t idx = this->last_seen_used_idx; idx != used; idx = (idx + 1) % this->size) {
+            func(this, this->used->ring[idx].id);
+        }
+        this->last_seen_used_idx = used;
+    }
 };
 
 struct VirtioRegisterMap {
@@ -91,6 +101,18 @@ struct VirtioRegisterMap {
             uint8_t write_zeroes_may_unmap;
             uint8_t unused2[3];
         } block;
+        struct {
+            u8 select;
+            u8 subsel;
+            u8 size;
+            u8 reserved[5];
+            union {
+                char string[128];
+                u8 bitmap[128];
+                struct virtio_input_absinfo abs;
+                struct virtio_input_devids ids;
+            } u;
+        } input;
     };
 } __attribute__((packed));
 static_assert(offsetof(VirtioRegisterMap, DriverFeatures) == 0x20);

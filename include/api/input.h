@@ -14,13 +14,14 @@ struct InputEvent {
     uint16_t type;
     union {
         struct {
-            uint16_t keycode;
-            uint16_t modifiers;
-        } key;
+            uint16_t code;
+            uint32_t value;
+        } raw;
+
         struct {
-            uint16_t abs_x;
-            uint16_t abs_y;
-        } mouse;
+            uint16_t code;
+            uint32_t pressed;
+        } key;
     };
 };
 
