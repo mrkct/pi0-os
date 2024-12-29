@@ -50,6 +50,7 @@ typedef enum MajorDeviceNumber {
     Maj_Keyboard = 9,
     Maj_Mouse = 10,
     Maj_Input = 11,
+    Maj_Framebuffer = 12,
 } MajorDeviceNumber;
 
 #include "arm/syscall.h"
@@ -58,4 +59,4 @@ typedef enum MajorDeviceNumber {
 // #include "process.h"
 // #include "input.h"
 #include "time.h"
-// #include "windows.h"
+#include "ioctl.h"

@@ -98,6 +98,7 @@ VirtioDeviceID virtio_util_probe(uintptr_t address)
     if (ioread32(&r->MagicValue) == VIRTIO_MAGIC) {
         switch (ioread32(&r->DeviceID)) {
             SUPPORTED(VirtioDeviceID::BlockDevice)
+            SUPPORTED(VirtioDeviceID::GPU)
             SUPPORTED(VirtioDeviceID::InputDevice)
             SUPPORTED(VirtioDeviceID::Invalid)
             default: {

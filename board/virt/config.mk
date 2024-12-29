@@ -19,13 +19,13 @@ ifeq ($(RECORD), 1)
 QEMU_CFG_FLAGS+= \
 	-icount shift=auto,rr=record,rrfile=$(RECORDING_FILENAME) \
     -drive file=snapshot-drive.qcow2,if=none,snapshot,id=snapshot-drive \
-    -device virtio-blk-device,drive=snapshot-drive,bus=virtio-mmio-bus.3 \
+    -device virtio-blk-device,drive=snapshot-drive,bus=virtio-mmio-bus.4 \
 
 else ifeq ($(REPLAY), 1)
 QEMU_CFG_FLAGS += \
 	-icount shift=auto,rr=replay,rrfile=$(RECORDING_FILENAME) \
     -drive file=snapshot-drive.qcow2,if=none,snapshot,id=snapshot-drive \
-    -device virtio-blk-device,drive=snapshot-drive,bus=virtio-mmio-bus.3 \
+    -device virtio-blk-device,drive=snapshot-drive,bus=virtio-mmio-bus.4 \
 
 endif
 

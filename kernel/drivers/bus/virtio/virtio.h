@@ -9,6 +9,7 @@
 enum class VirtioDeviceID: uint32_t {
     Invalid,
     BlockDevice = 2,
+    GPU = 16,
     InputDevice = 18,
     Unsupported = 0xffffffff
 };
@@ -101,6 +102,7 @@ struct VirtioRegisterMap {
             uint8_t write_zeroes_may_unmap;
             uint8_t unused2[3];
         } block;
+        struct virtio_gpu_config gpu;
         struct {
             u8 select;
             u8 subsel;

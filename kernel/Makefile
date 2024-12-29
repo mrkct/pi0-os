@@ -29,6 +29,7 @@ SOURCES=\
 	kernel/drivers/char/bcm2835_gpio.cpp \
 	kernel/drivers/char/pl011.cpp \
 	kernel/drivers/char/pl031.cpp \
+	kernel/drivers/char/virtiogpu.cpp \
 	kernel/drivers/char/virtioinput.cpp \
 	kernel/drivers/block/ramdisk.cpp \
 	kernel/drivers/block/virtioblk.cpp \

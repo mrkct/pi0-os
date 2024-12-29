@@ -11,6 +11,7 @@ uint8_t UART::s_next_minor = 0;
 uint8_t GPIOController::s_next_minor = 0;
 uint8_t RealTimeClock::s_next_minor = 0;
 uint8_t InputDevice::s_next_minor = 0;
+uint8_t FramebufferDevice::s_next_minor = 0;
 
 
 FileDevice::FileDevice(uint8_t major, uint8_t minor, char const* name)
@@ -259,6 +260,20 @@ int32_t InputDevice::ioctl(uint32_t request, void *argp)
     (void) argp;
 
     switch (request) {
+        default:
+            return -ENOTSUP;
+    }
+}
+
+int32_t FramebufferDevice::ioctl(uint32_t request, void *argp)
+{
+    switch (request) {
+        case api::FBIO_GET_DISPLAY_INFO: {
+            todo();
+            return 0;
+        }
+        case api::FBIO_REFRESH:
+            return this->refresh();
         default:
             return -ENOTSUP;
     }

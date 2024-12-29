@@ -249,3 +249,29 @@ private:
         RingBuffer<32, api::InputEvent> events;
     } m_events;
 };
+
+class FramebufferDevice: public CharacterDevice
+{
+private:
+    static uint8_t s_next_minor;
+public:
+    FramebufferDevice():
+        CharacterDevice(Maj_Framebuffer, s_next_minor++, "framebuffer")
+    {}
+
+    struct DisplayInfo {
+        uint32_t width, height, bytes_per_pixel, pitch;
+        uintptr_t fb_phys_addr;
+
+        constexpr uint32_t fb_length() const { return pitch * height; }
+    };
+
+    virtual ~FramebufferDevice() {}
+
+    virtual DisplayInfo display_info() const = 0;
+    virtual int32_t refresh() = 0;
+
+    virtual int64_t read(uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int32_t ioctl(uint32_t request, void *argp) override;
+};
