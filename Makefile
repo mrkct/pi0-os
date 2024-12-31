@@ -11,7 +11,7 @@ ifdef CONFIG_BUNDLED_DTB
 	export CONFIG_BUNDLED_DTB := $(ROOT_DIR)/board/$(BOARD)/$(CONFIG_BUNDLED_DTB)
 endif
 
-QEMU:=qemu-system-arm
+QEMU:=qemu-system-arm # /home/marco/Desktop/qemu/build/qemu-system-arm
 
 QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp $(QEMU_CFG_FLAGS) -kernel kernel/boot/boot.elf
 QEMU_BOARD_SPECIFIC_TARGETS ?= # empty
