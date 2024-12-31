@@ -15,7 +15,7 @@ int32_t VirtioInputDevice::init()
 
     r = static_cast<VirtioRegisterMap volatile*>(ioremap(m_config.address, sizeof(VirtioRegisterMap)));
     if (!r) {
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
     LOGD("Registers are mapped at 0x%p", r);
@@ -121,7 +121,7 @@ int32_t VirtioInputDevice::shutdown()
     return 0;
 }
 
-void VirtioInputDevice::process_event(SplitVirtQueue *q, int desc_idx)
+void VirtioInputDevice::process_event(SplitVirtQueue*, int desc_idx)
 {
     virtio_input_event event = m_eventsbuf[desc_idx];
     m_eventsbuf[desc_idx] = {};

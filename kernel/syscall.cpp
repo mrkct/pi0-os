@@ -6,7 +6,7 @@
 
 int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     sysarg_t arg1, sysarg_t arg2, sysarg_t arg3,
-    sysarg_t arg4, sysarg_t arg5, sysarg_t arg6)
+    sysarg_t arg4)
 {
     int rc;
 
@@ -41,14 +41,14 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
         rc = sys$millisleep((int) arg1);
         break;
     case SYS_FStat:
-        rc = sys$fstat((int) arg1, (struct stat*) arg2);
+        rc = sys$fstat((int) arg1, (api::Stat*) arg2);
         break;
     case SYS_GetPid:
         rc = sys$getpid();
         break;
     default:
         kprintf("Unknown syscall %d\n", syscall);
-        rc = -ENOSYS;
+        rc = -ERR_NOSYS;
     }
 
     return rc;

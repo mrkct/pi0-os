@@ -314,7 +314,7 @@ static void virt_load_peripherals()
     if (rc != 0)
         panic("Failed to initialize RTC: %d\n", rc);
     register_device(rtc);
-    DateTime now;
+    api::DateTime now;
     if (0 == rtc->get_time(now)) {
         kprintf("Current time: %d-%d-%d %d:%d:%d\n", now.year, now.month, now.day, now.hour, now.minute, now.second);
     }

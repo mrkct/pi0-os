@@ -77,7 +77,7 @@ int32_t PL011UART::shutdown()
 int64_t PL011UART::write(const uint8_t *buffer, size_t size)
 {
     if (r == nullptr)
-        return -EIO;
+        return -ERR_IO;
 
     static constexpr uint32_t TRANSMIT_FIFO_FULL = 1 << 5;
     for (size_t i = 0; i < size; i++) {
@@ -93,7 +93,7 @@ int64_t PL011UART::write(const uint8_t *buffer, size_t size)
 int64_t PL011UART::read(uint8_t*, size_t)
 {
     if (!m_fully_initialized) {
-        return -EIO;
+        return -ERR_IO;
     }
 
     return 0;
@@ -101,7 +101,7 @@ int64_t PL011UART::read(uint8_t*, size_t)
 
 int32_t PL011UART::ioctl(uint32_t, void*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 void PL011UART::irq_handler()

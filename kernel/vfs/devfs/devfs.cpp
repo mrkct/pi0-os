@@ -24,7 +24,7 @@ static int devfs_fs_on_mount(Filesystem *self, Inode *out_root);
 static int devfs_fs_open_inode(Filesystem*, Inode*);
 static int devfs_fs_close_inode(Filesystem*, Inode*);
 
-static int devfs_inode_stat(Inode *self, struct stat *st);
+static int devfs_inode_stat(Inode *self, api::Stat *st);
 
 static int64_t devfs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 static int64_t devfs_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
@@ -109,14 +109,14 @@ static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
 
     if (self->identifier != 0) {
         LOGE("Lookups in devfs are only allowed in inode 0");
-        rc = -ENOENT;
+        rc = -ERR_NOENT;
         goto failed;
     }
 
     device = get_device_by_name(name);
     if (device == nullptr) {
         LOGE("Could not find device %s", name);
-        rc = -ENOENT;
+        rc = -ERR_NOENT;
         goto failed;
     }
 
@@ -146,22 +146,22 @@ failed:
 
 static int devfs_dir_inode_create(Inode*, const char*, InodeType, Inode**)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int devfs_dir_inode_mkdir(Inode*, const char*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int devfs_dir_inode_rmdir(Inode*, const char*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int devfs_dir_inode_unlink(Inode*, const char*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int64_t devfs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size)
@@ -236,12 +236,12 @@ static int devfs_fs_open_inode(Filesystem*, Inode *inode)
     if (device == nullptr) {
         LOGE("Could not find device with devid %" PRIu64, inode->identifier);
         LOGE("This is a bug, there shouldn't be inodes in DevFS with invalid identifiers");
-        rc = -ENOENT;
+        rc = -ERR_NOENT;
         goto failed;
     } else if (!device->is_mountable()) {
         LOGE("Device %s is not mountable, but it should be", device->name());
         LOGE("This is a bug, there shouldn't be inodes in DevFS for devices that are not mountable");
-        rc = -EINVAL;
+        rc = -ERR_INVAL;
         goto failed;
     }
 
@@ -249,7 +249,7 @@ static int devfs_fs_open_inode(Filesystem*, Inode *inode)
     ctx = static_cast<DevFSInodeCtx*>(malloc(sizeof(DevFSInodeCtx)));
     if (ctx == nullptr) {
         LOGE("Could not allocate inode context");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
     *ctx = DevFSInodeCtx {
@@ -263,7 +263,7 @@ failed:
     return rc;
 }
 
-static int devfs_inode_stat(Inode *self, struct stat *st)
+static int devfs_inode_stat(Inode *self, api::Stat *st)
 {
     DevFSInodeCtx *ctx = (DevFSInodeCtx*) self->opaque;
 
@@ -271,14 +271,14 @@ static int devfs_inode_stat(Inode *self, struct stat *st)
     st->st_ino = self->identifier;
     switch (ctx->type) {
     case MountableDeviceType::CharacterDevice: {
-        st->st_mode = S_IFCHR;
+        st->st_mode = SF_IFCHR;
         st->st_blksize = 0;
         st->st_blocks = 0;
         break;
     }
     case MountableDeviceType::BlockDevice: {
         BlockDevice *device = reinterpret_cast<BlockDevice *>(ctx->device);
-        st->st_mode = S_IFBLK;
+        st->st_mode = SF_IFBLK;
         st->st_blksize = device->block_size();
         st->st_blocks = round_down(device->size(), device->block_size());
         break;
@@ -289,9 +289,9 @@ static int devfs_inode_stat(Inode *self, struct stat *st)
     st->st_gid = self->uid;
     st->st_rdev = 0;
     st->st_size = self->size;
-    st->st_atim = self->access_time;
-    st->st_mtim = self->modification_time;
-    st->st_ctim = self->creation_time;
+    st->atim = self->access_time;
+    st->mtim = self->modification_time;
+    st->ctim = self->creation_time;
     
     return 0;
 }
@@ -312,7 +312,7 @@ int devfs_create(Filesystem **out_fs)
     
     mem = (uint8_t*) malloc(sizeof(Filesystem) + sizeof(DevFSFilesystemCtx));
     if (!mem) {
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
 

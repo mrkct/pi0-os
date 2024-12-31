@@ -9,8 +9,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
-#include <errno.h>
 #include <memory>
+
+#include <api/syscalls.h>
 
 #include <kernel/kprintf.h>
 #include <kernel/panic.h>

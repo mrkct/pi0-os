@@ -5,6 +5,7 @@
 #include <kernel/timer.h>
 #include <kernel/vfs/devfs/devfs.h>
 #include <kernel/vfs/vfs.h>
+#include <api/syscalls.h>
 
 
 static void proc1();
@@ -70,21 +71,6 @@ extern "C" void kernel_main(BootParams const *boot_params)
     scheduler_start();
 }
 
-static void yield()
-{
-    syscall(SYS_Yield, 0, 0, 0, 0, 0, 0);
-}
-
-static int fork()
-{
-    return syscall(SYS_Fork, 0, 0, 0, 0, 0, 0);
-}
-
-static int execve(const char *path, char *const argv[], char *const envp[])
-{
-    return syscall(SYS_Execve, (uintptr_t) path, (uintptr_t) argv, (uintptr_t) envp, 0, 0, 0);
-}
-
 static void wait(int secs)
 {
     auto *timer = devicemanager_get_system_timer_device();
@@ -92,21 +78,21 @@ static void wait(int secs)
     
     while (timer->ticks() - last < (secs * 1000 *timer->ticks_per_ms())) {
         cpu_relax();
-        yield();
+        api::sys_yield();
     }
 }
 
 static void proc1()
 {
     int rc = 0;
-    char *argv[] = { "/bina/init", nullptr };
-    char *envp[] = { nullptr };
+    const char *argv[] = { "/bina/init", nullptr };
+    const char *envp[] = { nullptr };
 
     kprintf("I am main\n");
 
-    int pid = fork();
+    int pid = api::sys_fork();
     if (pid == 0) {
-        rc = execve("/bina/init", argv, envp);
+        rc = api::sys_execve("/bina/init", argv, envp);
         kprintf("something went wrong with execve: %d\n", rc);
         while (true) {
             wait(1);

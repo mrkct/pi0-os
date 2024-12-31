@@ -24,7 +24,7 @@ public:
     virtual bool is_mountable() const { return false; }
     virtual const char *name() const = 0;
     virtual Device::Type device_type() const = 0;
-    virtual int32_t init_for_early_boot() { return -ENOTSUP; }
+    virtual int32_t init_for_early_boot() { return -ERR_NOTSUP; }
     virtual int32_t init() = 0;
     virtual int32_t shutdown() = 0;
 };
@@ -144,15 +144,15 @@ public:
     }
     virtual ~Console() {}
 
-    virtual int64_t read(uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int64_t read(uint8_t*, size_t) override { return -ERR_NOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
 
 protected:
-    virtual int32_t get_console_size(size_t&, size_t&) const { return -ENOTSUP; }
-    virtual int32_t set_console_size(size_t, size_t) { return -ENOTSUP; }
-    virtual int32_t clear_screen() const { return -ENOTSUP; }
-    virtual int32_t get_cursorr_position(size_t&, size_t&) const { return -ENOTSUP; }
-    virtual int32_t set_cursor_position(size_t, size_t) { return -ENOTSUP; }
+    virtual int32_t get_console_size(size_t&, size_t&) const { return -ERR_NOTSUP; }
+    virtual int32_t set_console_size(size_t, size_t) { return -ERR_NOTSUP; }
+    virtual int32_t clear_screen() const { return -ERR_NOTSUP; }
+    virtual int32_t get_cursorr_position(size_t&, size_t&) const { return -ERR_NOTSUP; }
+    virtual int32_t set_cursor_position(size_t, size_t) { return -ERR_NOTSUP; }
 };
 
 class UART: public CharacterDevice
@@ -213,12 +213,12 @@ public:
     {}
     virtual ~RealTimeClock() {}
 
-    virtual int64_t read(uint8_t*, size_t) override { return -ENOTSUP; }
-    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int64_t read(uint8_t*, size_t) override { return -ERR_NOTSUP; }
+    virtual int64_t write(const uint8_t*, size_t) override { return -ERR_NOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
 
-    virtual int32_t get_time(DateTime&) = 0;
-    virtual int32_t set_time(const DateTime) = 0;
+    virtual int32_t get_time(api::DateTime&) = 0;
+    virtual int32_t set_time(const api::DateTime) = 0;
 };
 
 class InputDevice: public CharacterDevice
@@ -235,7 +235,7 @@ public:
     virtual ~InputDevice() {};
 
     virtual int64_t read(uint8_t *buffer, size_t size) override;
-    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int64_t write(const uint8_t*, size_t) override { return -ERR_NOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
 
 protected:
@@ -271,7 +271,7 @@ public:
     virtual DisplayInfo display_info() const = 0;
     virtual int32_t refresh() = 0;
 
-    virtual int64_t read(uint8_t*, size_t) override { return -ENOTSUP; }
-    virtual int64_t write(const uint8_t*, size_t) override { return -ENOTSUP; }
+    virtual int64_t read(uint8_t*, size_t) override { return -ERR_NOTSUP; }
+    virtual int64_t write(const uint8_t*, size_t) override { return -ERR_NOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
 };

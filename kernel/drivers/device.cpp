@@ -35,7 +35,7 @@ int64_t SimpleBlockDevice::read(int64_t offset, uint8_t *buffer, size_t size)
     if (offset % sector_size != 0) {
         temp_buffer = (uint8_t*) malloc(sector_size);
         if (temp_buffer == nullptr) {
-            rc = -ENOMEM;
+            rc = -ERR_NOMEM;
             goto cleanup;
         }
 
@@ -69,7 +69,7 @@ int64_t SimpleBlockDevice::read(int64_t offset, uint8_t *buffer, size_t size)
         if (temp_buffer == nullptr) {
             temp_buffer = (uint8_t*) malloc(sector_size);
             if (temp_buffer == nullptr) {
-                rc = -ENOMEM;
+                rc = -ERR_NOMEM;
                 goto cleanup;
             }
         }
@@ -95,7 +95,7 @@ cleanup:
 int64_t SimpleBlockDevice::write(int64_t offset, const uint8_t *buffer, size_t size)
 {
     if (is_read_only())
-        return -EROFS;
+        return -ERR_ROFS;
 
     int64_t written = 0, to_write = 0;
     int64_t rc = 0;
@@ -108,7 +108,7 @@ int64_t SimpleBlockDevice::write(int64_t offset, const uint8_t *buffer, size_t s
     if (offset % sector_size != 0) {
         temp_buffer = (uint8_t*) malloc(sector_size);
         if (temp_buffer == nullptr) {
-            rc = -ENOMEM;
+            rc = -ERR_NOMEM;
             goto cleanup;
         }
 
@@ -147,7 +147,7 @@ int64_t SimpleBlockDevice::write(int64_t offset, const uint8_t *buffer, size_t s
         if (temp_buffer == nullptr) {
             temp_buffer = (uint8_t*) malloc(sector_size);
             if (temp_buffer == nullptr) {
-                rc = -ENOMEM;
+                rc = -ERR_NOMEM;
                 goto cleanup;
             }
         }
@@ -178,31 +178,31 @@ cleanup:
 int32_t Console::ioctl(uint32_t, void*)
 {
     todo();
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 int32_t UART::ioctl(uint32_t, void*)
 {
     todo();
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 int64_t GPIOController::read(uint8_t *, size_t)
 {
     todo();
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 int64_t GPIOController::write(const uint8_t *, size_t)
 {
     todo();
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 int32_t GPIOController::ioctl(uint32_t, void *)
 {
     todo();
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 int32_t RealTimeClock::ioctl(uint32_t request, void*)
@@ -211,7 +211,7 @@ int32_t RealTimeClock::ioctl(uint32_t request, void*)
 
     switch (request) {
         default: {
-            rc = -ENOTSUP;
+            rc = -ERR_NOTSUP;
             break;
         }
     }
@@ -261,12 +261,14 @@ int32_t InputDevice::ioctl(uint32_t request, void *argp)
 
     switch (request) {
         default:
-            return -ENOTSUP;
+            return -ERR_NOTSUP;
     }
 }
 
 int32_t FramebufferDevice::ioctl(uint32_t request, void *argp)
 {
+    (void) argp;
+
     switch (request) {
         case api::FBIO_GET_DISPLAY_INFO: {
             todo();
@@ -275,6 +277,6 @@ int32_t FramebufferDevice::ioctl(uint32_t request, void *argp)
         case api::FBIO_REFRESH:
             return this->refresh();
         default:
-            return -ENOTSUP;
+            return -ERR_NOTSUP;
     }
 }

@@ -28,7 +28,7 @@ BCM2835SystemTimer::BCM2835SystemTimer(Config const *config)
 int32_t BCM2835SystemTimer::init()
 {
     if (r != nullptr)
-        return -EALREADY;
+        return -ERR_ALREADY;
     
     r = reinterpret_cast<RegisterMap volatile*>(ioremap(m_config.address, sizeof(RegisterMap)));
 

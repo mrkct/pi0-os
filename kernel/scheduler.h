@@ -83,6 +83,6 @@ int sys$close(int fd);
 
 int sys$millisleep(int ms);
 
-int sys$fstat(int fd, struct stat *stat);
+int sys$fstat(int fd, api::Stat *stat);
 
 int sys$getpid();

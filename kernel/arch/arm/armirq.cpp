@@ -54,7 +54,7 @@ extern "C" void irq_and_exception_handler(uint32_t vector_offset, InterruptFrame
         if (swi_number == ARM_SWI_SYSCALL) {
             frame->r[0] = dispatch_syscall(frame, frame->r[0],
                 frame->r[1], frame->r[2], frame->r[3],
-                frame->r[4], frame->r[5], frame->r[6]);
+                frame->r[4]);
         }
         break;
     }

@@ -12,7 +12,7 @@
 
 void _exit(int status)
 {
-    syscall(SYS_Exit, (uint32_t) status, 0, 0, 0, 0, 0);
+    sys_exit(status);
     while(1);
 }
 
@@ -35,9 +35,31 @@ void* _sbrk(int incr)
     return brk;
 }
 
+static void unix_stat_to_posix_stat(struct Stat *unix_stat, struct stat *posix_stat)
+{
+    posix_stat->st_dev = unix_stat->st_dev;
+    posix_stat->st_ino = unix_stat->st_ino;
+    posix_stat->st_mode = unix_stat->st_mode;
+    posix_stat->st_nlink = unix_stat->st_nlink;
+    posix_stat->st_uid = unix_stat->st_uid;
+    posix_stat->st_gid = unix_stat->st_gid;
+    posix_stat->st_rdev = unix_stat->st_rdev;
+    posix_stat->st_size = unix_stat->st_size;
+    posix_stat->st_blksize = unix_stat->st_blksize;
+    posix_stat->st_blocks = unix_stat->st_blocks;
+    posix_stat->st_atime = unix_stat->atim.seconds;
+    posix_stat->st_mtime = unix_stat->mtim.seconds;
+    posix_stat->st_ctime = unix_stat->ctim.seconds;
+}
+
 int _fstat(int file, struct stat* st)
 {
-    return syscall(SYS_FStat, (uint32_t) file, (uint32_t) st, 0, 0, 0, 0);
+    struct Stat tempstat;
+    int rc = sys_fstat(file, &tempstat);
+    if (rc >= 0) {
+        unix_stat_to_posix_stat(&tempstat, st);
+    }
+    return rc;
 }
 
 int _isatty(int file)
@@ -50,7 +72,7 @@ off_t _lseek(int file, int ptr, int dir)
 {
     int rc;
     uint64_t offset = 0;
-    rc = syscall(SYS_Seek, (uint32_t) file, (uint32_t) ptr, (uint32_t) dir, (uint32_t) &offset, 0, 0);
+    rc = sys_seek(file, ptr, dir, &offset);
     if (rc < 0)
         return -1;
     return (off_t) offset;
@@ -58,57 +80,57 @@ off_t _lseek(int file, int ptr, int dir)
 
 int _link(char const* oldpath, char const* newpath)
 {
-    return syscall(SYS_Link, (uint32_t) oldpath, (uint32_t) newpath, 0, 0, 0, 0);
+    return sys_link(oldpath, newpath);
 }
 
 int _unlink(char const* pathname)
 {
-    return syscall(SYS_Unlink, (uint32_t) pathname, 0, 0, 0, 0, 0);
+    return sys_unlink(pathname);
 }
 
 void _kill(int pid, int sig)
 {
-    syscall(SYS_Kill, (uint32_t) pid, (uint32_t) sig, 0, 0, 0, 0);
+    sys_kill(pid, sig);
 }
 
 int _getpid(void)
 {
-    return syscall(SYS_GetPid, 0, 0, 0, 0, 0, 0);
+    return sys_getpid();
 }
 
 int _open(char const* pathname, int flags, int mode)
 {
-    return syscall(SYS_Open, (uint32_t) pathname, (uint32_t) flags, (uint32_t) mode, 0, 0, 0);
+    return sys_open(pathname, flags, mode);
 }
 
 int _close(int file)
 {
-    return syscall(SYS_Close, (uint32_t) file, 0, 0, 0, 0, 0);
+    return sys_close(file);
 }
 
 int _write(int file, char* ptr, int len)
 {
-    return syscall(SYS_Write, (uint32_t) file, (uint32_t) ptr, (uint32_t) len, 0, 0, 0);
+    return sys_write(file, ptr, len);
 }
 
 int _read(int file, char* ptr, int len)
 {
-    return syscall(SYS_Read, (uint32_t) file, (uint32_t) ptr, (uint32_t) len, 0, 0, 0);
+    return sys_read(file, ptr, len);
 }
 
 pid_t _fork(void)
 {
-    return syscall(SYS_Fork, 0, 0, 0, 0, 0, 0);
+    return sys_fork();
 }
 
 int _execve(const char *pathname, char *const _Nullable argv[], char *const _Nullable envp[])
 {
-    return syscall(SYS_Execve, (uintptr_t) pathname, (uintptr_t) argv, (uintptr_t) envp, 0, 0, 0);
+    return sys_execve(pathname, argv, envp);
 }
 
 pid_t waitpid(pid_t pid, int *wstatus, int options)
 {
-    return syscall(SYS_WaitPid, (uintptr_t) pid, (uintptr_t) wstatus, (uintptr_t) options, 0, 0, 0);
+    return sys_waitpid(pid, wstatus, options);
 }
 
 pid_t _wait(int *wstatus)
@@ -118,7 +140,7 @@ pid_t _wait(int *wstatus)
 
 int mkdir(char const* pathname, mode_t mode)
 {
-    return syscall(SYS_MakeDirectory, (uint32_t) pathname, (uint32_t) mode, 0, 0, 0, 0);
+    return sys_mkdir(pathname, mode);
 }
 
 DIR *opendir(const char *name)
@@ -132,7 +154,7 @@ DIR *opendir(const char *name)
     if (dir == NULL || dirent == NULL)
         goto failed;
     
-    fd = open(name, O_RDONLY | O_DIRECTORY);
+    fd = open(name, OF_RDONLY | OF_DIRECTORY);
     if (fd < 0)
         goto failed;
 

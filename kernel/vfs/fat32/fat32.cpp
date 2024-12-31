@@ -44,7 +44,7 @@ static int fat32_fs_on_mount(Filesystem *self, Inode *out_root);
 static int fat32_fs_open_inode(Filesystem*, Inode*);
 static int fat32_fs_close_inode(Filesystem*, Inode*);
 
-static int fat32_inode_stat(Inode *self, struct stat *st);
+static int fat32_inode_stat(Inode *self, api::Stat *st);
 
 static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 static int64_t fat32_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
@@ -95,7 +95,7 @@ static inline int read_sector(Fat32FilesystemCtx *ctx, uint64_t sector_idx, void
     if (rc == (int64_t) ctx->sector_size)
         return 0;
     else if (rc > 0)
-        return -EIO;
+        return -ERR_IO;
 
     return rc;
 }
@@ -165,7 +165,7 @@ static void copy_entry_name(fat32::DirectoryEntry8_3& e, char* buf)
 }
 
 template<typename HandleEntry>
-static bool foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entry_cb)
+static int foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entry_cb)
 {
     int rc;
     kassert(dirinode->type == InodeType::Directory);
@@ -206,16 +206,16 @@ static bool foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entr
         TRY(next_cluster(fsctx, next_cluster_idx, next_cluster_idx));
     }
 
-    return -ENOENT;
+    return -ERR_NOENT;
 }
 
-static struct timespec fat32_datetime_to_timespec(uint16_t date, uint16_t time)
+static api::TimeSpec fat32_datetime_to_timespec(uint16_t date, uint16_t time)
 {
     (void) date;
     (void) time;
 
     // TODO: Actually do the conversion
-    return (struct timespec) { .tv_sec = 0, .tv_nsec = 0 };
+    return (api::TimeSpec) { .seconds = 0, .nanoseconds = 0 };
 }
 
 static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode)
@@ -230,12 +230,12 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
             return false;
 
         InodeType inodetype = InodeType::RegularFile;
-        mode_t mode = 0;
+        uint32_t mode = 0;
         if (fat_entry.DIR_Attr & fat32::DirectoryEntry8_3::ATTR_DIRECTORY) {
-            mode |= S_IFDIR;
+            mode |= SF_IFDIR;
             inodetype = InodeType::Directory;
         } else {
-            mode |= S_IFREG;
+            mode |= SF_IFREG;
             inodetype = InodeType::RegularFile;
         }
         // TODO: Figure out the mode bits
@@ -270,22 +270,22 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
 
 static int fat32_dir_inode_create(Inode*, const char*, InodeType, Inode**)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int fat32_dir_inode_mkdir(Inode*, const char*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int fat32_dir_inode_rmdir(Inode*, const char*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int fat32_dir_inode_unlink(Inode*, const char*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size)
@@ -318,7 +318,7 @@ static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffe
             return (int) read;
         } else if ((uint64_t) read != remaining_size_in_cluster) {
             LOGW("Storage read returned %" PRId64 " bytes, expected %" PRIu64 " bytes", read, remaining_size_in_cluster);
-            return -EIO;
+            return -ERR_IO;
         }
 
         bytes_read += read;
@@ -329,7 +329,7 @@ static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffe
         if (remaining_size > 0) {
             TRY(next_cluster(ctx, current_cluster, current_cluster));
             if (current_cluster >= 0x0ffffff8 || current_cluster < 2)
-                return -EIO;
+                return -ERR_IO;
         }
     }
 
@@ -338,12 +338,12 @@ static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffe
 
 static int64_t fat32_file_inode_write(Inode *, int64_t, const uint8_t *, size_t)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static int32_t fat32_file_inode_ioctl(Inode*, uint32_t, void*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset)
@@ -378,7 +378,7 @@ static int fat32_fs_open_inode(Filesystem*, Inode *inode)
     return 0;
 }
 
-static int fat32_inode_stat(Inode *self, struct stat *st)
+static int fat32_inode_stat(Inode *self, api::Stat *st)
 {
     auto *fsctx = (Fat32FilesystemCtx*) self->filesystem->opaque;
 
@@ -386,17 +386,17 @@ static int fat32_inode_stat(Inode *self, struct stat *st)
 
     st->st_dev = devno;
     st->st_ino = self->identifier;
-    st->st_mode = self->type == InodeType::Directory ? S_IFDIR : S_IFREG;
+    st->st_mode = self->type == InodeType::Directory ? SF_IFDIR : SF_IFREG;
     st->st_nlink = 1;
     st->st_uid = self->uid;
     st->st_gid = self->uid;
     st->st_rdev = 0;
     st->st_size = self->size;
-    st->st_atim = self->access_time;
-    st->st_mtim = self->modification_time;
-    st->st_ctim = self->creation_time;
+    st->atim = self->access_time;
+    st->mtim = self->modification_time;
+    st->ctim = self->creation_time;
     st->st_blksize = SECTOR_SIZE;
-    st->st_blocks = round_up<blkcnt_t>(self->size, SECTOR_SIZE) / SECTOR_SIZE;
+    st->st_blocks = round_up<uint64_t>(self->size, SECTOR_SIZE) / SECTOR_SIZE;
 
     return 0;
 }
@@ -422,15 +422,15 @@ int fat32_try_create(BlockDevice &storage, Filesystem **out_fs)
         return (int) read;
     } else if (read < (ssize_t) sizeof(bpb)) {
         LOGW("Read less than expected from storage for BPB");
-        return -EINVAL;
+        return -ERR_INVAL;
     }
 
     if (bpb.BS_BootSig32 != fat32::BOOT_SIGNATURE) {
         LOGW("BPB signature mismatch");
-        return -EINVAL;
+        return -ERR_INVAL;
     } else if (bpb.BPB_BytsPerSec != SECTOR_SIZE) {
         LOGE("Unsupported sector size %u", (unsigned) bpb.BPB_BytsPerSec);
-        return -EINVAL;
+        return -ERR_INVAL;
     }
     
     read = storage.read(bpb.BPB_BytsPerSec * bpb.BPB_FSInfo, (uint8_t*) &fs_info, sizeof(fs_info));
@@ -439,7 +439,7 @@ int fat32_try_create(BlockDevice &storage, Filesystem **out_fs)
         return (int) read;
     } else if (read < (ssize_t) sizeof(fs_info)) {
         LOGW("Read less than expected from storage for FS_Info");
-        return -EINVAL;
+        return -ERR_INVAL;
     }
 
     if (fs_info.FSI_LeadSig != fat32::FSINFO_LEAD_SIGNATURE ||
@@ -447,12 +447,12 @@ int fat32_try_create(BlockDevice &storage, Filesystem **out_fs)
         fs_info.FSI_TrailSig != fat32::FSINFO_TRAIL_SIGNATURE) {
 
         LOGE("Invalid FSInfo signature(s)");
-        return -EINVAL;
+        return -ERR_INVAL;
     }
 
     uint8_t *mem = (uint8_t*) malloc(sizeof(Filesystem) + sizeof(Fat32FilesystemCtx));
     if (!mem)
-        return -ENOMEM;
+        return -ERR_NOMEM;
 
     Filesystem *fs = (Filesystem*) mem;
     Fat32FilesystemCtx *ctx = (Fat32FilesystemCtx*) (mem + sizeof(Filesystem));

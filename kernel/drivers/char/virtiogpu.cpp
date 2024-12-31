@@ -35,7 +35,7 @@ int32_t VirtioGPU::init()
 
     r = static_cast<VirtioRegisterMap volatile*>(ioremap(m_config.address, sizeof(VirtioRegisterMap)));
     if (!r) {
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
     LOGD("Registers are mapped at 0x%p", r);
@@ -143,7 +143,7 @@ int32_t VirtioGPU::cmd_read_display_info(virtio_gpu_rect *out_info)
 
     if (resp.hdr.type != VIRTIO_GPU_RESP_OK_DISPLAY_INFO) {
         LOGE("Response from virtiogpu to GET_DISPLAY_INFO was not okay: %" PRIu32, resp.hdr.type);
-        rc = -EIO;
+        rc = -ERR_IO;
         goto failed;
     }
 
@@ -167,7 +167,7 @@ int32_t VirtioGPU::cmd_resource_create_2d(uint32_t id, uint32_t pixelformat, uin
             .padding = {0, 0, 0}
         },
         .resource_id = id,
-        .format = PIXEL_FORMAT,
+        .format = pixelformat,
         .width = width,
         .height = height
     };
@@ -181,7 +181,7 @@ int32_t VirtioGPU::cmd_resource_create_2d(uint32_t id, uint32_t pixelformat, uin
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA) {
         LOGE("Response from virtiogpu to RESOURCE_CREATE_2D was not okay: %" PRIu32, resp.type);
-        rc = -EIO;
+        rc = -ERR_IO;
         goto failed;
     }
 
@@ -228,7 +228,7 @@ int32_t VirtioGPU::cmd_resource_attach_backing(uint32_t id, uintptr_t paddr, uin
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA) {
         LOGE("Response from virtiogpu to RESOURCE_ATTACH_BACKING was not okay: %" PRIu32, resp.type);
-        rc = -EIO;
+        rc = -ERR_IO;
         goto failed;
     }
 
@@ -265,7 +265,7 @@ int32_t VirtioGPU::cmd_set_scanout(virtio_gpu_rect rect, uint32_t resource_id, u
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA) {
         LOGE("Response from virtiogpu to SET_SCANOUT was not okay: %" PRIu32, resp.type);
-        rc = -EIO;
+        rc = -ERR_IO;
         goto failed;
     }
     
@@ -303,7 +303,7 @@ int32_t VirtioGPU::cmd_transfer_to_host_2d(uint32_t resource_id, virtio_gpu_rect
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA) {
         LOGE("Response from virtiogpu to TRANSFER_TO_HOST_2D was not okay: %" PRIu32, resp.type);
-        rc = -EIO;
+        rc = -ERR_IO;
         goto failed;
     }
 
@@ -324,13 +324,8 @@ int32_t VirtioGPU::cmd_resource_flush(uint32_t resource_id, virtio_gpu_rect rect
             .ring_idx = 0,
             .padding = {0, 0, 0}
         },
-        .r = {
-            .x = 0,
-            .y = 0,
-            .width = m_displayinfo.width,
-            .height = m_displayinfo.height,
-        },
-        .resource_id = VIRTIO_RESOURCE_ID_FB,
+        .r = rect,
+        .resource_id = resource_id,
         .padding = VIRTIO_FB_PADDING
     };
     virtio_gpu_ctrl_hdr resp = {};
@@ -343,7 +338,7 @@ int32_t VirtioGPU::cmd_resource_flush(uint32_t resource_id, virtio_gpu_rect rect
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA) {
         LOGE("Response from virtiogpu to RESOURCE_FLUSH was not okay: %" PRIu32, resp.type);
-        rc = -EIO;
+        rc = -ERR_IO;
         goto failed;
     }
 
@@ -355,7 +350,6 @@ failed:
 int32_t VirtioGPU::setup_framebuffer()
 {
     int32_t rc = 0;
-    uint32_t fb_size;
     uintptr_t fb_paddr;
     struct virtio_gpu_rect display0;
 
@@ -495,13 +489,13 @@ int32_t VirtioGPU::cmd_send_receive(
     resp_desc_idx = virtio_virtq_alloc_desc(m_controlq);
     if (cmd_desc_idx < 0 || resp_desc_idx < 0) {
         LOGE("Failed to allocate descriptors for the command");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto cleanup;
     }
 
     if (!physical_page_alloc(PageOrder::_4KB, storage).is_success()) {
         LOGE("Failed to allocate storage page for the command/response");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto cleanup;
     }
 

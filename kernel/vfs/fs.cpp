@@ -33,7 +33,7 @@ Filesystem *fs_detect_and_create(BlockDevice &device)
     if (rc == 0) {
         LOGI("Device '%s' is detected as FAT32", device.name());
         return fs;
-    } else if (rc < 0 && rc != -EINVAL) {
+    } else if (rc < 0 && rc != -ERR_INVAL) {
         LOGE("Device '%s' is detected as FAT32, but failed to mount: %d", device.name(), rc);
         return nullptr;
     }

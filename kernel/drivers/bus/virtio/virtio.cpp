@@ -128,12 +128,12 @@ int32_t virtio_util_do_generic_init_step(
     //  checking values from MagicValue and Version ..."
     if (ioread32(&r->MagicValue) != VIRTIO_MAGIC) {
         LOGE("Invalid Magic Value");
-        rc = -ENODEV;
+        rc = -ERR_NODEV;
         goto failed;
     } else if (ioread32(&r->Version) != VIRTIO_VERSION) {
         LOGE("Invalid VirtIO version (expected %d, read %d)",
              VIRTIO_VERSION, ioread32(&r->Version));
-        rc = -ENOTSUP;
+        rc = -ERR_NOTSUP;
         goto failed;
     }
 
@@ -142,7 +142,7 @@ int32_t virtio_util_do_generic_init_step(
     //  any other register..."
     if (ioread32(&r->DeviceID) == 0) {
         LOGE("No VirtIO device found in register map");
-        rc = -ENODEV;
+        rc = -ERR_NODEV;
         goto failed;
     }
 
@@ -159,7 +159,7 @@ int32_t virtio_util_do_generic_init_step(
     // 3. Set the DRIVER status bit: the guest OS knows how to drive the device.
     if (ioread32(&r->DeviceID) != static_cast<uint32_t>(expected_device_class)) {
         LOGE("Not a block device");
-        rc = -ENOTSUP;
+        rc = -ERR_NOTSUP;
         goto failed;
     }
     iowrite32(&r->Status, ioread32(&r->Status) | VirtioDeviceStatus::Driver);
@@ -184,7 +184,7 @@ int32_t virtio_util_do_generic_init_step(
     //    device does not support our subset of features and the device is unusable.
     if (!(ioread32(&r->Status) & VirtioDeviceStatus::FeaturesOk)) {
         LOGE("Device does not support our feature set");
-        rc = -ENOTSUP;
+        rc = -ERR_NOTSUP;
         goto failed;
     }
 
@@ -230,7 +230,7 @@ int32_t virtio_util_setup_virtq(
     //    and expect a returned value of zero (0x0).
     if (ioread32(&r->QueueReady) != 0) {
         LOGE("Queue already in use");
-        rc = -EBUSY;
+        rc = -ERR_BUSY;
         goto failed;
     }
 
@@ -239,7 +239,7 @@ int32_t virtio_util_setup_virtq(
     queue_size = min(ioread32(&r->QueueNumMax), size);
     if (queue_size == 0) {
         LOGE("Queue not available");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
 
@@ -248,7 +248,7 @@ int32_t virtio_util_setup_virtq(
     q = virtq_alloc(index, queue_size);
     if (q == nullptr) {
         LOGE("Failed to allocate virtqueue");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
 
@@ -283,7 +283,7 @@ failed:
 int virtio_virtq_alloc_desc(SplitVirtQueue *q)
 {
     if (q->first_free_desc_idx >= q->size)
-        return -ENOMEM;
+        return -ERR_NOMEM;
     
     int desc_idx = q->first_free_desc_idx;
     q->first_free_desc_idx = q->desc_table[desc_idx].next;

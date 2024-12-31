@@ -11,7 +11,7 @@ static int verify_identification(Elf32_Ehdr const *header)
 {
     if (header->e_ident[0] != 0x7f || header->e_ident[1] != 'E' || header->e_ident[2] != 'L' || header->e_ident[3] != 'F') {
         LOGW("Invalid magic number");
-        return -ENOEXEC;
+        return -ERR_NOEXEC;
     }
     
     if (header->e_ident[4] != ELFCLASS32 ||
@@ -19,7 +19,7 @@ static int verify_identification(Elf32_Ehdr const *header)
         header->e_ident[6] != EV_CURRENT) {
         
         LOGW("Unsupported ELF type");
-        return -ENOTSUP;
+        return -ERR_NOTSUP;
     }
 
     return 0;
@@ -32,7 +32,7 @@ static int try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSp
 
     if (binary_size < sizeof(Elf32_Ehdr)) {
         LOGE("Binary is smaller than the ELF header");
-        rc = -ENOEXEC;
+        rc = -ERR_NOEXEC;
         goto cleanup;
     }
     
@@ -45,11 +45,11 @@ static int try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSp
 
     if (header->e_type != ET_EXEC) {
         LOGE("ELF is not executable");
-        rc = -ENOEXEC;
+        rc = -ERR_NOEXEC;
         goto cleanup;
     } else if (header->e_machine != EM_ARM) {
         LOGE("ELF is for incompatible architecture"); 
-        rc = -ENOTSUP;
+        rc = -ERR_NOTSUP;
         goto cleanup;
     }
 
@@ -71,14 +71,14 @@ static int try_load_elf(uint8_t const *elf_binary, size_t binary_size, AddressSp
                 error = physical_page_alloc(PageOrder::_4KB, page);
                 if (!error.is_success()) {
                     LOGE("Failed to alloc physical page");
-                    return -ENOMEM;
+                    return -ERR_NOMEM;
                 }
 
                 error = vm_map(as, page, addr, PageAccessPermissions::UserFullAccess);
                 if (!error.is_success()) {
                     LOGE("Failed to map page %p at virt_addr %p", page2addr(page), addr);
                     physical_page_free(page, PageOrder::_4KB);
-                    return -ENOMEM;
+                    return -ERR_NOMEM;
                 }
 
                 vm_memset(as, addr, 0, 4 * _1KB);
@@ -105,7 +105,7 @@ int elf_load_into_address_space(const char *path, uintptr_t *entrypoint, Address
     FileCustody *custody = nullptr;
     uint8_t *binary = nullptr;
     
-    rc = vfs_open(path, O_RDONLY, &custody);
+    rc = vfs_open(path, OF_RDONLY, &custody);
     if (rc != 0)
         goto cleanup;
 
@@ -114,7 +114,7 @@ int elf_load_into_address_space(const char *path, uintptr_t *entrypoint, Address
 
     binary = (uint8_t*) malloc(fsize);
     if (binary == nullptr) {
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto cleanup;
     }
 

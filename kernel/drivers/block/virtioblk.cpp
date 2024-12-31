@@ -23,7 +23,7 @@ int32_t VirtioBlockDevice::init()
 
     r = static_cast<VirtioRegisterMap volatile*>(ioremap(m_config.address, sizeof(VirtioRegisterMap)));
     if (!r) {
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
     LOGD("Registers are mapped at 0x%p", r);
@@ -112,7 +112,7 @@ int VirtioBlockDevice::enqueue_block_request(uint32_t type, uint32_t sector, uin
     status_idx = virtio_virtq_alloc_desc(q);
     if (header_idx < 0 || body_idx < 0 || status_idx < 0) {
         LOGE("Failed to allocate virtqueue descriptors");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
 
@@ -238,9 +238,9 @@ int64_t VirtioBlockDevice::read_sector(int64_t sector_idx, uint8_t *buffer)
     rc = spinlock_take_with_timeout(req.completed, 100);
     if (rc != 0) {
         LOGE("Timed out waiting for request to complete");
-        rc = -ETIMEDOUT;
+        rc = -ERR_TIMEDOUT;
     } else if (req.req.footer.status != 0) {
-        rc = -EIO;
+        rc = -ERR_IO;
         LOGE("Failed to read sector %" PRId64 ": virtio returned status %d", sector_idx, req.req.footer.status);
     } else {
         /**
@@ -263,10 +263,10 @@ cleanup:
 
 int64_t VirtioBlockDevice::write_sector(int64_t, uint8_t const*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 int32_t VirtioBlockDevice::ioctl(uint32_t, void*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }

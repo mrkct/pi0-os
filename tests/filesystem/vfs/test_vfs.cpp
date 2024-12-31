@@ -11,7 +11,7 @@ static Filesystem *s_fs;
 TEST(open_file)
 {
 	FileCustody *custody;
-	ASSERT_EQUAL_INT(0, vfs_open("/dir1/dir2/hello", O_RDONLY, &custody));
+	ASSERT_EQUAL_INT(0, vfs_open("/dir1/dir2/hello", OF_RDONLY, &custody));
 
 	const char *expected = "Hello, world!";
 	uint8_t contents[100];
@@ -27,8 +27,8 @@ TEST(open_file)
 TEST(open_file_twice)
 {
 	FileCustody *custody1, *custody2;
-	ASSERT_EQUAL_INT(0, vfs_open("/dir1/dir2/hello", O_RDONLY, &custody1));
-	ASSERT_EQUAL_INT(0, vfs_open("/dir1/dir2/hello", O_RDONLY, &custody2));
+	ASSERT_EQUAL_INT(0, vfs_open("/dir1/dir2/hello", OF_RDONLY, &custody1));
+	ASSERT_EQUAL_INT(0, vfs_open("/dir1/dir2/hello", OF_RDONLY, &custody2));
 
 	uint8_t buf1[100], buf2[100];
 	ssize_t read1 = vfs_read(custody1, buf1, sizeof(buf1));
@@ -46,7 +46,7 @@ TEST(open_file_twice)
 TEST(large_file)
 {
 	FileCustody *custody;
-	ASSERT_EQUAL_INT(0, vfs_open("/dir3/64k", O_RDONLY, &custody));
+	ASSERT_EQUAL_INT(0, vfs_open("/dir3/64k", OF_RDONLY, &custody));
 
 #define BUF_SIZE 64*1024
 	uint8_t *buf = (uint8_t*) malloc(BUF_SIZE);
@@ -67,7 +67,7 @@ TEST(large_file)
 TEST(file_not_found)
 {
 	FileCustody *custody;
-	ASSERT_EQUAL_INT<int>(-ENOENT, vfs_open("/dir1/dir2/doesnotexist", O_RDONLY, &custody));
+	ASSERT_EQUAL_INT<int>(-ERR_NOENT, vfs_open("/dir1/dir2/doesnotexist", OF_RDONLY, &custody));
 }
 
 static void load_resources()

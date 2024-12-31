@@ -1,6 +1,5 @@
 #include <kernel/irq.h>
 #include <kernel/timer.h>
-#include <errno.h>
 #include "spinlock.h"
 
 
@@ -16,7 +15,7 @@ int spinlock_take_with_timeout(Spinlock &lock, uint32_t timeout_ms)
     uint32_t start = get_ticks_ms();
     while (!try_acquire(&lock.is_taken)) {
         if (get_ticks_ms() - start > timeout_ms)
-            return -ETIMEDOUT;
+            return -ERR_TIMEDOUT;
         cpu_relax();
     }
     return 0;

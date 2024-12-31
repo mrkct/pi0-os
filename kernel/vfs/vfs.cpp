@@ -141,7 +141,7 @@ static int icache_insert(InodeCache *icache, InodeIdentifier identifier, Inode *
 
     auto *entry = (InodeCache::Entry*) malloc(sizeof(InodeCache::Entry));
     if (entry == nullptr)
-        return -ENOMEM;
+        return -ERR_NOMEM;
 
     *entry = InodeCache::Entry {
         .prev = nullptr,
@@ -217,7 +217,7 @@ static int alloc_custody(Inode *inode, uint32_t flags, FileCustody **out_custody
 {
     auto *custody = static_cast<FileCustody*>(malloc(sizeof(FileCustody)));
     if (!custody)
-        return -ENOMEM;
+        return -ERR_NOMEM;
     
     custody->inode = inode;
     custody->flags = flags;
@@ -245,7 +245,7 @@ static int lookup_inode(Inode *parent, const char *name, Inode **out_inode)
 
     *out_inode = (Inode*) malloc(sizeof(Inode));
     if (*out_inode == nullptr)
-        return -ENOMEM;
+        return -ERR_NOMEM;
         
     **out_inode = temp;
     (*out_inode)->refcount = 0;
@@ -298,7 +298,7 @@ static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_
     Inode *inode = icache_lookup(&fs->icache, fs->root);
     if (inode == nullptr) {
         LOGE("root inode not found");
-        return -ENOENT;
+        return -ERR_NOENT;
     }
 
     // The loop below assumes that the previous inode was already opened
@@ -323,7 +323,7 @@ static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_
         LOGD("lookup for '%s'", path);
         rc = lookup_inode(parent, path, &inode);
         if (rc != 0) {
-            rc = -ENOENT;
+            rc = -ERR_NOENT;
             // do not 'break', we want to know if this was the last component below
         }
 
@@ -334,7 +334,7 @@ static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_
         LOGI("lookup successful");
         *out_parent = parent;
         *out_inode = inode;
-    } else if (rc == -ENOENT && parent->type == InodeType::Directory && *path == '\0') {
+    } else if (rc == -ERR_NOENT && parent->type == InodeType::Directory && *path == '\0') {
         LOGE("lookup failed at the last component");
         *out_parent = parent;
         *out_inode = nullptr;
@@ -353,7 +353,7 @@ static int traverse(const char *path, Inode **out_parent, Inode **out_inode)
     int rc;
     char *cpath = canonicalize_path(path);
     if (cpath == nullptr)
-        return -ENOMEM;
+        return -ERR_NOMEM;
 
     LOGI("Lookup for '%s' (canonicalized to: '%s')", path, log_canonicalized_path(cpath));
 
@@ -363,7 +363,7 @@ static int traverse(const char *path, Inode **out_parent, Inode **out_inode)
     });
     if (mp == nullptr) {
         LOGW("Mo mountpoint found");
-        rc = -ENOENT;
+        rc = -ERR_NOENT;
     } else {
         LOGI("Found mountpoint at '%s'", log_canonicalized_path(mp->path));
         rc = traverse_in_fs(mp->fs, cpath + mp->path_skip, out_parent, out_inode);
@@ -382,11 +382,11 @@ int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
     *out_custody = nullptr;
     rc = traverse(path, &parent, &inode);
 
-    if (rc != 0 && parent != nullptr && (flags & O_CREAT)) {
+    if (rc != 0 && parent != nullptr && (flags & OF_CREATE)) {
         kassert(parent != nullptr);
         kassert(parent->type == InodeType::Directory);
         TODO();
-        rc = -ENOTSUP;
+        rc = -ERR_NOTSUP;
     } else if (rc == 0) {
         auto *fs = inode->filesystem;
         kassert(fs != nullptr);
@@ -395,7 +395,7 @@ int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
     }
 
     if (rc == 0 && inode->type == InodeType::Directory)
-        rc = -EISDIR;
+        rc = -ERR_ISDIR;
 
     if (rc == 0)
         rc = alloc_custody(inode, flags, out_custody);
@@ -420,7 +420,7 @@ int vfs_mount(const char *path, Filesystem &fs)
         free(cpath);
         free(mp);
         free(root_inode);
-        return -ENOMEM;
+        return -ERR_NOMEM;
     }
     
     mp->path = cpath;
@@ -450,7 +450,7 @@ int vfs_mount(const char *path, Filesystem &fs)
 ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
 {
     if (custody->inode->type == InodeType::Directory)
-        return -EISDIR;
+        return -ERR_ISDIR;
 
     LOGI("vfs_read(%" PRIu32 " bytes, custody offset @ %" PRIu64 ")", size, custody->offset);
     auto *inode = custody->inode;
@@ -464,7 +464,7 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
 ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
 {
     if (custody->inode->type == InodeType::Directory)
-        return -EISDIR;
+        return -ERR_ISDIR;
 
     auto *inode = custody->inode;
     ssize_t rc = inode->file_ops->write(inode, custody->offset, buffer, size);
@@ -490,7 +490,7 @@ int vfs_close(FileCustody *custody)
     return 0;
 }
 
-int vfs_stat(const char *path, struct stat *stat)
+int vfs_stat(const char *path, api::Stat *stat)
 {
     int rc;
     Inode *parent = nullptr;
@@ -506,7 +506,7 @@ int vfs_stat(const char *path, struct stat *stat)
     return rc;
 }
 
-int vfs_fstat(FileCustody *custody, struct stat *stat)
+int vfs_fstat(FileCustody *custody, api::Stat *stat)
 {
     return custody->inode->ops->stat(custody->inode, stat);
 }

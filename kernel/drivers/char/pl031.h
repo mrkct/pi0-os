@@ -33,8 +33,8 @@ public:
     virtual int32_t init() override;
     virtual int32_t shutdown() override;
 
-    virtual int32_t get_time(DateTime&) override;
-    virtual int32_t set_time(const DateTime) override;
+    virtual int32_t get_time(api::DateTime&) override;
+    virtual int32_t set_time(const api::DateTime) override;
 
 private:
     Config m_config;

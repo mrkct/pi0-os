@@ -112,13 +112,13 @@ static int clone_user_array_of_strings(char const *const user_array[], char ***o
         array_size++;
     if (array_size == MAX_ARRAY_SIZE) {
         LOGE("Too many string arguments");
-        return -E2BIG;
+        return -ERR_2BIG;
     }
 
     array = (char**) malloc(array_size * sizeof(char*));
     if (array == nullptr) {
         LOGE("Failed to allocate array of strings");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
 
@@ -126,14 +126,14 @@ static int clone_user_array_of_strings(char const *const user_array[], char ***o
         size_t len = strnlen(user_array[i], MAX_STRING_SIZE);
         if (len == MAX_STRING_SIZE) {
             LOGE("String too long");
-            rc = -E2BIG;
+            rc = -ERR_2BIG;
             goto failed;
         }
 
         array[i] = strdup(user_array[i]);
         if (array[i] == nullptr) {
             LOGE("Failed to allocate string");
-            rc = -ENOMEM;
+            rc = -ERR_NOMEM;
             goto failed;
         }
     }
@@ -321,15 +321,15 @@ void create_first_process(void (*entrypoint)(void))
     kassert(stage2 != nullptr);
     Thread *thread = stage2->threads.data[0];
 
-    rc = vfs_open("/dev/kernel_log", O_RDONLY, &temp);
+    rc = vfs_open("/dev/kernel_log", OF_RDONLY, &temp);
     kassert(rc == 0);
     stage2->openfiles[STDIN_FILENO] = temp;
     
-    rc = vfs_open("/dev/kernel_log", O_WRONLY, &temp);
+    rc = vfs_open("/dev/kernel_log", OF_WRONLY, &temp);
     kassert(rc == 0);
     stage2->openfiles[STDOUT_FILENO] = temp;
 
-    rc = vfs_open("/dev/kernel_log", O_WRONLY, &temp);
+    rc = vfs_open("/dev/kernel_log", OF_WRONLY, &temp);
     kassert(rc == 0);
     stage2->openfiles[STDERR_FILENO] = temp;
 
@@ -403,7 +403,7 @@ int sys$fork()
     forked = alloc_process(current_process->name, NULL, false);
     if (forked == nullptr) {
         LOGE("Failed to allocate memory to fork process");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
     
@@ -415,7 +415,7 @@ int sys$fork()
         forked->openfiles[i] = vfs_duplicate(custody);
         if (forked->openfiles[i] == nullptr) {
             LOGE("Failed to duplicate open file");
-            rc = -ENOMEM;
+            rc = -ERR_NOMEM;
             goto failed;
         }
     }
@@ -423,7 +423,7 @@ int sys$fork()
     forked_thread = forked->threads.data[0];
     if (Error err = vm_fork(current_process->address_space, forked->address_space); !err.is_success()) {
         LOGE("Failed to fork address space");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto failed;
     }
 
@@ -466,7 +466,7 @@ int sys$execve(const char *path, char *const user_argv[], char *const user_envp[
     
     if (!vm_create_address_space(new_as).is_success()) {
         LOGE("Failed to create address space for new process");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto cleanup;
     }
 
@@ -480,7 +480,7 @@ int sys$execve(const char *path, char *const user_argv[], char *const user_envp[
     userstack = (uint8_t*) alloc_thread_user_stack(&new_as, 0);
     if (userstack == nullptr) {
         LOGE("Failed to allocate user stack for new process");
-        rc = -ENOMEM;
+        rc = -ERR_NOMEM;
         goto cleanup;
     }
     // NOTE: We're still running with the old address space, pushing
@@ -531,7 +531,7 @@ int sys$open(const char *path, int flags, int mode)
     }
     if (fd == -1) {
         LOGE("Process %s[%d] failed to open '%s', no free file descriptors", current_process->name, current_process->pid, path);
-        return -ENFILE;
+        return -ERR_NFILE;
     }
 
     rc = vfs_open(path, flags, &file);
@@ -549,11 +549,11 @@ int sys$read(int fd, void *buf, size_t count)
     FileCustody *file = nullptr;
 
     if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
-        return -EBADF;
+        return -ERR_BADF;
 
     file = current_process->openfiles[fd];
     if (file == nullptr)
-        return -EBADF;
+        return -ERR_BADF;
     
     return vfs_read(file, (uint8_t*) buf, count);
 }
@@ -564,11 +564,11 @@ int sys$write(int fd, const void *buf, size_t count)
     FileCustody *file = nullptr;
 
     if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
-        return -EBADF;
+        return -ERR_BADF;
 
     file = current_process->openfiles[fd];
     if (file == nullptr)
-        return -EBADF;
+        return -ERR_BADF;
     
     return vfs_write(file, (const uint8_t*) buf, count);
 }
@@ -580,11 +580,11 @@ int sys$close(int fd)
     FileCustody *file = nullptr;
 
     if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
-        return -EBADF;
+        return -ERR_BADF;
     
     file = current_process->openfiles[fd];
     if (file == nullptr)
-        return -EBADF;
+        return -ERR_BADF;
     rc = vfs_close(file);
     current_process->openfiles[fd] = nullptr;
 
@@ -598,7 +598,7 @@ int sys$millisleep(int ms)
 
     LOGI("%s[%d] going to sleep for %d ms", current_thread->process->name, current_thread->tid, ms);
     if (ms < 0)
-        return -EINVAL;
+        return -ERR_INVAL;
     else if (ms == 0)
         return 0;
 
@@ -613,17 +613,17 @@ int sys$millisleep(int ms)
     return 0;
 }
 
-int sys$fstat(int fd, struct stat *stat)
+int sys$fstat(int fd, api::Stat *stat)
 {
     auto *current_process = cpu_current_process();
     FileCustody *file = nullptr;
 
     if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
-        return -EBADF;
+        return -ERR_BADF;
     
     file = current_process->openfiles[fd];
     if (file == nullptr)
-        return -EBADF;
+        return -ERR_BADF;
     
     return vfs_fstat(file, stat);
 }

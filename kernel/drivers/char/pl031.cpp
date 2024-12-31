@@ -29,10 +29,10 @@ int32_t PL031::shutdown()
     return 0;
 }
 
-int32_t PL031::get_time(DateTime &dt)
+int32_t PL031::get_time(api::DateTime &dt)
 {
     if (r == nullptr)
-        return -ENODEV;
+        return -ERR_NODEV;
 
     uint32_t data = ioread32(&r->dr);
 
@@ -43,10 +43,10 @@ int32_t PL031::get_time(DateTime &dt)
     return 0;
 }
 
-int32_t PL031::set_time(const DateTime dt)
+int32_t PL031::set_time(const api::DateTime dt)
 {
     if (r == nullptr)
-        return -ENODEV;
+        return -ERR_NODEV;
     
     struct tm time;
     datetime_to_tm(dt, &time);

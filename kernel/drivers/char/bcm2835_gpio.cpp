@@ -29,7 +29,7 @@ int32_t BCM2835GPIOController::shutdown()
 int32_t BCM2835GPIOController::configure_pin(uint32_t port, uint32_t pin, PinFunction function)
 {
     if (port != 0 || pin >= PIN_COUNT)
-        return -EINVAL;
+        return -ERR_INVAL;
 
     uint32_t function_bitmask = 0;
     switch (function) {
@@ -70,7 +70,7 @@ int32_t BCM2835GPIOController::configure_pin(uint32_t port, uint32_t pin, PinFun
 int32_t BCM2835GPIOController::configure_pin_pull_up_down(uint32_t port, uint32_t pin, PullState state)
 {
     if (port != 0 || pin >= PIN_COUNT)
-        return -EINVAL;
+        return -ERR_INVAL;
 
     uint32_t pull_up_down_bitmask = 0;
     switch (state) {

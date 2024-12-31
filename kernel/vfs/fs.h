@@ -2,8 +2,6 @@
 
 #include <kernel/base.h>
 #include <kernel/drivers/device.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 
 typedef uint64_t InodeIdentifier;
@@ -21,7 +19,7 @@ enum class InodeType {
 };
 
 struct InodeOps {
-    int (*stat)(Inode *self, struct stat *st);
+    int (*stat)(Inode *self, api::Stat *st);
 };
 
 struct InodeFileOps {
@@ -46,12 +44,12 @@ struct Inode {
     InodeIdentifier identifier;
     Filesystem *filesystem;
 
-    mode_t mode;
-    uid_t uid;
+    uint32_t mode;
+    uint32_t uid;
     uint64_t size;
-    struct timespec access_time;
-    struct timespec creation_time;
-    struct timespec modification_time;
+    api::TimeSpec access_time;
+    api::TimeSpec creation_time;
+    api::TimeSpec modification_time;
 
     void *opaque;
 

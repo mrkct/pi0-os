@@ -90,7 +90,7 @@ int64_t BCM2835AuxUART::writebyte(uint8_t c)
 int64_t BCM2835AuxUART::write(const uint8_t *buffer, size_t size)
 {
     if (r == nullptr)
-        return -EIO;
+        return -ERR_IO;
 
     int64_t rc = 0;
 
@@ -107,7 +107,7 @@ int64_t BCM2835AuxUART::write(const uint8_t *buffer, size_t size)
 int64_t BCM2835AuxUART::read(uint8_t*, size_t)
 {
     if (!m_initialized) {
-        return -EIO;
+        return -ERR_IO;
     }
 
     todo();
@@ -117,7 +117,7 @@ int64_t BCM2835AuxUART::read(uint8_t*, size_t)
 
 int32_t BCM2835AuxUART::ioctl(uint32_t, void*)
 {
-    return -ENOTSUP;
+    return -ERR_NOTSUP;
 }
 
 void BCM2835AuxUART::irq_handler()
