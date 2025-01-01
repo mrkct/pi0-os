@@ -23,3 +23,9 @@ jobs:
       - name: Run Build in Docker
         run: |
           docker run --rm -v $(pwd):/pi0-os build-env
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: os-image
+          path: ci-artifacts/
