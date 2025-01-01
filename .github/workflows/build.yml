@@ -25,7 +25,7 @@ jobs:
           docker run --rm -v $(pwd):/pi0-os build-env
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: os-image
           path: ci-artifacts/
