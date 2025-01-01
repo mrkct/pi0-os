@@ -3,11 +3,6 @@
 #include <api/syscalls.h>
 
 
-void wait(int seconds)
-{
-    syscall(SYS_MilliSleep, 1000 * seconds, 0, 0, 0, 0, 0);    
-}
-
 int main(int argc, char **argv)
 {
     printf("Starting init...\n");
@@ -18,7 +13,7 @@ int main(int argc, char **argv)
 
     while (1) {
         printf("tick\n");
-        wait(1);
+        sys_millisleep(1000);
     }
 
     return 0;

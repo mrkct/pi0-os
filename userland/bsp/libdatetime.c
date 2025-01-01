@@ -2,16 +2,6 @@
 #include "libdatetime.h"
 
 
-void os_sleep(int ms)
-{
-    syscall(SYS_Sleep, NULL, ms, 0, 0, 0, 0);
-}
-
-int get_datetime(DateTime *dt)
-{
-    return syscall(SYS_GetDateTime, NULL, (uint32_t) dt, 0, 0, 0, 0);
-}
-
 DateTime datetime_add(DateTime dt, int hours_to_add, int minutes_to_add, int seconds_to_add)
 {
     dt.second += seconds_to_add;

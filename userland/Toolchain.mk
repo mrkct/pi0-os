@@ -12,22 +12,11 @@ CFLAGS := -g -Wall -Wextra \
 	-static \
 	-fno-pic \
 	-I$(BSP_HERE)/../include \
-	-I$(BSP_HERE)/libs \
-	-L$(BSP_HERE)/libs \
-	-L$(BSP_HERE)/bsp/newlib \
+	-I$(BSP_HERE)/bsp \
+	-L$(BSP_HERE)/bsp \
 
 ifeq ($(ARCH), ARMV6)
 	CFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
 else
 	CFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
 endif
-
-include $(BSP_HERE)/bsp/objects.mk
-BSP_OBJECTS:=$(addprefix $(BSP_HERE)/bsp/, $(BSP_OBJECTS))
-
-BSP_LIBS := -lc -lg -lgcc -lm
-
-.PHONY: bsp
-
-bsp:
-	$(MAKE) -C $(BSP_HERE)/bsp all

@@ -1,12 +1,23 @@
-include ../toolchain.mk
-include objects.mk
+include ../Toolchain.mk
+
+OBJECTS = \
+	crt0.c.o \
+	newlib.c.o \
+	default_font.c.o \
+	libdatetime.c.o \
+	libgfx.c.o \
+	libsstring.c.o
 
 .PHONY: all clean
 
-all: $(BSP_OBJECTS)
+all: libbsp.a
 
-clean:
-	$(RM) $(BSP_OBJECTS)
+libbsp.a: $(OBJECTS)
+	$(AR) rcs libbsp.a $(OBJECTS)
 
 %.c.o: %.c
 	$(CC) $(CFLAGS) $< -c -o $@
+
+clean:
+	$(RM) $(OBJECTS)
+	$(RM) libapp.a

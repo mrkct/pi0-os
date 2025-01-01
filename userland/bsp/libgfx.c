@@ -52,7 +52,8 @@ Window open_window(const char *title, int width, int height, bool show_titlebar)
     if (show_titlebar)
         draw_titlebar(&window);
     
-    int rc = sys_create_window(width, height);
+    // TODO: Implement opening the window
+    int rc = -1;
     if (rc != 0) {
         fprintf(stderr, "Failed to create window. Rc: %d\r\n", rc);
         exit(-1);
@@ -61,9 +62,10 @@ Window open_window(const char *title, int width, int height, bool show_titlebar)
     return window;
 }
 
-int refresh_window(Window *window)
+int refresh_window(Window*)
 {
-    return sys_refresh_window(window->framebuffer);
+    // TODO: Implement this
+    return -1; 
 }
 
 static void _draw_filled_rect(Window *window, int x, int y, int w, int h, uint32_t color)
