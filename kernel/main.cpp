@@ -85,8 +85,8 @@ static void wait(int secs)
 static void proc1()
 {
     int rc = 0;
-    const char *argv[] = { "/bina/init", nullptr };
-    const char *envp[] = { nullptr };
+    const char * const argv[] = { "/bina/init", nullptr };
+    const char * const envp[] = { nullptr };
 
     kprintf("I am main\n");
 

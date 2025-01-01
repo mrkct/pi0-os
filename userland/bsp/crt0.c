@@ -3,7 +3,7 @@
 
 
 extern void __libc_init_array(void);
-extern int main(int argc, const char *argv[]);
+extern int main(int argc, char *argv[]);
 extern void exit(int status);
 
 void _init()

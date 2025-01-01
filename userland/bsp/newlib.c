@@ -125,7 +125,7 @@ pid_t _fork(void)
 
 int _execve(const char *pathname, char *const _Nullable argv[], char *const _Nullable envp[])
 {
-    return sys_execve(pathname, argv, envp);
+    return sys_execve(pathname, (const char * const *) argv, (const char * const *) envp);
 }
 
 pid_t waitpid(pid_t pid, int *wstatus, int options)
