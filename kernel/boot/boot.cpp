@@ -19,7 +19,7 @@ extern "C" uint8_t __bundle_dtb_end[];
 extern "C" [[noreturn]] void activate_mmu_and_jump_to_kernel(uint32_t ttbr0, uint32_t stack, uint32_t pc);
 
 
-extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t load_address)
+extern "C" void boot_start(uint32_t, uint32_t, uint32_t, uint32_t)
 {
     board_early_console_init();
     early_kprintf("Booting...\n");

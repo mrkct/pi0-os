@@ -9,6 +9,7 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     sysarg_t arg4)
 {
     int rc;
+    (void) arg4;
 
     irq_enable();
 

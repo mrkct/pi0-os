@@ -19,6 +19,7 @@ typedef enum Errors {
     ERR_NOMEM =	12,	    /* Not enough space */
     ERR_BUSY = 16,	    /* Device or resource busy */
     ERR_NODEV = 19,	    /* No such device */
+    ERR_NOTDIR = 20,	/* Not a directory */
     ERR_ISDIR = 21,	    /* Is a directory */
     ERR_INVAL = 22,	    /* Invalid argument */
     ERR_NFILE = 23,	    /* Too many open files in system */

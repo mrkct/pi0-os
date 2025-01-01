@@ -155,6 +155,7 @@ static int icache_insert(InodeCache *icache, InodeIdentifier identifier, Inode *
     return 0;
 }
 
+#if 0
 static Inode *icache_remove(InodeCache *icache, InodeIdentifier identifier)
 {
     auto *entry = icache->list.find_first([&](InodeCache::Entry *entry) {
@@ -169,6 +170,7 @@ static Inode *icache_remove(InodeCache *icache, InodeIdentifier identifier)
 
     return inode;
 }
+#endif
 
 static int open_inode(Inode *inode)
 {
@@ -316,7 +318,7 @@ static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_
 
         if (parent->type != InodeType::Directory) {
             LOGE("parent inode is not a directory");
-            rc = -ENOTDIR;
+            rc = -ERR_NOTDIR;
             break;
         }
 
