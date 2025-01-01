@@ -17,15 +17,20 @@ bsp/libbsp.a:
 	$(MAKE) -C $(BSP_HERE)/bsp libbsp.a
 
 $(APP_NAME): bsp/libbsp.a $(APP_OBJECTS)
+	@echo "\033[36mLinking $(APP_NAME)\033[0m"
 	$(CC) $(CFLAGS) $(APP_CFLAGS) $(APP_OBJECTS) -o $(APP_NAME) -lc -lbsp -lg -lgcc -lm
 
 clean:
 	$(RM) $(APP_NAME)
 	$(RM) $(APP_OBJECTS)
+	$(RM) $(APP_OBJECTS:.o=.d)
 	$(MAKE) -C $(BSP_HERE)/bsp clean
 
 install: $(APP_NAME)
 	cp $(APP_NAME) $(MOUNT_POINT)/bina/
 
 %.c.o: %.c
-	$(CC) $(CFLAGS) $(APP_CFLAGS) $< -c -o $@
+	@echo "\033[36mCompiling $<\033[0m"
+	$(CC) $(CFLAGS) $(APP_CFLAGS) -c $< -MMD -MP -MF $(@:.o=.d) -o $@
+
+-include $(APP_OBJECTS:.o=.d)

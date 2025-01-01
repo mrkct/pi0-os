@@ -14,14 +14,15 @@ build-apps: $(BUILD_TARGETS)
 clean-apps: $(CLEAN_TARGETS)
 
 build-%:
-	@echo "Building '$*'..."
+	@echo "\033[32mBuilding '$*'\033[0m"
 	$(MAKE) -C $*
 
 clean-%:
-	echo "Cleaning '$*'..."
+	@echo "\033[31mCleaning '$*'\033[0m"
 	$(MAKE) -C $* clean
 
 disk-image: build-apps
+	@echo "\033[32mBuilding disk image...\033[0m"
 	rm -rf $(DIR)
 	mkdir -p $(DIR)
 	cp -r base/* $(DIR)

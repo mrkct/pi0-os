@@ -82,12 +82,15 @@ kernel.elf: $(OBJS)
 -include $(DEPENDS)
 
 %.cpp.o: %.cpp Makefile
+	@echo "\033[36mCompiling $<\033[0m"
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
 %.c.o: %.c Makefile
+	@echo "\033[36mCompiling $<\033[0m"
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
 %.S.o: %.S Makefile
+	@echo "\033[36mCompiling $<\033[0m"
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
 clean:
