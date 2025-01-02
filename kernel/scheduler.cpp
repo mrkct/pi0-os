@@ -633,4 +633,62 @@ int sys$getpid()
     return cpu_current_process()->pid;
 }
 
+int sys$create_pipe(int *write_fd, int *read_fd)
+{
+    int rc;
+    auto *current_process = cpu_current_process();
+    FileCustody *read_custody = nullptr;
+    FileCustody *write_custody = nullptr;
+    int read_fd_index = -1, write_fd_index = -1;
 
+    rc = vfs_create_pipe(&write_custody, &read_custody);
+    if (rc != 0) {
+        LOGE("Failed to create pipe, rc=%d", rc);
+        goto failed;
+    }
+    
+    for (unsigned i = 0; i < array_size(current_process->openfiles); i++) {
+        if (current_process->openfiles[i] == nullptr) {
+            read_fd_index = i;
+            break;
+        }
+    }
+    if (read_fd_index == -1) {
+        LOGE("Failed to create pipe, no free file descriptors");
+        rc = -ERR_NFILE;
+        goto failed;
+    }
+
+    current_process->openfiles[read_fd_index] = read_custody;
+    for (unsigned i = 0; i < array_size(current_process->openfiles); i++) {
+        if (current_process->openfiles[i] == nullptr) {
+            write_fd_index = i;
+            break;
+        }
+    }
+    if (write_fd_index == -1) {
+        LOGE("Failed to create pipe, no free file descriptors");
+        rc = -ERR_NFILE;
+        goto failed;
+    }
+    current_process->openfiles[write_fd_index] = write_custody;
+
+    *read_fd = read_fd_index;
+    *write_fd = write_fd_index;
+    
+    return 0;
+
+failed:
+    if (read_custody != nullptr)
+        vfs_close(read_custody);
+    if (write_custody != nullptr)
+        vfs_close(write_custody);
+    if (read_fd_index != -1)
+        current_process->openfiles[read_fd_index] = nullptr;
+    if (write_fd_index != -1)
+        current_process->openfiles[write_fd_index] = nullptr;
+
+    
+
+    return rc;
+}

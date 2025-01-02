@@ -41,3 +41,34 @@ Filesystem *fs_detect_and_create(BlockDevice &device)
     LOGE("Failed to find a compatible filesystem on device '%s'", device.name());
     return nullptr;
 }
+
+int32_t fs_inode_ioctl_not_supported(Inode*, uint32_t, void*)
+{
+    return -ERR_NOTSUP;
+}
+
+uint64_t fs_inode_seek_not_supported(Inode*, uint64_t, int, int32_t)
+{
+    return -ERR_NOTSUP;
+}
+
+int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **)
+{
+    return -ERR_NOTSUP;
+}
+
+int fs_dir_inode_mkdir_not_supported(Inode*, const char *)
+{
+    return -ERR_NOTSUP;
+}
+
+int fs_dir_inode_rmdir_not_supported(Inode*, const char *)
+{
+    return -ERR_NOTSUP;
+}
+
+int fs_dir_inode_unlink_not_supported(Inode*, const char *)
+{
+    return -ERR_NOTSUP;
+}
+

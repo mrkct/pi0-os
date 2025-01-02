@@ -86,3 +86,6 @@ int sys$millisleep(int ms);
 int sys$fstat(int fd, api::Stat *stat);
 
 int sys$getpid();
+
+int sys$create_pipe(int *write_fd, int *read_fd);
+

@@ -453,6 +453,11 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
 {
     if (custody->inode->type == InodeType::Directory)
         return -ERR_ISDIR;
+    
+    if ((custody->flags & OF_ACCMODE) == OF_WRONLY) {
+        LOGI("vfs_read: denied because custody was opened with WRONLY flag (flags: %" PRIu32 ")", custody->flags);
+        return -ERR_PERM;
+    }
 
     LOGI("vfs_read(%" PRIu32 " bytes, custody offset @ %" PRIu64 ")", size, custody->offset);
     auto *inode = custody->inode;
@@ -467,6 +472,11 @@ ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
 {
     if (custody->inode->type == InodeType::Directory)
         return -ERR_ISDIR;
+
+    if ((custody->flags & OF_ACCMODE) == OF_RDONLY) {
+        LOGI("vfs_write: denied because custody was opened with RDONLY flag (flags: %" PRIu32 ")", custody->flags);
+        return -ERR_PERM;
+    }
 
     auto *inode = custody->inode;
     ssize_t rc = inode->file_ops->write(inode, custody->offset, buffer, size);
@@ -523,4 +533,37 @@ FileCustody* vfs_duplicate(FileCustody *custody)
     dup->inode->refcount++;
 
     return dup;
+}
+
+int vfs_create_pipe(FileCustody **out_sender_custody, FileCustody **out_receiver_custody)
+{
+    int rc = 0;
+    FileCustody *sender = nullptr;
+    FileCustody *receiver = nullptr;
+
+    LOGD("Creating a new pipe");
+    rc = vfs_open("/pipe/new", OF_CREATE, &sender);
+    if (rc != 0) {
+        LOGE("Failed to create pipe: %d", rc);
+        goto cleanup;
+    }
+
+    receiver = vfs_duplicate(sender);
+    if (receiver == nullptr) {
+        LOGE("Failed to duplicate pipe");
+        rc = -ERR_NOMEM;
+        goto cleanup;
+    }
+
+    sender->flags = OF_WRONLY;
+    receiver->flags = OF_RDONLY;
+    *out_sender_custody = sender;
+    *out_receiver_custody = receiver;
+    
+    return 0;
+
+cleanup:
+    free_custody(sender);
+    free_custody(receiver);
+    return rc;
 }

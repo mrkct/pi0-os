@@ -4,6 +4,7 @@
 #include <kernel/scheduler.h>
 #include <kernel/timer.h>
 #include <kernel/vfs/devfs/devfs.h>
+#include <kernel/vfs/pipefs/pipefs.h>
 #include <kernel/vfs/vfs.h>
 #include <api/syscalls.h>
 
@@ -65,6 +66,15 @@ extern "C" void kernel_main(BootParams const *boot_params)
         panic("Failed to create devfs: %d\n", rc);
     }
     rc = vfs_mount("/dev/", *devfs);
+    kassert(rc == 0);
+
+    Filesystem *pipefs;
+    rc = pipefs_create(&pipefs);
+    if (rc < 0) {
+        panic("Failed to create pipefs: %d\n", rc);
+    }
+    rc = vfs_mount("/pipe/", *pipefs);
+    kassert(rc == 0);
 
     kprintf("Running the first process...\n");
     create_first_process(proc1);
@@ -98,9 +108,24 @@ static void proc1()
             wait(1);
         }
     } else {
-        while (true) {
-            kprintf("I am main with child %d\n", pid);
-            wait(1);
+        int write, read;
+        rc = api::sys_mkpipe(&write, &read);
+        
+        pid = api::sys_fork();
+        if (pid == 0) {
+            while (true) {
+                api::sys_write(write, "Hello from child\0", 21);
+                wait(1);
+            }
+        } else {
+            while (true) {
+                char buf[100];
+                buf[99] = '\0';
+                int nread = api::sys_read(read, buf, 100);
+                if (nread > 0)
+                    kprintf("Read %d bytes: %s\n", nread, buf);
+                wait(1);
+            }
         }
     }
 }

@@ -5,8 +5,8 @@
 
 
 int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
-    sysarg_t arg1, sysarg_t arg2, sysarg_t arg3,
-    sysarg_t arg4)
+    sysarg_t arg1, sysarg_t arg2,
+    sysarg_t arg3, sysarg_t arg4)
 {
     int rc;
     (void) arg4;
@@ -46,6 +46,9 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
         break;
     case SYS_GetPid:
         rc = sys$getpid();
+        break;
+    case SYS_CreatePipe:
+        rc = sys$create_pipe((int*) arg1, (int*) arg2);
         break;
     default:
         kprintf("Unknown syscall %d\n", syscall);

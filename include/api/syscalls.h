@@ -24,6 +24,7 @@ typedef enum Errors {
     ERR_INVAL = 22,	    /* Invalid argument */
     ERR_NFILE = 23,	    /* Too many open files in system */
     ERR_ROFS = 30,	    /* Read-only file system */
+    ERR_PIPE = 32,	    /* Broken pipe */
     ERR_NOSYS = 88,	    /* Function not implemented */
     ERR_TIMEDOUT = 116,	/* Connection timed out */
     ERR_ALREADY = 120,	/* Socket already connected */
@@ -122,6 +123,11 @@ static inline int sys_waitpid(int pid, int *status, int options)
     return syscall(SYS_WaitPid, (sysarg_t) pid, (sysarg_t) status, (sysarg_t) options, 0);
 }
 
+static inline int sys_mkpipe(int *writer, int *receiver)
+{
+    return syscall(SYS_CreatePipe, (sysarg_t) writer, (sysarg_t) receiver, 0, 0);
+}
+
 #ifdef __cplusplus
 }
 #endif
@@ -162,6 +168,7 @@ namespace api {
 #endif
 
 /* Supported SYS_Open flags */
+#define OF_ACCMODE      (OF_RDONLY | OF_WRONLY | OF_RDWR)
 #define OF_RDONLY       0x0000
 #define OF_WRONLY       0x0001
 #define OF_RDWR         0x0002

@@ -14,6 +14,7 @@ int main(int argc, char **argv)
     while (1) {
         printf("tick\n");
         sys_millisleep(1000);
+        sys_yield();
     }
 
     return 0;

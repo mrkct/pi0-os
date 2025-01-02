@@ -16,6 +16,7 @@ enum class InodeType {
     RegularFile,
     SymbolicLink,
     Socket,
+    Pipe,
 };
 
 struct InodeOps {
@@ -100,3 +101,10 @@ static inline void inode_cache_free(InodeCache*) { TODO(); }
 uint64_t default_checked_seek(uint64_t filesize, uint64_t current, int whence, int32_t offset);
 
 Filesystem *fs_detect_and_create(BlockDevice&);
+
+int32_t fs_inode_ioctl_not_supported(Inode*, uint32_t, void*);
+uint64_t fs_inode_seek_not_supported(Inode*, uint64_t, int, int32_t);
+int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **);
+int fs_dir_inode_mkdir_not_supported(Inode*, const char *);
+int fs_dir_inode_rmdir_not_supported(Inode*, const char *);
+int fs_dir_inode_unlink_not_supported(Inode*, const char *);

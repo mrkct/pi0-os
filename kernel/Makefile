@@ -50,6 +50,7 @@ SOURCES=\
 	kernel/task/elfloader.cpp \
 	kernel/vfs/devfs/devfs.cpp \
 	kernel/vfs/fat32/fat32.cpp \
+	kernel/vfs/pipefs/pipefs.cpp \
 	kernel/vfs/fs.cpp \
 	kernel/vfs/vfs.cpp \
 	kernel/irq.cpp \
