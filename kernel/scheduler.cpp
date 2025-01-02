@@ -628,6 +628,25 @@ int sys$fstat(int fd, api::Stat *stat)
     return vfs_fstat(file, stat);
 }
 
+int sys$seek(int fd, int offset, int whence, uint64_t *out_new_offset)
+{
+    auto *current_process = cpu_current_process();
+    FileCustody *file = nullptr;
+
+    if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
+        return -ERR_BADF;
+    file = current_process->openfiles[fd];
+    if (file == nullptr)
+        return -ERR_BADF;
+
+    ssize_t newoff = vfs_seek(file, whence, offset);
+    if (newoff < 0)
+        return (int) newoff;
+
+    *out_new_offset = newoff;
+    return 0;
+}
+
 int sys$getpid()
 {
     return cpu_current_process()->pid;
@@ -692,3 +711,29 @@ failed:
 
     return rc;
 }
+
+int sys$movefd(int fd, int new_fd)
+{
+    auto *current_process = cpu_current_process();
+    FileCustody *file = nullptr;
+
+    if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
+        return -ERR_BADF;
+
+    file = current_process->openfiles[fd];
+    if (file == nullptr)
+        return -ERR_BADF;
+
+    if (new_fd < 0 || (unsigned) new_fd >= array_size(current_process->openfiles))
+        return -ERR_BADF;
+    
+    if (current_process->openfiles[new_fd] != nullptr) {
+        vfs_close(current_process->openfiles[new_fd]);
+    }
+
+    current_process->openfiles[new_fd] = file;
+    current_process->openfiles[fd] = nullptr;
+
+    return 0;
+}
+

@@ -9,16 +9,18 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     sysarg_t arg3, sysarg_t arg4)
 {
     int rc;
-    (void) arg4;
 
     irq_enable();
 
     switch (syscall) {
+    case SYS_Yield:
+        rc = sys$yield();
+        break;
     case SYS_Exit:
         rc = sys$exit((int) arg1);
         break;
-    case SYS_Yield:
-        rc = sys$yield();
+    case SYS_GetPid:
+        rc = sys$getpid();
         break;
     case SYS_Fork:
         rc = sys$fork();
@@ -29,26 +31,29 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_Open:
         rc = sys$open((char*) arg1, (int) arg2, (int) arg3);
         break;
-    case SYS_Write:
-        rc = sys$write((int) arg1, (char*) arg2, (size_t) arg3);
-        break;
     case SYS_Read:
         rc = sys$read((int) arg1, (char*) arg2, (size_t) arg3);
+        break;
+    case SYS_Write:
+        rc = sys$write((int) arg1, (char*) arg2, (size_t) arg3);
         break;
     case SYS_Close:
         rc = sys$close((int) arg1);
         break;
-    case SYS_MilliSleep:
-        rc = sys$millisleep((int) arg1);
-        break;
     case SYS_FStat:
         rc = sys$fstat((int) arg1, (api::Stat*) arg2);
         break;
-    case SYS_GetPid:
-        rc = sys$getpid();
+    case SYS_Seek:
+        rc = sys$seek((int) arg1, (int) arg2, (int) arg3, (uint64_t*) arg4);
         break;
     case SYS_CreatePipe:
         rc = sys$create_pipe((int*) arg1, (int*) arg2);
+        break;
+    case SYS_MoveFd:
+        rc = sys$movefd((int) arg1, (int) arg2);
+        break;
+    case SYS_MilliSleep:
+        rc = sys$millisleep((int) arg1);
         break;
     default:
         kprintf("Unknown syscall %d\n", syscall);

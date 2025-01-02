@@ -40,7 +40,6 @@ typedef enum Errors {
 typedef enum SyscallIdentifiers {
     SYS_Yield = 1,
     SYS_Exit = 2,
-    SYS_DebugLog = 3,
     SYS_GetPid = 4,
     SYS_Fork = 5,
     SYS_Execve = 6,
@@ -51,18 +50,15 @@ typedef enum SyscallIdentifiers {
     SYS_Read = 11,
     SYS_Write = 12,
     SYS_Close = 13,
-    SYS_Stat = 14,
+    SYS_FStat = 14,
     SYS_Seek = 15,
     SYS_CreatePipe = 16,
-    SYS_Dup2 = 17,
-    SYS_Select = 18,
-    SYS_FStat = 19,
-    SYS_MakeDirectory = 20,
-    SYS_RemoveDirectory = 21,
-    SYS_Link = 22,
-    SYS_Unlink = 23,
+    SYS_MoveFd = 17,
 
-    SYS_GetDateTime = 30,
+    SYS_Link = 18,
+    SYS_Unlink = 19,
+    SYS_MakeDirectory = 20,
+
     SYS_MilliSleep = 31,
 } SyscallIdentifiers;
 
@@ -126,6 +122,11 @@ static inline int sys_waitpid(int pid, int *status, int options)
 static inline int sys_mkpipe(int *writer, int *receiver)
 {
     return syscall(SYS_CreatePipe, (sysarg_t) writer, (sysarg_t) receiver, 0, 0);
+}
+
+static inline int sys_movefd(int oldfd, int newfd)
+{
+    return syscall(SYS_MoveFd, (sysarg_t) oldfd, (sysarg_t) newfd, 0, 0);
 }
 
 #ifdef __cplusplus
