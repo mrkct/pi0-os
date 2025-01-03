@@ -104,25 +104,8 @@ int64_t BCM2835AuxUART::write(const uint8_t *buffer, size_t size)
     return size;
 }
 
-int64_t BCM2835AuxUART::read(uint8_t*, size_t)
-{
-    if (!m_initialized) {
-        return -ERR_IO;
-    }
-
-    todo();
-
-    return 0;
-}
-
-int32_t BCM2835AuxUART::ioctl(uint32_t, void*)
-{
-    return -ERR_NOTSUP;
-}
-
 void BCM2835AuxUART::irq_handler()
 {
-    kprintf("UART IRQ\n");
     static constexpr uint32_t IRQ_PENDING = 1;
     if ((ioread32(&r->mu_iir_reg) & IRQ_PENDING) != 0)
         return;
@@ -132,6 +115,6 @@ void BCM2835AuxUART::irq_handler()
     // Check if it is a UART "Receiver holds valid byte" interrupt
     if ((irq_source >> 1 & 0b11) == 0b10) {
         uint8_t data = ioread32(&r->mu_io_reg) & 0xff;
-        kprintf("UART: %c\n", data);
+        on_received(&data, 1);
     }
 }

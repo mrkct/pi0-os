@@ -28,6 +28,9 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_Execve:
         rc = sys$execve((char*) arg1, (char**) arg2, (char**)arg3);
         break;
+    case SYS_Poll:
+        rc = sys$poll((api::PollFd*) arg1, (int) arg2, (int) arg3);
+        break;
     case SYS_Open:
         rc = sys$open((char*) arg1, (int) arg2, (int) arg3);
         break;

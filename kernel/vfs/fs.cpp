@@ -52,6 +52,12 @@ uint64_t fs_inode_seek_not_supported(Inode*, uint64_t, int, int32_t)
     return -ERR_NOTSUP;
 }
 
+int32_t fs_file_inode_poll_always_ready(Inode*, uint32_t events, uint32_t *out_revents)
+{
+    *out_revents = events & F_POLLMASK;
+    return 0;
+}
+
 int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **)
 {
     return -ERR_NOTSUP;

@@ -9,10 +9,7 @@ struct PipeFSFilesystemCtx {
 };
 
 struct PipeFSInodeCtx {
-    uint8_t* buffer;
-    size_t read_pos;
-    size_t write_pos;
-    size_t capacity;
+    RingBuffer<4096, uint8_t> data;
 };
 
 static int pipefs_fs_on_mount(Filesystem *self, Inode *out_root);
@@ -20,8 +17,11 @@ static int pipefs_fs_open_inode(Filesystem*, Inode*);
 static int pipefs_fs_close_inode(Filesystem*, Inode*);
 
 static int pipefs_inode_stat(Inode *self, api::Stat *st);
-static int64_t pipefs_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
-static int64_t pipefs_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
+
+static int64_t pipefs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
+static int64_t pipefs_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
+static int32_t pipefs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out_revents);
+
 static int pipefs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 
 static struct FilesystemOps s_pipefs_ops {
@@ -35,10 +35,11 @@ static struct InodeOps s_pipefs_inode_ops {
 };
 
 static struct InodeFileOps s_pipefs_inode_file_ops {
-    .read = pipefs_inode_read,
-    .write = pipefs_inode_write,
+    .read = pipefs_file_inode_read,
+    .write = pipefs_file_inode_write,
     .ioctl = fs_inode_ioctl_not_supported,
     .seek = fs_inode_seek_not_supported,
+    .poll = pipefs_file_inode_poll,
 };
 
 static struct InodeDirOps s_pipefs_inode_dir_ops {
@@ -106,41 +107,29 @@ static int pipefs_fs_open_inode(Filesystem*, Inode *inode)
     if (ctx == nullptr)
         return -ERR_NOMEM;
 
-    ctx->buffer = static_cast<uint8_t*>(malloc(4096));
-    if (ctx->buffer == nullptr) {
-        free(ctx);
-        return -ERR_NOMEM;
-    }
-
     LOGI("Created pipe inode (id: %" PRIu64 ")", inode->identifier);
-    *ctx = PipeFSInodeCtx {
-        .buffer = ctx->buffer,
-        .read_pos = 0,
-        .write_pos = 0,
-        .capacity = 4096,
-    };
-    
+    ctx->data.clear();
+
     inode->opaque = ctx;
     return 0;
 }
 
-static int64_t pipefs_inode_read(Inode *self, int64_t, uint8_t *buffer, size_t size)
+static int64_t pipefs_file_inode_read(Inode *self, int64_t, uint8_t *buffer, size_t size)
 {
     auto *ctx = static_cast<PipeFSInodeCtx*>(self->opaque);
     LOGI("Reading %" PRIu32 " bytes from pipe (id: %" PRIu64 ")", size, self->identifier);
-    if (ctx->read_pos == ctx->write_pos)
+    if (ctx->data.is_empty())
         return 0;
 
     size_t bytes_read = 0;
-    while (bytes_read < size && ctx->read_pos != ctx->write_pos) {
-        buffer[bytes_read++] = ctx->buffer[ctx->read_pos];
-        ctx->read_pos = (ctx->read_pos + 1) % ctx->capacity;
+    while (bytes_read < size && !ctx->data.is_empty()) {
+        ctx->data.pop(buffer[bytes_read++]);
     }
 
     return bytes_read;
 }
 
-static int64_t pipefs_inode_write(Inode *self, int64_t, const uint8_t *buffer, size_t size)
+static int64_t pipefs_file_inode_write(Inode *self, int64_t, const uint8_t *buffer, size_t size)
 {
     auto *ctx = static_cast<PipeFSInodeCtx*>(self->opaque);
 
@@ -148,14 +137,27 @@ static int64_t pipefs_inode_write(Inode *self, int64_t, const uint8_t *buffer, s
 
     size_t bytes_written = 0;
     while (bytes_written < size) {
-        if ((ctx->write_pos + 1) % ctx->capacity == ctx->read_pos)
+        if (ctx->data.is_full())
             break;
-            
-        ctx->buffer[ctx->write_pos] = buffer[bytes_written++];
-        ctx->write_pos = (ctx->write_pos + 1) % ctx->capacity;
+        ctx->data.push(buffer[bytes_written++]);
     }
 
     return bytes_written;
+}
+
+static int32_t pipefs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out_revents)
+{
+    auto *ctx = static_cast<PipeFSInodeCtx*>(self->opaque);
+    
+    if ((events & F_POLLIN) && !ctx->data.is_empty()) {
+        *out_revents |= F_POLLIN;
+    }
+
+    if ((events & F_POLLOUT) && !ctx->data.is_full()) {
+        *out_revents |= F_POLLOUT;
+    }
+
+    return 0;
 }
 
 static int pipefs_fs_close_inode(Filesystem*, Inode *inode)
@@ -164,7 +166,6 @@ static int pipefs_fs_close_inode(Filesystem*, Inode *inode)
         return 0;
 
     auto *ctx = static_cast<PipeFSInodeCtx*>(inode->opaque);
-    free(ctx->buffer);
     free(ctx);
     inode->opaque = nullptr;
     return 0;

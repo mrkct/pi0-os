@@ -73,6 +73,10 @@ public:
     virtual int64_t read(int64_t, uint8_t *buffer, size_t size) = 0;
     virtual int64_t write(int64_t, const uint8_t *buffer, size_t size) = 0;
     virtual int32_t ioctl(uint32_t request, void *argp) = 0;
+    virtual int32_t poll(uint32_t events, uint32_t *out_revents) const {
+        *out_revents = events & F_POLLMASK;
+        return 0;
+    }
 
 private:
     uint8_t m_major, m_minor;
@@ -159,12 +163,21 @@ class UART: public CharacterDevice
 {
 private:
     static uint8_t s_next_minor;
+
 public:
     UART(): CharacterDevice(Maj_UART, s_next_minor++, "uart")
     {}
     virtual ~UART() {}
 
+    virtual int64_t read(uint8_t*, size_t) override;
     virtual int32_t ioctl(uint32_t request, void *argp) override;
+    virtual int32_t poll(uint32_t events, uint32_t *out_revents) const override;
+
+protected:
+    virtual bool can_write() const { return true; }
+
+    void on_received(uint8_t *data, size_t size);
+    RingBuffer<64, uint8_t> m_rx_buffer;
 };
 
 class GPIOController: public CharacterDevice
@@ -192,7 +205,6 @@ public:
     virtual int64_t read(uint8_t *buffer, size_t size) override;
     virtual int64_t write(const uint8_t *buffer, size_t size) override;
     virtual int32_t ioctl(uint32_t request, void *argp) override;
-
 
     virtual int32_t configure_pin(uint32_t port, uint32_t pin, PinFunction function) = 0;
     virtual int32_t configure_pin_pull_up_down(uint32_t port, uint32_t pin, PullState) = 0;
@@ -237,6 +249,7 @@ public:
     virtual int64_t read(uint8_t *buffer, size_t size) override;
     virtual int64_t write(const uint8_t*, size_t) override { return -ERR_NOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
+    virtual int32_t poll(uint32_t events, uint32_t *out_revents) const override;
 
 protected:
     void notify_event(api::InputEvent);

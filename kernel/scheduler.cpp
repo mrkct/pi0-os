@@ -737,3 +737,50 @@ int sys$movefd(int fd, int new_fd)
     return 0;
 }
 
+int sys$poll(api::PollFd *fds, int nfds, int timeout)
+{
+    int rc;
+    auto *current_process = cpu_current_process();
+    FileCustody *file = nullptr;
+    int available_fd = -1;
+    uint64_t starttime = get_ticks_ms();
+
+    do {
+        for (int i = 0; i < nfds; i++) {
+            if (fds[i].fd < 0)
+                continue;
+
+            if ((unsigned) fds[i].fd >= array_size(current_process->openfiles) || current_process->openfiles[fds[i].fd] == nullptr) {
+                rc = -ERR_BADF;
+                goto failed;
+            }
+            file = current_process->openfiles[fds[i].fd];
+            fds[i].revents = 0;
+            rc = vfs_poll(file, fds[i].events, &fds[i].revents);
+            if (rc != 0) {
+                LOGW("vfs_poll() failed for fd=%d, rc=%d", fds[i].fd, rc);
+                goto failed;
+            }
+
+            if (fds[i].revents != 0) {
+                available_fd = i;
+                break;
+            }
+        }
+
+        if (available_fd != -1)
+            break;
+
+        if (timeout > 0 && (int64_t) (get_ticks_ms() - starttime) > timeout) {
+            rc = -ERR_TIMEDOUT;
+            goto failed;
+        }
+        sys$yield();
+    } while(true);
+
+    rc = available_fd;
+    return rc;
+
+failed:
+    return rc;
+}

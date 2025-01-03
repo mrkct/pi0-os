@@ -16,6 +16,12 @@ struct RingBuffer {
     bool is_empty() const { return count == 0; }
     size_t available() const { return N - count; }
 
+    void clear() {
+        read_pos = 0;
+        write_pos = 0;
+        count = 0;
+    }
+
     void push(const T& item)
     {
         data[write_pos] = item;

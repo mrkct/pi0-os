@@ -181,10 +181,45 @@ int32_t Console::ioctl(uint32_t, void*)
     return -ERR_NOTSUP;
 }
 
+int64_t UART::read(uint8_t *buffer, size_t size)
+{
+    int64_t bytes_read = 0;
+
+    auto lock = irq_lock();
+
+    while (bytes_read < size && !m_rx_buffer.is_empty()) {
+        m_rx_buffer.pop(buffer[bytes_read++]);
+    }
+
+    release(lock);
+
+    return bytes_read;
+}
+
 int32_t UART::ioctl(uint32_t, void*)
 {
     todo();
     return -ERR_NOTSUP;
+}
+
+int32_t UART::poll(uint32_t events, uint32_t *out_revents) const
+{
+    if ((events & F_POLLIN) && !m_rx_buffer.is_empty()) {
+        *out_revents |= F_POLLIN;
+    }
+
+    if ((events & F_POLLOUT) && can_write()) {
+        *out_revents |= F_POLLOUT;
+    }
+
+    return 0;
+}
+
+void UART::on_received(uint8_t *buffer, size_t size)
+{
+    for (size_t i = 0; i < size; i++) {
+        m_rx_buffer.push(buffer[i]);
+    }
 }
 
 int64_t GPIOController::read(uint8_t *, size_t)
@@ -253,6 +288,19 @@ void InputDevice::get_next_event(api::InputEvent& event)
         mutex_release(this->m_events.lock);
         break;
     }
+}
+
+int32_t InputDevice::poll(uint32_t events, uint32_t *out_revents) const
+{
+    if ((events & F_POLLIN) && !m_events.events.is_empty()) {
+        *out_revents |= F_POLLIN;
+    }
+
+    if ((events & F_POLLOUT) && !m_events.events.is_full()) {
+        *out_revents |= F_POLLOUT;
+    }
+
+    return 0;
 }
 
 int32_t InputDevice::ioctl(uint32_t request, void *argp)

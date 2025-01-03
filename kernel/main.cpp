@@ -114,17 +114,35 @@ static void proc1()
         pid = api::sys_fork();
         if (pid == 0) {
             while (true) {
-                api::sys_write(write, "Hello from child\0", 21);
+                kprintf("Writing to pipe 1st\n");
+                api::sys_write(write, "Hello from child (1st)\0", 23);
                 wait(1);
+
+                kprintf("Writing to pipe 2nd\n");
+                api::sys_write(write, "Hello from child (2nd)\0", 23);
+                wait(1);
+
+                kprintf("Writing to pipe 3rd\n");
+                api::sys_write(write, "Hello from child (3rd)\0", 23);
+                wait(8);
             }
         } else {
             while (true) {
+                api::PollFd fds[1];
                 char buf[100];
                 buf[99] = '\0';
-                int nread = api::sys_read(read, buf, 100);
-                if (nread > 0)
-                    kprintf("Read %d bytes: %s\n", nread, buf);
-                wait(1);
+
+                fds[0].fd = read;
+                fds[0].events = F_POLLIN;
+
+                rc = api::sys_poll(fds, 1, 1000);
+                if (rc == -ERR_TIMEDOUT) {
+                    kprintf("Timed out\n");
+                } else {
+                    int nread = api::sys_read(read, buf, 100);
+                    if (nread > 0)
+                        kprintf("Read %d bytes: %s\n", nread, buf);
+                }
             }
         }
     }

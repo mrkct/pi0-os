@@ -90,26 +90,12 @@ int64_t PL011UART::write(const uint8_t *buffer, size_t size)
 }
 
 
-int64_t PL011UART::read(uint8_t*, size_t)
-{
-    if (!m_fully_initialized) {
-        return -ERR_IO;
-    }
-
-    return 0;
-}
-
-int32_t PL011UART::ioctl(uint32_t, void*)
-{
-    return -ERR_NOTSUP;
-}
-
 void PL011UART::irq_handler()
 {
     if (ioread32(&r->RIS) & RXINTR_MASK) {
         while (!(ioread32(&r->FR) & RXFE_MASK)) {
             uint8_t data = ioread32(&r->DR) & 0xff;
-            kprintf("'%c'\n", data);
+            on_received(&data, 1);
         }
         iowrite32(&r->ICR, RXINTR_MASK);
     }

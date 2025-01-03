@@ -29,3 +29,5 @@ int vfs_fstat(FileCustody *custody, api::Stat *stat);
 FileCustody* vfs_duplicate(FileCustody*);
 
 int vfs_create_pipe(FileCustody **out_sender_custody, FileCustody **out_receiver_custody);
+
+bool vfs_poll(FileCustody *custody, uint32_t events, uint32_t *out_revents);

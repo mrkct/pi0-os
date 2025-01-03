@@ -30,6 +30,7 @@ static int64_t devfs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffe
 static int64_t devfs_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
 static int32_t devfs_file_inode_ioctl(Inode *self, uint32_t request, void *argp);
 static uint64_t devfs_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset);
+static int32_t devfs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out_revents);
 
 static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int devfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
@@ -53,6 +54,7 @@ static struct InodeFileOps s_devfs_inode_file_ops {
     .write = devfs_file_inode_write,
     .ioctl = devfs_file_inode_ioctl,
     .seek = devfs_file_inode_seek,
+    .poll = devfs_file_inode_poll,
 };
 
 static struct InodeDirOps s_devfs_inode_dir_ops {
@@ -197,6 +199,12 @@ static uint64_t devfs_file_inode_seek(Inode *self, uint64_t current, int whence,
         default:
             panic("Unknown device type %d", ctx->type);
     }
+}
+
+static int32_t devfs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out_revents)
+{
+    DevFSInodeCtx *ctx = (DevFSInodeCtx*) self->opaque;
+    return ctx->device->poll(events, out_revents);
 }
 
 static int devfs_fs_on_mount(Filesystem *self, Inode *out_root)

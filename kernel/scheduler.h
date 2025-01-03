@@ -92,3 +92,5 @@ int sys$getpid();
 int sys$create_pipe(int *write_fd, int *read_fd);
 
 int sys$movefd(int fd, int new_fd);
+
+int sys$poll(api::PollFd *fds, int nfds, int timeout);

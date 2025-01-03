@@ -73,6 +73,7 @@ static struct InodeFileOps s_fat32_inode_file_ops {
     .write = fat32_file_inode_write,
     .ioctl = fat32_file_inode_ioctl,
     .seek = fat32_file_inode_seek,
+    .poll = fs_file_inode_poll_always_ready,
 };
 
 static struct InodeDirOps s_fat32_inode_dir_ops {

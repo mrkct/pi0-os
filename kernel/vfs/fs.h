@@ -28,6 +28,7 @@ struct InodeFileOps {
     int64_t (*write)(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
     int32_t (*ioctl)(Inode *self, uint32_t request, void *argp);
     uint64_t (*seek)(Inode *self, uint64_t current, int whence, int32_t offset);
+    int32_t (*poll)(Inode *self, uint32_t events, uint32_t *out_revents);
 };
 
 struct InodeDirOps {
@@ -104,6 +105,7 @@ Filesystem *fs_detect_and_create(BlockDevice&);
 
 int32_t fs_inode_ioctl_not_supported(Inode*, uint32_t, void*);
 uint64_t fs_inode_seek_not_supported(Inode*, uint64_t, int, int32_t);
+int32_t fs_file_inode_poll_always_ready(Inode *self, uint32_t events, uint32_t *out_revents);
 int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **);
 int fs_dir_inode_mkdir_not_supported(Inode*, const char *);
 int fs_dir_inode_rmdir_not_supported(Inode*, const char *);

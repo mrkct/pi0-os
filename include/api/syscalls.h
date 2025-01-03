@@ -45,6 +45,7 @@ typedef enum SyscallIdentifiers {
     SYS_Execve = 6,
     SYS_WaitPid = 7,
     SYS_Kill = 8,
+    SYS_Poll = 9,
 
     SYS_Open = 10,
     SYS_Read = 11,
@@ -127,6 +128,21 @@ static inline int sys_mkpipe(int *writer, int *receiver)
 static inline int sys_movefd(int oldfd, int newfd)
 {
     return syscall(SYS_MoveFd, (sysarg_t) oldfd, (sysarg_t) newfd, 0, 0);
+}
+
+typedef struct PollFd {
+    int32_t fd;
+
+#define F_POLLMASK        (F_POLLIN | F_POLLOUT)
+#define F_POLLIN          0x001   /* There is data to read.  */
+#define F_POLLOUT         0x004   /* Writing now will not block.  */
+    uint32_t events;
+    uint32_t revents;
+} PollFd;
+
+static inline int sys_poll(PollFd *fds, int nfds, int timeout)
+{
+    return syscall(SYS_Poll, (sysarg_t) fds, (sysarg_t) nfds, (sysarg_t) timeout, 0);
 }
 
 #ifdef __cplusplus

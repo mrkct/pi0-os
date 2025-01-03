@@ -488,6 +488,9 @@ ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
 
 ssize_t vfs_seek(FileCustody *custody, int whence, int32_t offset)
 {
+    if (custody->inode->type == InodeType::Directory)
+        return -ERR_ISDIR;
+
     auto *inode = custody->inode;
     ssize_t new_seek = inode->file_ops->seek(inode, custody->offset, whence, offset);
     if (new_seek < 0)
@@ -566,4 +569,12 @@ cleanup:
     free_custody(sender);
     free_custody(receiver);
     return rc;
+}
+
+bool vfs_poll(FileCustody *custody, uint32_t events, uint32_t *out_revents)
+{
+    if (custody->inode->type == InodeType::Directory)
+        return true;
+
+    return custody->inode->file_ops->poll(custody->inode, events, out_revents);
 }
