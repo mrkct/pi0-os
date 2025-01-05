@@ -151,7 +151,15 @@ int32_t virtio_util_do_generic_init_step(
     // 3.1.1 Driver Requirements: Device Initialization
 
     // 1. Reset the device.
+#if 0
+    /**
+     * NOTE: QEMU currently has a bug where it deadlocks if you reset the
+     * virtio-gpu device while recording an execution trace.
+     * QEMU already resets the device at boot, so we can skip this since
+     * its not like we initialize the virtio devices multiple times
+     */
     iowrite32(&r->Status, 0);
+#endif
 
     // 2. Set the ACKNOWLEDGE status bit: the guest OS has noticed the device.
     iowrite32(&r->Status, ioread32(&r->Status) | VirtioDeviceStatus::Acknowledge);
