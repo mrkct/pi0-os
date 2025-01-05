@@ -178,47 +178,39 @@ static void free_array_of_strings(char *const *array, size_t array_size)
 static uint8_t *push_string_array_to_stack(
     uint8_t *userstack,
     char const* const array[],
-    uintptr_t *out_array_start_addr,
-    size_t *out_array_size
+    size_t array_size,
+    uintptr_t *out_array_start_addr    
 )
 {
     const char **user_array = nullptr;
     const char *next_string = (const char *) userstack;
-    size_t array_size = 0;
 
-    // First we copy all the strings, one after the other
-    for (size_t i = 0; array[i] != nullptr; i++, array_size++) {
+    userstack -= sizeof(uintptr_t) * array_size;
+    user_array = reinterpret_cast<const char**>(userstack);
+    
+    for (size_t i = 0; i < array_size; i++) {
         size_t len = strlen(array[i]) + 1;
         userstack -= len;
         memcpy(userstack, array[i], len);
+        user_array[i] = reinterpret_cast<const char*>(userstack);
         LOGI("String '%s' stack-placed at %p", array[i], userstack);
     }
 
-    // Then we iterate back to build the array
-    next_string = (const char *) userstack;
+    *out_array_start_addr = reinterpret_cast<uintptr_t>(user_array);
     userstack = (uint8_t*) round_down((uintptr_t) userstack, ARCH_STACK_ALIGNMENT);
-    userstack -= sizeof(uintptr_t) * (array_size + 1);
-    user_array = (const char**) userstack;
-    for (ssize_t i = array_size - 1; i >= 0; i--) {
-        LOGI("String '%s' taken from stack at %p", next_string, next_string);
-        user_array[i] = next_string;
-        next_string += strlen(next_string) + 1;
-    }
 
-    *out_array_start_addr = (uintptr_t) userstack;
-    *out_array_size = array_size;
-    
-    userstack = (uint8_t*) round_down((uintptr_t) userstack, ARCH_STACK_ALIGNMENT);
     return userstack;
 }
 
-static uint8_t *push_process_args(uint8_t *userstack, char *const argv[], char *const envp[])
+static uint8_t *push_process_args(uint8_t *userstack,
+    char *const argv[], size_t argc,
+    char *const envp[], size_t envc
+)
 {
-    size_t argc, envc = 0;
     uintptr_t user_argv, user_envp;
 
-    userstack = push_string_array_to_stack(userstack, argv, &user_argv, &argc);
-    userstack = push_string_array_to_stack(userstack, envp, &user_envp, &envc);
+    userstack = push_string_array_to_stack(userstack, argv, argc, &user_argv);
+    userstack = push_string_array_to_stack(userstack, envp, envc, &user_envp);
 
     userstack -= sizeof(ArmCrt0InitialStackState);
     ArmCrt0InitialStackState *state = (ArmCrt0InitialStackState*) userstack;
@@ -456,11 +448,14 @@ int sys$execve(const char *path, char *const user_argv[], char *const user_envp[
         LOGE("Failed to clone user argv");
         goto cleanup;
     }
+    LOGD("Cloned argv (argc=%u)", argc);
+
     rc = clone_user_array_of_strings(user_envp, &envp, &envc);
     if (rc != 0) {
         LOGE("Failed to clone user envp");
         goto cleanup;
     }
+    LOGD("Cloned envp (envc=%u)", envc);
 
     LOGI("execve %s[%d/%d](%s)", current_process->name, current_process->pid, current_thread->tid, path);
     
@@ -501,7 +496,7 @@ int sys$execve(const char *path, char *const user_argv[], char *const user_envp[
     vm_switch_address_space(current_process->address_space);
     vm_free(old_as);
 
-    userstack = push_process_args(userstack, argv, envp);
+    userstack = push_process_args(userstack, argv, argc, envp, envc);
     kassert((uintptr_t) userstack % ARCH_STACK_ALIGNMENT == 0);
     current_thread->iframe->set_thread_start_values(entrypoint, (uintptr_t) userstack);
 
