@@ -591,6 +591,18 @@ int sys$close(int fd)
     return rc;
 }
 
+int sys$ioctl(int fd, uint32_t ioctl, void *argp)
+{
+    auto *current_process = cpu_current_process();
+    FileCustody *file = nullptr;
+    if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles))
+        return -ERR_BADF;
+
+    file = current_process->openfiles[fd];
+    return vfs_ioctl(file, ioctl, argp);
+}
+
+
 int sys$millisleep(int ms)
 {
     auto *current_thread = cpu_current_thread();

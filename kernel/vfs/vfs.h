@@ -22,6 +22,8 @@ ssize_t vfs_seek(FileCustody*, int whence, int32_t);
 
 int vfs_close(FileCustody*);
 
+int vfs_ioctl(FileCustody*, uint32_t ioctl, void *argp);
+
 int vfs_stat(const char *path, api::Stat*);
 
 int vfs_fstat(FileCustody *custody, api::Stat *stat);

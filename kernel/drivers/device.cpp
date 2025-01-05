@@ -240,11 +240,15 @@ int32_t GPIOController::ioctl(uint32_t, void *)
     return -ERR_NOTSUP;
 }
 
-int32_t RealTimeClock::ioctl(uint32_t request, void*)
+int32_t RealTimeClock::ioctl(uint32_t request, void *argp)
 {
     int32_t rc;
 
     switch (request) {
+        case api::RTCIO_GET_DATETIME : {
+            rc = get_time(*(api::DateTime*) argp);
+            break;
+        }
         default: {
             rc = -ERR_NOTSUP;
             break;
@@ -319,7 +323,13 @@ int32_t FramebufferDevice::ioctl(uint32_t request, void *argp)
 
     switch (request) {
         case api::FBIO_GET_DISPLAY_INFO: {
-            todo();
+            auto display_info = this->display_info();
+            *reinterpret_cast<api::FramebufferDisplayInfo*>(argp) = (api::FramebufferDisplayInfo) {
+                .width = display_info.width,
+                .height = display_info.height,
+                .pitch = display_info.pitch,
+                .bytes_per_pixel = display_info.bytes_per_pixel,
+            };
             return 0;
         }
         case api::FBIO_REFRESH:

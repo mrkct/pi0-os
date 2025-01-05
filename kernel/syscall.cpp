@@ -43,6 +43,9 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_Close:
         rc = sys$close((int) arg1);
         break;
+    case SYS_Ioctl:
+        rc = sys$ioctl((int) arg1, (uint32_t) arg2, (void*) arg3);
+        break;
     case SYS_FStat:
         rc = sys$fstat((int) arg1, (api::Stat*) arg2);
         break;

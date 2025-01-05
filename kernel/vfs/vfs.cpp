@@ -505,6 +505,14 @@ int vfs_close(FileCustody *custody)
     return 0;
 }
 
+int vfs_ioctl(FileCustody *custody, uint32_t ioctl, void *argp)
+{
+    if (custody->inode->type == InodeType::Directory)
+        return -ERR_ISDIR;
+
+    return custody->inode->file_ops->ioctl(custody->inode, ioctl, argp);
+}
+
 int vfs_stat(const char *path, api::Stat *stat)
 {
     int rc;

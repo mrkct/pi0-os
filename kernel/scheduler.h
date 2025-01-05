@@ -81,6 +81,8 @@ int sys$write(int fd, const void *buf, size_t count);
 
 int sys$close(int fd);
 
+int sys$ioctl(int fd, uint32_t ioctl, void *argp);
+
 int sys$fstat(int fd, api::Stat *stat);
 
 int sys$seek(int fd, int offset, int whence, uint64_t *out_new_offset);

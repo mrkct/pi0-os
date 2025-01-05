@@ -51,14 +51,15 @@ typedef enum SyscallIdentifiers {
     SYS_Read = 11,
     SYS_Write = 12,
     SYS_Close = 13,
-    SYS_FStat = 14,
-    SYS_Seek = 15,
-    SYS_CreatePipe = 16,
-    SYS_MoveFd = 17,
+    SYS_Ioctl = 14,
+    SYS_FStat = 15,
+    SYS_Seek = 16,
+    SYS_CreatePipe = 17,
+    SYS_MoveFd = 18,
 
-    SYS_Link = 18,
-    SYS_Unlink = 19,
-    SYS_MakeDirectory = 20,
+    SYS_Link = 19,
+    SYS_Unlink = 20,
+    SYS_MakeDirectory = 21,
 
     SYS_MilliSleep = 31,
 } SyscallIdentifiers;
@@ -155,7 +156,7 @@ static inline int sys_poll(PollFd *fds, int nfds, int timeout)
 namespace api {
 #endif
 
-typedef struct {
+typedef struct DateTime {
     int year;
     int month;
     int day;
@@ -163,6 +164,23 @@ typedef struct {
     int minute;
     int second;
 } DateTime;
+
+static inline int datetime_compare(const DateTime *a, const DateTime *b)
+{
+    if (a->year != b->year)
+        return a->year - b->year;
+    if (a->month != b->month)
+        return a->month - b->month;
+    if (a->day != b->day)
+        return a->day - b->day;
+    if (a->hour != b->hour)
+        return a->hour - b->hour;
+    if (a->minute != b->minute)
+        return a->minute - b->minute;
+    if (a->second != b->second)
+        return a->second - b->second;
+    return 0;
+}
 
 typedef struct TimeSpec {
     uint32_t seconds;
@@ -243,6 +261,11 @@ static inline int sys_close(int fd)
     return syscall(SYS_Close, (sysarg_t) fd, 0, 0, 0);
 }
 
+static inline int sys_ioctl(int fd, unsigned long request, void *arg)
+{
+    return syscall(SYS_Ioctl, (sysarg_t) fd, (sysarg_t) request, (sysarg_t) arg, 0);
+}
+
 static inline int sys_seek(int fd, int offset, int whence, uint64_t *out_new_offset)
 {
     return syscall(SYS_Seek, (sysarg_t) fd, (sysarg_t) offset, (sysarg_t) whence, (sysarg_t) out_new_offset);
@@ -279,11 +302,23 @@ static inline int sys_mkdir(const char *path, int mode)
 namespace api {
 #endif
 
+typedef struct FramebufferDisplayInfo {
+    uint32_t width;
+    uint32_t height;
+    uint32_t pitch;
+    uint32_t bytes_per_pixel;
+} FramebufferDisplayInfo;
+
 enum FramebufferIoctl {
     FBIO_GET_DISPLAY_INFO = 1,
     FBIO_REFRESH = 2,
     FBIO_MAP = 3,
 };
+
+enum RealTimeClockIoctl {
+    RTCIO_GET_DATETIME = 1,
+};
+
 
 #ifdef __cplusplus
 }
