@@ -3,9 +3,10 @@ include ../Toolchain.mk
 OBJECTS = \
 	crt0.c.o \
 	newlib.c.o \
-	default_font.c.o \
 	libdatetime.c.o \
-	libgfx.c.o \
+	libgfx/default_font.c.o \
+	libgfx/libgfx.c.o \
+	libutil/moretime.c.o \
 	libsstring.c.o
 
 .PHONY: all clean

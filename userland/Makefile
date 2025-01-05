@@ -1,6 +1,6 @@
 .PHONY: all
 
-APPS := init
+APPS := init wm
 DIR := /tmp/myos-disk-image-temp-storage
 
 .PHONY: all clean build-apps build-% clean-apps clean-% clean-disk-image
