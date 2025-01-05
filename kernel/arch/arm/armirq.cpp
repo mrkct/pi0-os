@@ -17,11 +17,11 @@ enum class InterruptVector: int {
     FIQ
 };
 
-#define FORMAT_TASK_STATE                               \
-    "\t r0: %x\t r1: %x\t r2: %x\t r3: %x\n"            \
-    "\t r4: %x\t r5: %x\t r6: %x\t r7: %x\n"            \
-    "\t r8: %x\t r9: %x\t r10: %x\t r11: %x\n"          \
-    "\t spsr: %x"
+#define FORMAT_TASK_STATE                                   \
+    "\t r0:  %08x\t r1:  %08x\t r2:  %08x\t r3:  %08x\n"    \
+    "\t r4:  %08x\t r5:  %08x\t r6:  %08x\t r7:  %08x\n"    \
+    "\t r8:  %08x\t r9:  %08x\t r10: %08x\t r11: %08x\n"    \
+    "\t spsr:%08x\t lr:  %08x"
 
 #define FORMAT_ARGS_TASK_STATE(state)                   \
     (state)->r[0],  (state)->r[1],                      \
@@ -30,7 +30,7 @@ enum class InterruptVector: int {
     (state)->r[6],  (state)->r[7],                      \
     (state)->r[8],  (state)->r[9],                      \
     (state)->r[10], (state)->r[11],                     \
-    (state)->spsr
+    (state)->spsr,  (state)->user_lr
 
 
 extern "C" uint8_t vector_table_data_start[];
@@ -99,7 +99,7 @@ static void data_abort_handler(InterruptFrame* state)
         kprintf(
             "[DATA ABORT]: Process %s crashed\n"
             "Reason: %s accessing memory address %p while executing instruction %p\n"
-            FORMAT_TASK_STATE,
+            FORMAT_TASK_STATE "\n",
             cpu_current_process()->name,
             dfsr_status_to_string(fault_status),
             faulting_addr,
@@ -118,7 +118,7 @@ static void data_abort_handler(InterruptFrame* state)
     uint32_t fault_status = dfsr_fault_status(dfsr);
     panic(
         "[DATA ABORT]: %s accessing memory address %p while executing instruction %p\n"
-        FORMAT_TASK_STATE,
+        FORMAT_TASK_STATE "\n",
         dfsr_status_to_string(fault_status),
         faulting_addr,
         state->lr,
