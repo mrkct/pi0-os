@@ -18,9 +18,9 @@ extern "C" void kernel_main(BootParams const *boot_params)
 
     vm_early_init(boot_params);
     devicemanager_init_kernel_log_device(boot_params);
-    kprintf_set_putchar_func([](char c) {
+    kprintf_set_puts_func([](const char *line, size_t length) {
         auto *console = devicemanager_get_kernel_log_device();
-        console->write(0, (uint8_t*) &c, 1);
+        console->write((const uint8_t*) line, length);
     });
 
     kprintf("Booting...\n");

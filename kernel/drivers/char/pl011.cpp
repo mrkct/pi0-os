@@ -79,12 +79,16 @@ int64_t PL011UART::write(const uint8_t *buffer, size_t size)
     if (r == nullptr)
         return -ERR_IO;
 
+    auto lock = irq_lock();
+
     static constexpr uint32_t TRANSMIT_FIFO_FULL = 1 << 5;
     for (size_t i = 0; i < size; i++) {
         while (ioread32(&r->FR) & TRANSMIT_FIFO_FULL)
             cpu_relax();
         iowrite32(&r->DR, buffer[i]);
     }
+
+    release(lock);
 
     return size;
 }

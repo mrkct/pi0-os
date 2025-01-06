@@ -5,9 +5,9 @@
 #include <kernel/base.h>
 
 
-typedef void (*PutCharFunc)(char c);
+typedef void (*PutsFunc)(const char *c, size_t size);
 
-void kprintf_set_putchar_func(PutCharFunc f);
+void kprintf_set_puts_func(PutsFunc f);
 
 size_t kprintf(char const* format, ...);
 

@@ -93,15 +93,16 @@ int64_t BCM2835AuxUART::write(const uint8_t *buffer, size_t size)
         return -ERR_IO;
 
     int64_t rc = 0;
+    auto lock = irq_lock();
 
     for (size_t i = 0; i < size; i++) {
         rc = writebyte(buffer[i]);
-        if (rc != 0) {
-            return rc;
-        }
-    } 
+        if (rc != 0)
+            break;
+    }
+    release(lock);
 
-    return size;
+    return rc == 0 ? size : rc;
 }
 
 void BCM2835AuxUART::irq_handler()
