@@ -58,6 +58,10 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_MoveFd:
         rc = sys$movefd((int) arg1, (int) arg2);
         break;
+    case SYS_MMap: {
+        rc = sys$mmap((int) arg1, (uintptr_t) arg2, (uint32_t) arg3, (uint32_t) arg4);
+        break;
+    }
     case SYS_MilliSleep:
         rc = sys$millisleep((int) arg1);
         break;

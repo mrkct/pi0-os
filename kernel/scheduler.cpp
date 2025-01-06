@@ -599,7 +599,6 @@ int sys$ioctl(int fd, uint32_t ioctl, void *argp)
     return vfs_ioctl(file, ioctl, argp);
 }
 
-
 int sys$millisleep(int ms)
 {
     auto *current_thread = cpu_current_thread();
@@ -792,4 +791,22 @@ int sys$poll(api::PollFd *fds, int nfds, int timeout)
 
 failed:
     return rc;
+}
+
+int sys$mmap(int fd, uintptr_t vaddr, uint32_t length, uint32_t flags)
+{
+    auto *current_process = cpu_current_process();
+    auto *current_thread = cpu_current_thread();
+    FileCustody *file = nullptr;
+
+    if (!vm_addr_is_page_aligned(vaddr))
+        return -ERR_INVAL;
+    length = vm_align_up_to_page(length);
+
+    if (fd < 0 || (unsigned) fd >= array_size(cpu_current_process()->openfiles) || cpu_current_process()->openfiles[fd] == nullptr)
+        return -ERR_BADF;
+
+    LOGI("%s[%d] mmap fd %d at %p", current_thread->process->name, current_thread->tid, fd, vaddr);
+    file = current_process->openfiles[fd];
+    return vfs_mmap(file, &current_process->address_space, vaddr, length, flags);
 }

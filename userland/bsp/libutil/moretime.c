@@ -18,5 +18,5 @@ int clock_init(Clock *clock)
 
 int clock_get_datetime(Clock *clock, DateTime *datetime)
 {
-    return sys_ioctl(clock->fd, RTCIO_GET_DATETIME, (sysarg_t) datetime);
+    return sys_ioctl(clock->fd, RTCIO_GET_DATETIME, datetime);
 }

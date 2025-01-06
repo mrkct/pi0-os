@@ -40,6 +40,7 @@ static struct InodeFileOps s_pipefs_inode_file_ops {
     .ioctl = fs_inode_ioctl_not_supported,
     .seek = fs_inode_seek_not_supported,
     .poll = pipefs_file_inode_poll,
+    .mmap = fs_file_inode_mmap_not_supported,
 };
 
 static struct InodeDirOps s_pipefs_inode_dir_ops {
@@ -118,14 +119,17 @@ static int64_t pipefs_file_inode_read(Inode *self, int64_t, uint8_t *buffer, siz
 {
     auto *ctx = static_cast<PipeFSInodeCtx*>(self->opaque);
     LOGI("Reading %" PRIu32 " bytes from pipe (id: %" PRIu64 ")", size, self->identifier);
-    if (ctx->data.is_empty())
+    if (ctx->data.is_empty()) {
+        LOGD("Pipe is empty, returning EOF");
         return 0;
+    }
 
     size_t bytes_read = 0;
     while (bytes_read < size && !ctx->data.is_empty()) {
         ctx->data.pop(buffer[bytes_read++]);
     }
 
+    LOGD("Read %" PRIu32 " bytes from pipe (id: %" PRIu64 ")", bytes_read, self->identifier);
     return bytes_read;
 }
 
@@ -150,10 +154,12 @@ static int32_t pipefs_file_inode_poll(Inode *self, uint32_t events, uint32_t *ou
     auto *ctx = static_cast<PipeFSInodeCtx*>(self->opaque);
     
     if ((events & F_POLLIN) && !ctx->data.is_empty()) {
+        LOGD("Pipe is not empty for reads, returning POLLIN");
         *out_revents |= F_POLLIN;
     }
 
     if ((events & F_POLLOUT) && !ctx->data.is_full()) {
+        LOGD("Pipe is not full for writes, returning POLLOUT");
         *out_revents |= F_POLLOUT;
     }
 

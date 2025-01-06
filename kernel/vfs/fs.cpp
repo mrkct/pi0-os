@@ -58,6 +58,11 @@ int32_t fs_file_inode_poll_always_ready(Inode*, uint32_t events, uint32_t *out_r
     return 0;
 }
 
+int32_t fs_file_inode_mmap_not_supported(Inode*, AddressSpace*, uintptr_t, uint32_t, uint32_t)
+{
+    return -ERR_NOTSUP;
+}
+
 int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **)
 {
     return -ERR_NOTSUP;

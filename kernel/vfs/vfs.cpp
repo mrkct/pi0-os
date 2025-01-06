@@ -586,3 +586,11 @@ bool vfs_poll(FileCustody *custody, uint32_t events, uint32_t *out_revents)
 
     return custody->inode->file_ops->poll(custody->inode, events, out_revents);
 }
+
+int vfs_mmap(FileCustody *custody, AddressSpace *as, uintptr_t vaddr, uint32_t length, uint32_t flags)
+{
+    if (custody->inode->type == InodeType::Directory)
+        return -ERR_ISDIR;
+
+    return custody->inode->file_ops->mmap(custody->inode, as, vaddr, length, flags);
+}

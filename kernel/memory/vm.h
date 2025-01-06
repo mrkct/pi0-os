@@ -11,6 +11,25 @@ uintptr_t virt2phys(uintptr_t virt);
 
 uintptr_t phys2virt(uintptr_t phys);
 
+static inline constexpr bool vm_addr_is_page_aligned(uintptr_t addr)
+{
+    return (addr & (_4KB - 1)) == 0;
+}
+
+static inline constexpr bool vm_addr_is_page_aligned(void *addr)
+{
+    return vm_addr_is_page_aligned(reinterpret_cast<uintptr_t>(addr));
+}
+
+static inline constexpr uintptr_t vm_align_up_to_page(uintptr_t addr)
+{
+    return (addr + (_4KB - 1)) & ~(_4KB - 1);
+}
+
+static inline constexpr uintptr_t vm_align_down_to_page(uintptr_t addr)
+{
+    return addr & ~(_4KB - 1);
+}
 
 struct AddressSpace {
     struct PhysicalPage* ttbr0_page;

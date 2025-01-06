@@ -33,3 +33,5 @@ FileCustody* vfs_duplicate(FileCustody*);
 int vfs_create_pipe(FileCustody **out_sender_custody, FileCustody **out_receiver_custody);
 
 bool vfs_poll(FileCustody *custody, uint32_t events, uint32_t *out_revents);
+
+int vfs_mmap(FileCustody *custody, AddressSpace *as, uintptr_t vaddr, uint32_t length, uint32_t flags);

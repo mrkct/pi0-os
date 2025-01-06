@@ -27,8 +27,6 @@ int64_t SimpleBlockDevice::read(int64_t offset, uint8_t *buffer, size_t size)
     uint8_t *temp_buffer = nullptr;
     int64_t sector_size = block_size();
 
-    LOGI("Reading %d bytes from offset %" PRId64, size, offset);
-
     offset = clamp<int64_t>(0, offset, this->size());
     size = clamp<int64_t>(0, size, this->size() - offset);
 
@@ -337,4 +335,23 @@ int32_t FramebufferDevice::ioctl(uint32_t request, void *argp)
         default:
             return -ERR_NOTSUP;
     }
+}
+
+int32_t FramebufferDevice::mmap(AddressSpace *as, uintptr_t vaddr, uint32_t length, uint32_t)
+{
+    kassert(vm_addr_is_page_aligned(vaddr));
+    kassert(vm_addr_is_page_aligned(length));
+
+    auto display_info = this->display_info();
+    auto fb_phys_addr = vm_align_down_to_page(display_info.fb_phys_addr);
+    auto fb_length = vm_align_up_to_page(display_info.fb_length());
+
+    LOGD("Mapping framebuffer %s to user vaddr %p (%" PRIu32 " bytes)", name(), vaddr, fb_length);
+    for (uintptr_t offset = 0; offset < fb_length; offset += _4KB) {
+        PhysicalPage *page = addr2page(fb_phys_addr + offset);
+        kassert(page != nullptr);
+        kassert(vm_map(*as, page, vaddr + offset, PageAccessPermissions::UserFullAccess).is_success());
+    }
+
+    return 0;
 }

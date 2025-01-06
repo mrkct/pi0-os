@@ -28,13 +28,15 @@ static int open_framebuffer_display(const char *path, Display *display)
         fprintf(stderr, "Failed to open framebuffer '%s'\n", path);
         return -1;
     }
-    
+
     if (0 != (rc = sys_ioctl(fd, FBIO_GET_DISPLAY_INFO, &fbinfo))) {
         fprintf(stderr, "sys_ioctl(FBIO_GET_DISPLAY_INFO) failed\n");
         goto cleanup;
     }
 
-    if (0 != (rc = sys_ioctl(fd, FBIO_MAP, &f))) {
+    // This is completely arbitrary...
+    f = (uint32_t*) 0x80000000;
+    if (0 != (rc = sys_mmap(fd, f, fbinfo.pitch * fbinfo.height, 0))) {
         fprintf(stderr, "sys_ioctl(FBIO_MAP) failed\n");
         goto cleanup;
     }
@@ -134,9 +136,9 @@ int main(int argc, char *argv[])
     }
     fds[STDIN_FILENO].events = F_POLLIN;
     fds[STDOUT_FILENO].fd = stdout_receiver;
-    fds[STDOUT_FILENO].events = F_POLLOUT;
+    fds[STDOUT_FILENO].events = F_POLLIN;
     fds[STDERR_FILENO].fd = stderr_receiver;
-    fds[STDERR_FILENO].events = F_POLLOUT;
+    fds[STDERR_FILENO].events = F_POLLIN;
 
     while (true) {
         int updated = sys_poll(fds, ARRAY_SIZE(fds), 1000);
@@ -150,7 +152,7 @@ int main(int argc, char *argv[])
             if (updated == -ERR_TIMEDOUT) {
                 continue;
             } else {
-                fprintf(stderr, "sys_select() failed: %d\n", updated);
+                fprintf(stderr, "sys_poll() failed: %d\n", updated);
                 exit(-1);
             }
         }

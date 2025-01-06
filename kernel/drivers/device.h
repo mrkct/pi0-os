@@ -77,6 +77,7 @@ public:
         *out_revents = events & F_POLLMASK;
         return 0;
     }
+    virtual int32_t mmap(AddressSpace*, uintptr_t, uint32_t, uint32_t) { return -ERR_NOTSUP; }
 
 private:
     uint8_t m_major, m_minor;
@@ -287,4 +288,5 @@ public:
     virtual int64_t read(uint8_t*, size_t) override { return -ERR_NOTSUP; }
     virtual int64_t write(const uint8_t*, size_t) override { return -ERR_NOTSUP; }
     virtual int32_t ioctl(uint32_t request, void *argp) override;
+    virtual int32_t mmap(AddressSpace*, uintptr_t, uint32_t, uint32_t) override;
 };

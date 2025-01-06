@@ -31,7 +31,7 @@ struct Process {
     int next_available_tid;
     int pid;
     int exit_code;
-    const char name[64];
+    char name[64];
     AddressSpace address_space;
     FileCustody *openfiles[16];
 
@@ -96,3 +96,5 @@ int sys$create_pipe(int *write_fd, int *read_fd);
 int sys$movefd(int fd, int new_fd);
 
 int sys$poll(api::PollFd *fds, int nfds, int timeout);
+
+int sys$mmap(int fd, uintptr_t vaddr, uint32_t length, uint32_t flags);

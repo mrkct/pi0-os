@@ -37,6 +37,8 @@ typedef enum Errors {
     typedef uint64_t sysarg_t;
 #endif
 
+
+
 typedef enum SyscallIdentifiers {
     SYS_Yield = 1,
     SYS_Exit = 2,
@@ -56,10 +58,10 @@ typedef enum SyscallIdentifiers {
     SYS_Seek = 16,
     SYS_CreatePipe = 17,
     SYS_MoveFd = 18,
-
     SYS_Link = 19,
     SYS_Unlink = 20,
     SYS_MakeDirectory = 21,
+    SYS_MMap = 22,
 
     SYS_MilliSleep = 31,
 } SyscallIdentifiers;
@@ -289,6 +291,11 @@ static inline int sys_unlink(const char *path)
 static inline int sys_mkdir(const char *path, int mode)
 {
     return syscall(SYS_MakeDirectory, (sysarg_t) path, (sysarg_t) mode, 0, 0);
+}
+
+static inline int sys_mmap(int fd, void *addr, size_t length, uint32_t flags)
+{
+    return syscall(SYS_MMap, (sysarg_t) fd, (sysarg_t) addr, (sysarg_t) length, (sysarg_t) flags);
 }
 
 #ifdef __cplusplus
