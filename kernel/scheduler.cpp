@@ -491,6 +491,8 @@ int sys$execve(const char *path, char *const user_argv[], char *const user_envp[
         panic("execve for multiple threads not implemented");
     }
 
+    strncpy(current_process->name, path, sizeof(current_process->name) - 1);
+
     old_as = current_process->address_space;
     current_process->address_space = new_as;
     vm_switch_address_space(current_process->address_space);
