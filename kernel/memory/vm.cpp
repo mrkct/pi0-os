@@ -213,7 +213,18 @@ Error vm_create_address_space(struct AddressSpace& as)
         lvl1_table[i].raw = kernel_lvl1_table[i].raw;
 
     // Map the vector table too...
+    // FIXME: The "proper" fix is to move the vector table to the kernel area!
     lvl1_table[0] = kernel_lvl1_table[0];
+    if (kernel_lvl1_table[0].is_coarse_page()) {
+        PhysicalPage *page = addr2page(kernel_lvl1_table[0].coarse.base_address());
+        kassert(page != nullptr);
+        page->ref_count++;
+
+        auto *lvl2_table = reinterpret_cast<SecondLevelEntry*>(phys2virt(kernel_lvl1_table[0].coarse.base_address()));
+        page = addr2page(lvl2_table[0].small_page.base_address());
+        kassert(page != nullptr);
+        page->ref_count++;
+    }
 
     return Success;
 }
@@ -391,6 +402,8 @@ void vm_free(struct AddressSpace &as)
     if (lvl1_table == nullptr)
         return;
     
+    // Note: Do not 'memset' to 0 the pages, their refcount might be > 1 !
+
     const auto KERNEL_START = areas::kernel_area.start;
     for (size_t i = 0; i < lvl1_index(KERNEL_START); i++) {
         auto &entry = lvl1_table[i]; 
@@ -408,11 +421,9 @@ void vm_free(struct AddressSpace &as)
             MUST(physical_page_free(p, PageOrder::_4KB));
         }
 
-        memset(lvl2_table, 0, LVL2_TABLE_SIZE);
         MUST(physical_page_free(p, PageOrder::_1KB));
     }
 
-    memset(lvl1_table, 0, LVL1_TABLE_SIZE);
     MUST(physical_page_free(as.ttbr0_page, PageOrder::_16KB));
 }
 

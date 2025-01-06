@@ -183,7 +183,6 @@ static uint8_t *push_string_array_to_stack(
 )
 {
     const char **user_array = nullptr;
-    const char *next_string = (const char *) userstack;
 
     userstack -= sizeof(uintptr_t) * array_size;
     user_array = reinterpret_cast<const char**>(userstack);
@@ -348,7 +347,7 @@ void scheduler_start()
             }
 
             kassert(thread->state == ThreadState::Runnable);
-            LOGD("Context switching to %s[%d/%d]", thread->process->name, thread->process->pid, thread->tid);
+            LOGD("Context switching to %s[%d/%d] (address table @ phys %p)", thread->process->name, thread->process->pid, thread->tid, page2addr(thread->process->address_space.ttbr0_page));
 
             // This should be protected someway if we want to support multicore
             // otherwise 2 cores could end up scheduling the same thread using the same kernel stack
