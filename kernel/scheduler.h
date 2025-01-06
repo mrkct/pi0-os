@@ -47,6 +47,7 @@ void create_first_process(void (*entrypoint)(void));
 
 void scheduler_start();
 
+bool scheduler_has_started();
 Process *cpu_current_process();
 Thread *cpu_current_thread();
 

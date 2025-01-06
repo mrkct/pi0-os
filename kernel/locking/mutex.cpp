@@ -1,4 +1,5 @@
 #include "mutex.h"
+#include <kernel/scheduler.h>
 
 // TODO: A real implementation, this is just a placeholder
 
@@ -11,6 +12,11 @@ void mutex_init(Mutex& mutex, MutexInitialState state)
 
 void mutex_take(Mutex& mutex)
 {
+    if (scheduler_has_started()) {
+        while (spinlock_is_taken(mutex.lock))
+            sys$yield();
+    }
+
     spinlock_take(mutex.lock);
 }
 

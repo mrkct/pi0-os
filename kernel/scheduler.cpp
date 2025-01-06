@@ -13,13 +13,13 @@
 
 #include "scheduler.h"
 
-#define LOG_ENABLED
+// #define LOG_ENABLED
 #define LOG_TAG "SCHED"
 #include <kernel/log.h>
 
 
 int s_next_available_pid = 0;
-
+static bool g_scheduler_has_started = false;
 static Thread *s_current_thread = nullptr;
 static Thread *s_all_threads[64] = {0};
 static size_t s_all_threads_len = 0;
@@ -301,6 +301,7 @@ cleanup:
     return nullptr;
 }
 
+bool scheduler_has_started() { return g_scheduler_has_started; }
 Thread  *cpu_current_thread()    { return s_current_thread; }
 Process *cpu_current_process()   { return cpu_current_thread()->process; }
 
@@ -354,6 +355,7 @@ void scheduler_start()
             vm_switch_address_space(thread->process->address_space);
             s_current_thread = thread;
             arch_context_switch(&s_scheduler_ctx, reinterpret_cast<ContextSwitchFrame*>(thread->kernel_stack_ptr));
+            g_scheduler_has_started = true;
         }
 
         cpu_relax();

@@ -83,13 +83,7 @@ extern "C" void kernel_main(BootParams const *boot_params)
 
 static void wait(int secs)
 {
-    auto *timer = devicemanager_get_system_timer_device();
-    uint64_t last = timer->ticks();
-    
-    while (timer->ticks() - last < (secs * 1000 *timer->ticks_per_ms())) {
-        cpu_relax();
-        api::sys_yield();
-    }
+    api::sys_millisleep(secs * 1000);
 }
 
 static void proc1()
