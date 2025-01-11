@@ -7,12 +7,14 @@
 
 #include <api/syscalls.h>
 #include <libgfx/libgfx.h>
+#include "tmt.h"
 
 
 typedef struct View {
     struct Display *display;
     bool dirty;
-    
+    TMT *vt;
+    int selected_window_idx;
     struct DateTime last_time;
 } View;
 

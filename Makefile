@@ -14,7 +14,7 @@ endif
 
 QEMU:=qemu-system-arm # /home/marco/Desktop/qemu/build/qemu-system-arm
 
-QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp $(QEMU_CFG_FLAGS) -kernel $(KERNEL)
+QEMU_FLAGS:=-d mmu,cpu_reset,guest_errors,unimp -display gtk,zoom-to-fit=off $(QEMU_CFG_FLAGS) -kernel $(KERNEL)
 QEMU_BOARD_SPECIFIC_TARGETS ?= # empty
 
 .PHONY: all kernel userland clean qemu qemu-gdb 

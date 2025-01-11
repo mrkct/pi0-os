@@ -124,8 +124,8 @@ int main(int argc, char *argv[])
         sys_movefd(stdin_receiver, STDIN_FILENO);
         sys_movefd(stdout_sender, STDOUT_FILENO);
         sys_movefd(stderr_sender, STDERR_FILENO);
-        sys_execve("/bin/shell", NULL, NULL);
-        fprintf(stderr, "execve() failed\n");
+        sys_execve("/bina/shell", NULL, NULL);
+        fprintf(stderr, "execve() failed\r\n");
         sys_exit(-1);
     }
 
