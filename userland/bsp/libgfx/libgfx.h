@@ -3,13 +3,25 @@
 #include "libmmath.h"
 #include <stdint.h>
 
-enum {
-    COL_BLACK = 0xff000000,
-    COL_RED = 0xffff0000,
-    COL_GREEN = 0xff00ff00,
-    COL_BLUE = 0xff0000ff,
-    COL_WHITE = 0xffffffff
-};
+
+#define PIXELFMT_ARGB8 1
+
+#ifdef PIXELFMT_ARGB8
+#define COLOR(a, r, g, b) ((b << 24) | (g << 16) | (r << 8) | a)
+#else
+#error "No pixel format defined"
+#endif
+
+#define COL_BLACK   COLOR(0xff, 0, 0, 0)
+#define COL_GRAY    COLOR(0xff, 0x80, 0x80, 0x80)
+#define COL_RED     COLOR(0xff, 0xff, 0, 0)
+#define COL_GREEN   COLOR(0xff, 0, 0xff, 0)
+#define COL_BLUE    COLOR(0xff, 0, 0, 0xff)
+#define COL_WHITE   COLOR(0xff, 0xff, 0xff, 0xff)
+#define COL_YELLOW  COLOR(0xff, 0xff, 0xff, 0)
+#define COL_MAGENTA COLOR(0xff, 0xff, 0, 0xff)
+#define COL_CYAN    COLOR(0xff, 0, 0xff, 0xff)
+
 
 typedef struct Display {
     uint32_t* framebuffer;
@@ -36,6 +48,7 @@ typedef struct PSFFont {
 
     uint8_t const* data;
     size_t size;
+    uint32_t hmargin, vmargin;
 } Font;
 
 void draw_filled_rect(Display* window, int x, int y, int w, int h, uint32_t color);
@@ -50,6 +63,6 @@ Font* get_default_font(void);
 
 int load_psf_font(uint8_t const* data, size_t size, Font*);
 
-void draw_char(Display* window, Font* font, char c, int x, int y, uint32_t color);
+void draw_char(Display* window, Font* font, char c, int x, int y, int scale, uint32_t color);
 
-void draw_text(Display* window, Font* font, char const* text, int x, int y, uint32_t color);
+void draw_text(Display* window, Font* font, char const* text, int x, int y, int scale, uint32_t color);

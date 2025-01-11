@@ -12,12 +12,8 @@ extern const uint8_t _resource_default_psf_font[];
 extern const size_t _resource_default_psf_font_size;
 static Font g_default_font;
 
-static void _draw_filled_rect(Display *display, int x, int y, int w, int h, uint32_t color);
-static void _draw_outlined_rect(Display *display, int x, int y, int w, int h, int thickness, uint32_t color);
 static void _draw_circle(Display *display, int x, int y, int radius, uint32_t color);
 static void _draw_line(Display *display, int x1, int y1, int x2, int y2, int thickness, uint32_t color);
-static void _draw_char(Display *display, Font *font, char c, int x, int y, uint32_t color);
-static void _draw_text(Display *display, Font *font, const char *text, int x, int y, uint32_t color);
 
 inline static void set_pixel(Display* display, int x, int y, uint32_t color)
 {
@@ -26,32 +22,30 @@ inline static void set_pixel(Display* display, int x, int y, uint32_t color)
     }
 }
 
-static void _draw_filled_rect(Display *display, int x, int y, int w, int h, uint32_t color)
+void draw_filled_rect(Display *display, int x, int y, int w, int h, uint32_t color)
 {
     int x1 = MAX(0, MIN(x, x + w));
     int x2 = MIN(display->width, MAX(x, x + w));
     int y1 = MAX(0, MIN(y, y + h));
-    int y2 = MIN(display->height, MAX(y, y + w));
+    int y2 = MIN(display->height, MAX(y, y + h));
 
-    for (int _y = y1; _y < y2; _y++) {
-        uint32_t *fb = &display->framebuffer[_y * display->width + x1];
-        for (int _x = x1; _x < x2; _x++, fb++) {
+    for (int y = y1; y < y2; y++) {
+        uint32_t *fb = &display->framebuffer[y * display->width + x1];
+        for (int x = x1; x < x2; x++, fb++) {
             *fb = color;
         }
     }
 }
 
-void draw_filled_rect(Display *display, int x, int y, int w, int h, uint32_t color)
-{
-    _draw_filled_rect(display, x, y, w, h, color);
-}
 
-static void _draw_outlined_rect(Display *display, int x, int y, int w, int h, int thickness, uint32_t color)
+void draw_outlined_rect(Display *display, int x, int y, int w, int h, int thickness, uint32_t color)
 {
     int x1 = MAX(0, MIN(x, x + w));
     int x2 = MIN(display->width, MAX(x, x + w));
     int y1 = MAX(0, MIN(y, y + h));
-    int y2 = MAX(display->height, MAX(y, y + w));
+    int y2 = MIN(display->height, MAX(y, y + h));
+
+    printf("x1: %d, x2: %d, y1: %d, y2: %d\n", x1, x2, y1, y2);
 
     for (int i = 0; i < thickness; i++) {
         for (int _x = x1; _x < x2; _x++) {
@@ -66,11 +60,6 @@ static void _draw_outlined_rect(Display *display, int x, int y, int w, int h, in
             set_pixel(display, x2 - i, _y, color);
         }
     }
-}
-
-void draw_outlined_rect(Display *display, int x, int y, int w, int h, int thickness, uint32_t color)
-{
-    _draw_outlined_rect(display, x, y, w, h, thickness, color);
 }
 
 static void _draw_circle(Display *display, int x, int y, int radius, uint32_t color)
@@ -178,11 +167,13 @@ int load_psf_font(uint8_t const* data, size_t size, Font *font)
 
     font->data = data;
     font->size = size;
+    font->hmargin = 2;
+    font->vmargin = 4;
 
     return 0;
 }
 
-static void _draw_char(Display *display, Font *font, char c, int x, int y, uint32_t color)
+void draw_char(Display *display, Font *font, char c, int x, int y, int scale, uint32_t color)
 {
     if (c >= font->header.num_glyphs) return;
     if (c < ' ' || c > '~') return;
@@ -192,27 +183,21 @@ static void _draw_char(Display *display, Font *font, char c, int x, int y, uint3
     for (size_t glyph_y = 0; glyph_y < font->header.height; glyph_y++) {
         uint8_t glyph_row = start_of_glyph[glyph_y];
         for (size_t glyph_x = 0; glyph_x < 8; glyph_x++) {
-            if (glyph_row & (1 << (7 - glyph_x)))
-                set_pixel(display, x + glyph_x, y + glyph_y, color);
+            if (glyph_row & (1 << (7 - glyph_x))) {
+                if (scale == 1)
+                    set_pixel(display, x + scale * glyph_x, y + scale * glyph_y, color);
+                else
+                    draw_filled_rect(display, x + scale * glyph_x, y + scale * glyph_y, scale, scale, color);
+            }
         }
     }
 }
 
-void draw_char(Display *display, Font *font, char c, int x, int y, uint32_t color)
-{
-    _draw_char(display, font, c, x, y, color);
-}
-
-static void _draw_text(Display *display, Font *font, const char *text, int x, int y, uint32_t color)
+void draw_text(Display *display, Font *font, const char *text, int x, int y, int scale, uint32_t color)
 {
     while (*text && x < display->width) {
-        _draw_char(display, font, *text, x, y, color);
+        draw_char(display, font, *text, x, y, scale, color);
         text++;
-        x += 8;
+        x += (font->header.width + font->hmargin) * scale;
     }
-}
-
-void draw_text(Display *display, Font *font, const char *text, int x, int y, uint32_t color)
-{
-    _draw_text(display, font, text, x, y, color);
 }
