@@ -7,7 +7,7 @@
 
 
 static constexpr uintptr_t  RAM_START = 0x40000000;
-static constexpr uint32_t   RAM_SIZE = 512 * _1MB;
+static constexpr uint32_t   RAM_SIZE = 128 * _1MB;
 
 static constexpr uintptr_t UART_BASE = 0x9000000;
 static constexpr uintptr_t REG_DR = UART_BASE + 0x00;
