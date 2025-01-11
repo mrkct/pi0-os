@@ -35,8 +35,15 @@ static void free_process(Process *process)
     while (process->threads.count > 0)
         free_thread(process->threads.data[0]);
     
-
     release(lock);
+
+    for (size_t i = 0; i < array_size(process->openfiles); i++) {
+        FileCustody *custody = process->openfiles[i];
+        if (custody == nullptr)
+            continue;
+
+        vfs_close(custody);
+    }
 }
 
 static void free_thread(Thread *thread)
