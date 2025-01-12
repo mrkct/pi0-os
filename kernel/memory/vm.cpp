@@ -447,7 +447,7 @@ Error vm_fork(AddressSpace &as, AddressSpace &out_forked)
         PhysicalPage *pgtable;
         if (rc = physical_page_alloc(PageOrder::_1KB, pgtable); !rc.is_success())
             goto error;
-
+        memset((void*) phys2virt(page2addr(pgtable)), 0, LVL2_TABLE_SIZE);
         dst_lvl1[i].coarse = CoarsePageTableEntry::make_entry(page2addr(pgtable));
         
         for (size_t j = 0; j < LVL2_ENTRIES; j++) {
