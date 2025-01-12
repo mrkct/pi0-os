@@ -13,7 +13,8 @@
 
 #include "scheduler.h"
 
-// #define LOG_ENABLED
+#define LOG_ENABLED
+#define LOG_CTX_SWITCH 0
 #define LOG_TAG "SCHED"
 #include <kernel/log.h>
 
@@ -355,8 +356,9 @@ void scheduler_start()
             }
 
             kassert(thread->state == ThreadState::Runnable);
+#if LOG_CTX_SWITCHES
             LOGD("Context switching to %s[%d/%d] (address table @ phys %p)", thread->process->name, thread->process->pid, thread->tid, page2addr(thread->process->address_space.ttbr0_page));
-
+#endif
             // This should be protected someway if we want to support multicore
             // otherwise 2 cores could end up scheduling the same thread using the same kernel stack
             vm_switch_address_space(thread->process->address_space);
