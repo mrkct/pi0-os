@@ -202,6 +202,13 @@ Error vm_create_address_space(struct AddressSpace& as)
 {
     struct PhysicalPage* as_ttbr0_page;
     TRY(physical_page_alloc(PageOrder::_16KB, as_ttbr0_page));
+    
+    struct PhysicalPage *as_hack_2nd_level_table_page;
+    if (auto e = physical_page_alloc(PageOrder::_1KB, as_hack_2nd_level_table_page); !e.is_success()) {
+        physical_page_free(as_ttbr0_page, PageOrder::_16KB);
+        return e;
+    }
+
     as.ttbr0_page = as_ttbr0_page;
 
     FirstLevelEntry* lvl1_table = as.get_root_table_ptr();
@@ -212,18 +219,26 @@ Error vm_create_address_space(struct AddressSpace& as)
     for (size_t i = lvl1_index(KERNEL_START); i < LVL1_ENTRIES; i++)
         lvl1_table[i].raw = kernel_lvl1_table[i].raw;
 
-    // Map the vector table too...
-    // FIXME: The "proper" fix is to move the vector table to the kernel area!
-    lvl1_table[0] = kernel_lvl1_table[0];
-    if (kernel_lvl1_table[0].is_coarse_page()) {
-        PhysicalPage *page = addr2page(kernel_lvl1_table[0].coarse.base_address());
-        kassert(page != nullptr);
-        page->ref_count++;
+    /**
+     * HACK: We need to map the vector table at 0x0 for all AS
+     * but we can't just copy kernel_lvl1_table[0].raw directly as
+     * it would break the refcount + leak process data in the first MB
+     * so we need to refcount++ only the very first page
+     * 
+     * The proper fix is to use ARM's 'hivec' bit in the SCR register
+     * and remap the vector table at 0xffff0000.
+     * Meanwhile, this code duplicates only the very first 4KB manually
+     * increments the refcount of that first page
+     */
+    lvl1_table[0].coarse = CoarsePageTableEntry::make_entry(page2addr(as_hack_2nd_level_table_page));
+    {
+        auto *src_table = reinterpret_cast<SecondLevelEntry*>(phys2virt(kernel_lvl1_table[0].coarse.base_address()));
+        struct PhysicalPage *p = addr2page(src_table[0].small_page.base_address());
+        p->ref_count++;
 
-        auto *lvl2_table = reinterpret_cast<SecondLevelEntry*>(phys2virt(kernel_lvl1_table[0].coarse.base_address()));
-        page = addr2page(lvl2_table[0].small_page.base_address());
-        kassert(page != nullptr);
-        page->ref_count++;
+        auto *dst_table = reinterpret_cast<SecondLevelEntry*>(phys2virt(lvl1_table[0].coarse.base_address()));
+        memset(dst_table, 0, LVL2_TABLE_SIZE);
+        dst_table[0].small_page = SmallPageEntry::make_entry(page2addr(p), PageAccessPermissions::PriviledgedOnly);
     }
 
     return Success;
