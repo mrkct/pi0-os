@@ -16,7 +16,7 @@ void _exit(int status)
     while(1);
 }
 
-static uint8_t s_heap[32 * 1024 * 1024];
+static uint8_t s_heap[16 * 1024 * 1024];
 static uint8_t *s_brk = s_heap;
 static const char *OUT_OF_MEMORY_ERROR_MSG = "\n"
     "@@@@@@@@@@@@@@@@@@@@@@@@@\n"
