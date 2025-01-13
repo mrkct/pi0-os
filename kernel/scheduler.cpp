@@ -32,19 +32,12 @@ static void free_thread(Thread *thread);
 
 static void free_process(Process *process)
 {
+    // When all threads are freed, the process will also be freed
     auto lock = irq_lock();
     while (process->threads.count > 0)
         free_thread(process->threads.data[0]);
     
     release(lock);
-
-    for (size_t i = 0; i < array_size(process->openfiles); i++) {
-        FileCustody *custody = process->openfiles[i];
-        if (custody == nullptr)
-            continue;
-
-        vfs_close(custody);
-    }
 }
 
 static void free_thread(Thread *thread)
@@ -56,8 +49,17 @@ static void free_thread(Thread *thread)
     array_swap_remove(parent->threads.data, parent->threads.count, thread);
     parent->threads.count--;
 
-    if (parent->threads.count == 0)
+    if (parent->threads.count == 0) {
+        // The actual freeing of the process
+        for (size_t i = 0; i < array_size(parent->openfiles); i++) {
+            FileCustody *custody = parent->openfiles[i];
+            if (custody == nullptr)
+                continue;
+
+            vfs_close(custody);
+        }
         kfree(parent);
+    }
 
     release(lock);
 }

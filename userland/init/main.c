@@ -20,11 +20,5 @@ int main(int argc, char **argv)
         sys_exit(1);
     }
 
-    while (1) {
-        printf("tick\n");
-        sys_millisleep(1000);
-        sys_yield();
-    }
-
     return 0;
 }

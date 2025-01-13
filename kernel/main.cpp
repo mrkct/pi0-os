@@ -81,6 +81,19 @@ extern "C" void kernel_main(BootParams const *boot_params)
     scheduler_start();
 }
 
+#ifndef TEST_PROCESS
+
+static void proc1()
+{
+    int rc = 0;
+    const char * const argv[] = { "/bina/init", nullptr };
+    const char * const envp[] = { nullptr };
+    api::sys_execve("/bina/init", argv, envp);
+    panic("something went wrong with execve: %d\n", rc);
+}
+
+#else
+
 static void wait(int secs)
 {
     api::sys_millisleep(secs * 1000);
@@ -141,3 +154,5 @@ static void proc1()
         }
     }
 }
+
+#endif
