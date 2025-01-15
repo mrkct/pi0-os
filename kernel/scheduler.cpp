@@ -34,9 +34,12 @@ static void free_process(Process *process)
 {
     // When all threads are freed, the process will also be freed
     auto lock = irq_lock();
-    while (process->threads.count > 0)
-        free_thread(process->threads.data[0]);
     
+    // Important: do not put process->threads.count in the for loop condition, that's a use-after-free!
+    unsigned count = process->threads.count;
+    for (size_t i = 0; i < count; i++)
+        free_thread(process->threads.data[0]);
+
     release(lock);
 }
 
@@ -46,6 +49,7 @@ static void free_thread(Thread *thread)
     Process *parent = thread->process;
     kfree(thread);
 
+    LOGD("Freeing thread %s[%d/%d]", parent->name, parent->pid, thread->tid);
     array_swap_remove(parent->threads.data, parent->threads.count, thread);
     parent->threads.count--;
 
@@ -73,6 +77,14 @@ static void *alloc_kernel_stack()
     uint8_t *addr = reinterpret_cast<uint8_t*>(phys2virt(page2addr(kernel_stack_page)));
     addr += _4KB - 8;
     return addr;
+}
+
+static void free_kernel_stack(void *kernel_stack_ptr)
+{
+    auto addr_page = round_down(reinterpret_cast<uintptr_t>(kernel_stack_ptr), _4KB);
+    PhysicalPage *page = addr2page(virt2phys(addr_page));
+    kassert(page != nullptr);
+    physical_page_free(page, PageOrder::_4KB);
 }
 
 static void *alloc_thread_user_stack(AddressSpace *address_space, int tid)
@@ -243,7 +255,22 @@ static void register_thread(Thread *thread)
     release(lock);
 }
 
-Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged)
+/**
+ * \brief Allocates a new process with 1 thread
+ * 
+ * Allocates a new process with the given name and 1 thread
+ * starting at \ref entrypoint
+ * 
+ * The initial thread will have its \ref Thread::state set
+ * to \ref ThreadState::Suspended. This is to allow extra
+ * initialization to be done before starting the thread.
+ * 
+ * The thread is not registed with the scheduler, therefore
+ * once you're done with its initialization you should change
+ * its state to \ref ThreadState::Running and call
+ * \ref register_thread to make it schedulable.
+*/
+static Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged)
 {
     Process *new_process = (Process*) malloc(sizeof(Process));
     Thread **threads_array = (Thread**) malloc(sizeof(Thread*));
@@ -293,14 +320,13 @@ Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged)
         reinterpret_cast<uintptr_t>(entrypoint),
         privileged);
 
-    register_thread(first_thread);
     return new_process;
 
 cleanup:
     if (new_process) {
         vm_free(new_process->address_space);
         if (new_process->threads.data[0]->kernel_stack_ptr) {
-            // TODO: Free the kernel stack memory
+            free_kernel_stack(new_process->threads.data[0]->kernel_stack_ptr);
         }
     }
     free(new_process);
@@ -322,6 +348,7 @@ void create_first_process(void (*entrypoint)(void))
     Process *stage2 = alloc_process("kernel", entrypoint, true);
     kassert(stage2 != nullptr);
     Thread *thread = stage2->threads.data[0];
+    register_thread(thread);
 
     rc = vfs_open("/dev/kernel_log", OF_RDONLY, &temp);
     kassert(rc == 0);
@@ -350,6 +377,7 @@ void scheduler_start()
                 continue;
             
             if (thread->state == ThreadState::Zombie) {
+                LOGD("Thread %s[%d/%d] is a zombie, freeing it", thread->process->name, thread->process->pid, thread->tid);
                 free_thread(thread);
                 s_all_threads[i] = nullptr;
                 continue;
@@ -435,6 +463,7 @@ int sys$fork()
     forked_thread->iframe->set_syscall_return_value(0);
 
     forked_thread->state = ThreadState::Runnable;
+    register_thread(forked_thread);
     return forked->pid;
 
 failed:

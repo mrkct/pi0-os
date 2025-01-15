@@ -51,21 +51,6 @@ bool scheduler_has_started();
 Process *cpu_current_process();
 Thread *cpu_current_thread();
 
-/**
- * \brief Allocates a new process
- * 
- * Allocates a new process with the given name and 1 thread
- * starting at \ref entrypoint
- * 
- * The initial thread will have its \ref Thread::state set
- * to \ref ThreadState::Suspended. This is to allow extra
- * initialization to be done before starting the thread.
- * 
- * Once you have completed their initialization you should change their
- * state to start them
-*/
-Process *alloc_process(const char *name, void (*entrypoint)(), bool privileged);
-
 int sys$exit(int exit_code);
 
 int sys$yield();
