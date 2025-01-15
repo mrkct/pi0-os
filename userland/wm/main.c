@@ -163,7 +163,14 @@ int main(int argc, char *argv[])
             case STDIN_FILENO: {
                 count = sys_read(fds[updated].fd, buf, sizeof(buf));
                 if (count > 0) {
-                    sys_write(stdin_sender, buf, count);
+                    /* Convert '\r' to '\n\r' */
+                    for (int i = 0; i < count; i++) {
+                        if (buf[i] == '\r') {
+                            sys_write(stdin_sender, "\n\r", 2);
+                        } else {
+                            sys_write(stdin_sender, buf + i, 1);
+                        }
+                    }
                 }
                 break;
             }
@@ -176,7 +183,15 @@ int main(int argc, char *argv[])
                     continue;
                 }
 
-                view_terminal_write(&view, buf, count);
+                /* Convert '\n' to '\r\n' */
+                for (int i = 0; i < count; i++) {
+                    if (buf[i] == '\n') {
+                        view_terminal_write(&view, "\r\n", 2);
+                    } else {
+                        view_terminal_write(&view, buf + i, 1);
+                    }
+                }
+        
                 break;
             }
 
