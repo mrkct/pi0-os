@@ -851,3 +851,24 @@ int sys$mmap(int fd, uintptr_t vaddr, uint32_t length, uint32_t flags)
     file = current_process->openfiles[fd];
     return vfs_mmap(file, &current_process->address_space, vaddr, length, flags);
 }
+
+int sys$dup2(int fd, int new_fd)
+{
+    auto *current_process = cpu_current_process();
+    FileCustody *file = nullptr;
+
+    if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles) || current_process->openfiles[fd] == nullptr)
+        return -ERR_BADF;
+    if (new_fd < 0 || (unsigned) new_fd >= array_size(current_process->openfiles))
+        return -ERR_BADF;
+
+    if (current_process->openfiles[new_fd] != nullptr) {
+        vfs_close(current_process->openfiles[new_fd]);
+        current_process->openfiles[new_fd] = nullptr;
+    }
+
+    file = current_process->openfiles[fd];
+    current_process->openfiles[new_fd] = vfs_duplicate(file);
+
+    return 0;
+}

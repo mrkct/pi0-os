@@ -62,6 +62,7 @@ typedef enum SyscallIdentifiers {
     SYS_Unlink = 20,
     SYS_MakeDirectory = 21,
     SYS_MMap = 22,
+    SYS_Dup2 = 23,
 
     SYS_MilliSleep = 31,
 } SyscallIdentifiers;
@@ -131,6 +132,11 @@ static inline int sys_mkpipe(int *writer, int *receiver)
 static inline int sys_movefd(int oldfd, int newfd)
 {
     return syscall(SYS_MoveFd, (sysarg_t) oldfd, (sysarg_t) newfd, 0, 0);
+}
+
+static inline int sys_dup2(int oldfd, int newfd)
+{
+    return syscall(SYS_Dup2, (sysarg_t) oldfd, (sysarg_t) newfd, 0, 0);
 }
 
 typedef struct PollFd {
