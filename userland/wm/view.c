@@ -81,7 +81,6 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
             break;
 
         case TMT_MSG_UPDATE:
-            printf("screen update\n");
             /* the screen image changed; a is a pointer to the TMTSCREEN */
             for (size_t r = 0; r < s->nline; r++){
                 if (s->lines[r]->dirty){
@@ -105,7 +104,6 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
 
         case TMT_MSG_MOVED:
             /* the cursor moved; a is a pointer to the cursor's TMTPOINT */
-            printf("cursor is now at %zd,%zd\n", c->r, c->c);
             break;
     }
 }
