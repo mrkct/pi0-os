@@ -50,6 +50,9 @@ static char *read_line(const char *prompt)
         }
         sys_read(STDIN_FILENO, &c, 1);
 
+        if (c == '\r')
+            continue;
+
         putchar(c);
 
         bool is_eol = c == '\n';
