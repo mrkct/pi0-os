@@ -1,6 +1,10 @@
 #include <kernel/base.h>
 #include "vm.h"
 
+#define LOG_ENABLED
+#define LOG_TAG "VMM"
+#include <kernel/log.h>
+
 
 static constexpr size_t LVL1_ENTRIES = _16KB / sizeof(FirstLevelEntry);
 static constexpr size_t LVL2_ENTRIES = _1KB / sizeof(SecondLevelEntry);
@@ -460,8 +464,10 @@ Error vm_fork(AddressSpace &as, AddressSpace &out_forked)
         kassert(entry.is_coarse_page());
         
         PhysicalPage *pgtable;
-        if (rc = physical_page_alloc(PageOrder::_1KB, pgtable); !rc.is_success())
+        if (rc = physical_page_alloc(PageOrder::_1KB, pgtable); !rc.is_success()) {
+            LOGW("Failed to allocate pgtable for forked address space");
             goto error;
+        }
         memset((void*) phys2virt(page2addr(pgtable)), 0, LVL2_TABLE_SIZE);
         dst_lvl1[i].coarse = CoarsePageTableEntry::make_entry(page2addr(pgtable));
         
@@ -472,8 +478,10 @@ Error vm_fork(AddressSpace &as, AddressSpace &out_forked)
                 continue;
             
             PhysicalPage *page;
-            if (rc = physical_page_alloc(PageOrder::_4KB, page); !rc.is_success())
+            if (rc = physical_page_alloc(PageOrder::_4KB, page); !rc.is_success()) {
+                LOGW("Failed to allocate page for forked address space");
                 goto error;
+            }
             
             auto *src = reinterpret_cast<void*>(phys2virt(src_lvl2_entry.small_page.base_address()));
             auto *dst = reinterpret_cast<void*>(phys2virt(page2addr(page)));
@@ -486,6 +494,7 @@ Error vm_fork(AddressSpace &as, AddressSpace &out_forked)
     return Success;
 
 error:
+    LOGD("Forking address space failed. Stats before freeing:");
     vm_free(out_forked);
     return rc;
 }
