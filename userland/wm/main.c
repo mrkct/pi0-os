@@ -11,6 +11,9 @@
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
+#define STDIN_FDPOS         0
+#define STDOUT_STDERR_FDPOS 1
+
 
 static int framebuffer_refresh(Display *display)
 {
@@ -82,14 +85,13 @@ int main(int argc, char *argv[])
 
     int rc = 0;
     int count;
-    PollFd fds[3];
+    PollFd fds[2];
     char buf[1024];
     struct DateTime datetime;
     Clock clock;
     View view;
     int stdin_sender, stdin_receiver;
-    int stdout_sender, stdout_receiver;
-    int stderr_sender, stderr_receiver;
+    int stdout_stderr_sender, stdout_stderr_receiver;
 
     /* Some initialization */
     if (0 != (rc = clock_init(&clock))) {
@@ -107,23 +109,21 @@ int main(int argc, char *argv[])
         fprintf(stderr, "sys_mkpipe() for stdin failed\n");
         exit(-1);
     }
-    if (sys_mkpipe(&stdout_sender, &stdout_receiver) < 0) {
-        fprintf(stderr, "sys_mkpipe() for stdout failed\n");
-        exit(-1);
-    }
-    if (sys_mkpipe(&stderr_sender, &stderr_receiver) < 0) {
-        fprintf(stderr, "sys_mkpipe() for stderr failed\n");
+    if (sys_mkpipe(&stdout_stderr_sender, &stdout_stderr_receiver) < 0) {
+        fprintf(stderr, "sys_mkpipe() for stdout+stderr failed\n");
         exit(-1);
     }
 
     /* Spawn the shell process */
     if (0 == sys_fork()) {
-        sys_close(STDIN_FILENO);
-        sys_close(STDOUT_FILENO);
-        sys_close(STDERR_FILENO);
-        sys_movefd(stdin_receiver, STDIN_FILENO);
-        sys_movefd(stdout_sender, STDOUT_FILENO);
-        sys_movefd(stderr_sender, STDERR_FILENO);
+        sys_dup2(stdin_receiver, STDIN_FILENO);
+        sys_dup2(stdout_stderr_sender, STDOUT_FILENO);
+        sys_dup2(stdout_stderr_sender, STDERR_FILENO);
+
+        /* Close the other ends of the pipes, we don't want to leak them*/
+        sys_close(stdin_sender);
+        sys_close(stdout_stderr_receiver);
+
         const char *argv[] = { "/bina/shell", NULL };
         const char *envp[] = { NULL };
         sys_execve("/bina/shell", argv, envp);
@@ -131,16 +131,14 @@ int main(int argc, char *argv[])
         sys_exit(-1);
     }
 
-    fds[STDIN_FILENO].fd = sys_open("/dev/uart0", OF_RDONLY, 0);
-    if (fds[STDIN_FILENO].fd < 0) {
+    fds[STDIN_FDPOS].fd = sys_open("/dev/uart0", OF_RDONLY, 0);
+    if (fds[STDIN_FDPOS].fd < 0) {
         fprintf(stderr, "Failed to open /dev/uart0\n");
         exit(-1);
     }
-    fds[STDIN_FILENO].events = F_POLLIN;
-    fds[STDOUT_FILENO].fd = stdout_receiver;
-    fds[STDOUT_FILENO].events = F_POLLIN;
-    fds[STDERR_FILENO].fd = stderr_receiver;
-    fds[STDERR_FILENO].events = F_POLLIN;
+    fds[STDIN_FDPOS].events = F_POLLIN;
+    fds[STDOUT_STDERR_FDPOS].fd = stdout_stderr_receiver;
+    fds[STDOUT_STDERR_FDPOS].events = F_POLLIN;
 
     while (true) {
         int updated = sys_poll(fds, ARRAY_SIZE(fds), 1000);
@@ -160,7 +158,7 @@ int main(int argc, char *argv[])
         }
 
         switch (updated) {
-            case STDIN_FILENO: {
+            case STDIN_FDPOS: {
                 count = sys_read(fds[updated].fd, buf, sizeof(buf));
                 if (count > 0) {
                     /* Convert '\r' to '\n\r' */
@@ -175,14 +173,14 @@ int main(int argc, char *argv[])
                 break;
             }
 
-            case STDOUT_FILENO:
-            case STDERR_FILENO: {
+            case STDOUT_STDERR_FDPOS: {
                 count = sys_read(fds[updated].fd, buf, sizeof(buf));
                 if (count < 0) {
                     fprintf(stderr, "Failed to read from stdout/stderr\n");
                     continue;
                 }
 
+                printf("[%.*s]\n", count, buf);
                 /* Convert '\n' to '\r\n' */
                 for (int i = 0; i < count; i++) {
                     if (buf[i] == '\n') {
