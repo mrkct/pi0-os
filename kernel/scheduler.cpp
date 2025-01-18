@@ -514,7 +514,7 @@ int sys$execve(const char *path, char *const user_argv[], char *const user_envp[
 
     rc = elf_load_into_address_space(path, &entrypoint, new_as);
     if (rc != 0) {
-        LOGE("Failed to load ELF file '%s', rc=%s(%d)\n", path, strerror(rc), rc);
+        LOGE("Failed to load ELF file '%s', rc=%s(%d)", path, strerror(rc), rc);
         goto cleanup;
     }
     LOGD("Successsfully loaded ELF file '%s', entrypoint: %p", path, entrypoint);
