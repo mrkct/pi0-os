@@ -28,18 +28,35 @@ struct Thread {
 struct Process {
     INTRUSIVE_LINKED_LIST_HEADER(Process);
 
+    struct ProcessExitListener {
+        INTRUSIVE_LINKED_LIST_HEADER(ProcessExitListener);
+
+        void *arg;
+        void (*callback)(Process *process, void *arg);
+    };
+
     int next_available_tid;
     int pid;
     int exit_code;
     char name[64];
     AddressSpace address_space;
     FileCustody *openfiles[16];
+    IntrusiveLinkedList<ProcessExitListener> process_exit_listeners;
 
     struct {
         Thread **data;
         size_t allocated;
         size_t count;
     } threads;
+
+    bool is_zombie() const {
+        for (size_t i = 0; i < this->threads.count; i++) {
+            if (this->threads.data[i]->state != ThreadState::Zombie)
+                return false;
+        }
+
+        return true;
+    }
 };
 
 
@@ -86,3 +103,5 @@ int sys$poll(api::PollFd *fds, int nfds, int timeout);
 int sys$mmap(int fd, uintptr_t vaddr, uint32_t length, uint32_t flags);
 
 int sys$dup2(int oldfd, int newfd);
+
+int sys$waitexit(int pid);

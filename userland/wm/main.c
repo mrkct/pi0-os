@@ -180,7 +180,6 @@ int main(int argc, char *argv[])
                     continue;
                 }
 
-                printf("[%.*s]\n", count, buf);
                 /* Convert '\n' to '\r\n' */
                 for (int i = 0; i < count; i++) {
                     if (buf[i] == '\n') {

@@ -141,7 +141,7 @@ static int run_program(size_t argc, const char *argv[])
         exit(-1);
     } 
     
-    waitpid(pid, &status, WNOHANG);
+    sys_waitexit(pid);
     return 0;
 }
 

@@ -32,8 +32,11 @@ static void free_thread(Thread *thread);
 
 static void free_process(Process *process)
 {
+    while (auto *listener = process->process_exit_listeners.pop()) {
+        listener->callback(process, listener->arg);
+    }
+
     auto lock = irq_lock();
-    
     LOGD("Freeing process %s[%d]", process->name, process->pid);
     for (size_t i = 0; i < process->threads.count; i++)
         free_thread(process->threads.data[0]);
@@ -262,6 +265,18 @@ static void register_thread(Thread *thread)
     kassert(s_all_threads_len < array_size(s_all_threads));
     s_all_threads[s_all_threads_len++] = thread;
     release(lock);
+}
+
+static Process *lookup_process_by_pid(int pid)
+{
+    // FIXME: This is a ugly way of doing this
+    for (size_t i = 0; i < array_size(s_all_threads); i++) {
+        Thread *thread = s_all_threads[i];
+        if (thread != nullptr && thread->process->pid == pid)
+            return thread->process;
+    }
+
+    return nullptr;
 }
 
 /**
@@ -879,5 +894,42 @@ int sys$dup2(int fd, int new_fd)
     file = current_process->openfiles[fd];
     current_process->openfiles[new_fd] = vfs_duplicate(file);
 
+    return 0;
+}
+
+int sys$waitexit(int pid)
+{
+    auto *current_process = cpu_current_process();
+    auto *current_thread = cpu_current_thread();
+    Mutex mutex;
+    Process::ProcessExitListener listener;
+    mutex_init(mutex, MutexInitialState::Locked);
+
+    LOGI("%s[%d] wait for process %d to exit", current_thread->process->name, current_thread->tid, pid);
+
+    auto lock = irq_lock();
+    Process *process = lookup_process_by_pid(pid);
+    if (process == nullptr) {
+        release(lock);
+        LOGW("Failed to wait for process %d, process not found", pid);
+        return -ERR_INVAL;
+    }
+    kassert(process->pid == pid);
+
+    if (process->is_zombie()) {
+        release(lock);
+        LOGI("No need to wait, process %s[%d] has already exited", process->name, process->pid);
+        return 0;
+    }
+
+    listener.arg = &mutex;
+    listener.callback = [](Process*, void *_mutex) {
+        mutex_release(*(Mutex*)_mutex);
+    };
+    process->process_exit_listeners.add(&listener);
+    
+    release(lock);
+    mutex_take(mutex);
+    LOGI("Process %s[%d] exited", process->name, process->pid);
     return 0;
 }
