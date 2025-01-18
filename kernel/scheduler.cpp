@@ -32,13 +32,25 @@ static void free_thread(Thread *thread);
 
 static void free_process(Process *process)
 {
-    // When all threads are freed, the process will also be freed
     auto lock = irq_lock();
     
-    // Important: do not put process->threads.count in the for loop condition, that's a use-after-free!
-    unsigned count = process->threads.count;
-    for (size_t i = 0; i < count; i++)
+    LOGD("Freeing process %s[%d]", process->name, process->pid);
+    for (size_t i = 0; i < process->threads.count; i++)
         free_thread(process->threads.data[0]);
+    free(process->threads.data);
+    LOGD("All threads freed");
+    for (size_t i = 0; i < array_size(process->openfiles); i++) {
+        FileCustody *custody = process->openfiles[i];
+        if (custody == nullptr)
+            continue;
+
+        LOGD("Closing file %d", i);
+        vfs_close(custody);
+    }
+    LOGD("All files closed, freeing address space");
+    vm_free(process->address_space);
+    LOGD("Done, freeing the process structure");
+    kfree(process);
 
     release(lock);
 }
@@ -53,16 +65,10 @@ static void free_thread(Thread *thread)
     array_swap_remove(parent->threads.data, parent->threads.count, thread);
     parent->threads.count--;
 
-    if (parent->threads.count == 0) {
-        // The actual freeing of the process
-        for (size_t i = 0; i < array_size(parent->openfiles); i++) {
-            FileCustody *custody = parent->openfiles[i];
-            if (custody == nullptr)
-                continue;
-
-            vfs_close(custody);
-        }
-        kfree(parent);
+    // Remove from the scheduling queue (if it's there)
+    unsigned idx = array_find(s_all_threads, s_all_threads_len, thread);
+    if (idx != s_all_threads_len) {
+        s_all_threads[idx] = nullptr;
     }
 
     release(lock);
@@ -406,7 +412,7 @@ int sys$exit(int exit_code)
     auto *current_process = cpu_current_process();
     auto *current_thread = cpu_current_thread();
 
-    LOGI("Exiting %s[%d/%d] with exit code %d\n", current_process->name, current_process->pid, current_thread->tid, exit_code);
+    LOGI("Exiting %s[%d/%d] with exit code %d", current_process->name, current_process->pid, current_thread->tid, exit_code);
     current_thread->state = ThreadState::Zombie;
     current_process->exit_code = exit_code;
     sys$yield();

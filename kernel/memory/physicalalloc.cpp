@@ -59,7 +59,11 @@ struct PhysicalPage* addr2page(uintptr_t addr)
     return &g_pages.data[idx];
 }
 
-uintptr_t page2addr(struct PhysicalPage* page) { return s_physical_ram_starting_address + (page - g_pages.data) * _1KB; }
+uintptr_t page2addr(struct PhysicalPage* page) {
+    kassert(page >= g_pages.data);
+    kassert(page < g_pages.data + g_pages.len);
+    return s_physical_ram_starting_address + (page - g_pages.data) * _1KB; 
+}
 static size_t page2array_index(struct PhysicalPage* page) { return page - g_pages.data; }
 
 static void append_page_to_free_pages_list(struct PhysicalPage* page, PageOrder order)

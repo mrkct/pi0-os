@@ -33,7 +33,12 @@ static inline constexpr uintptr_t vm_align_down_to_page(uintptr_t addr)
 
 struct AddressSpace {
     struct PhysicalPage* ttbr0_page;
-    FirstLevelEntry *get_root_table_ptr() const { return reinterpret_cast<FirstLevelEntry*>(phys2virt(page2addr(ttbr0_page))); }
+    FirstLevelEntry *get_root_table_ptr() const
+    {
+        if (ttbr0_page == nullptr)
+            return nullptr;
+        return reinterpret_cast<FirstLevelEntry*>(phys2virt(page2addr(ttbr0_page)));
+    }
 };
 
 void vm_early_init(BootParams const *boot_params);

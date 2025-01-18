@@ -180,6 +180,8 @@ uintptr_t vm_read_current_ttbr0()
 
 uintptr_t phys2virt(uintptr_t phys)
 {
+    kassert(phys >= s_ram.phys_start_addr);
+    kassert(phys < s_ram.phys_start_addr + s_ram.size);
     return phys - s_ram.phys_start_addr + areas::physical_mem.start;
 }
 
@@ -417,6 +419,7 @@ Error vm_memset(struct AddressSpace& as, uintptr_t dest, uint8_t val, size_t siz
 
 void vm_free(struct AddressSpace &as)
 {
+    LOGD("Freeing address space %p", &as);
     auto *lvl1_table = as.get_root_table_ptr();
     if (lvl1_table == nullptr)
         return;
@@ -428,7 +431,7 @@ void vm_free(struct AddressSpace &as)
         auto &entry = lvl1_table[i]; 
         if (entry.is_empty() || entry.is_section())
             continue;
-         
+
         struct PhysicalPage* p = addr2page(entry.coarse.base_address());
         auto *lvl2_table = reinterpret_cast<SecondLevelEntry*>(phys2virt(entry.coarse.base_address()));
         for (size_t j = 0; j < LVL2_ENTRIES; j++) {
@@ -438,12 +441,15 @@ void vm_free(struct AddressSpace &as)
             
             struct PhysicalPage* p = addr2page(lvl2_entry.small_page.base_address());
             MUST(physical_page_free(p, PageOrder::_4KB));
+            lvl2_entry.raw = 0;
         }
 
         MUST(physical_page_free(p, PageOrder::_1KB));
+        entry.raw = 0;
     }
 
     MUST(physical_page_free(as.ttbr0_page, PageOrder::_16KB));
+    as.ttbr0_page = nullptr;
 }
 
 Error vm_fork(AddressSpace &as, AddressSpace &out_forked)
@@ -494,7 +500,7 @@ Error vm_fork(AddressSpace &as, AddressSpace &out_forked)
     return Success;
 
 error:
-    LOGD("Forking address space failed. Stats before freeing:");
+    LOGE("Forking address space failed. Destroying address space @ %p", page2addr(as.ttbr0_page));
     vm_free(out_forked);
     return rc;
 }
