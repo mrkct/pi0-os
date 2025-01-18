@@ -71,6 +71,9 @@ static void free_thread(Thread *thread)
         s_all_threads[idx] = nullptr;
     }
 
+    if (parent->threads.count == 0)
+        free_process(parent);
+
     release(lock);
 }
 
