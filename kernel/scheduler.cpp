@@ -899,7 +899,6 @@ int sys$dup2(int fd, int new_fd)
 
 int sys$waitexit(int pid)
 {
-    auto *current_process = cpu_current_process();
     auto *current_thread = cpu_current_thread();
     Mutex mutex;
     Process::ProcessExitListener listener;

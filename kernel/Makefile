@@ -6,7 +6,7 @@ OBJCOPY=arm-none-eabi-objcopy
 CXXFLAGS=-fpic -nostdlib -lgcc -lc -lg -lgcc -lstdc++ -lm
 CXXFLAGS+=-MMD -MP -I$(SOURCES_ROOT) -I../include
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
-CXXFLAGS+=-Wall -Wextra -g
+CXXFLAGS+=-Wall -Wextra -Werror -g
 
 ifeq ($(ARCH), ARMV6)
 	CXXFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6

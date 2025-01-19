@@ -1,3 +1,6 @@
+/** Patched to disable warning  */
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 /*
  *
  * The original cowsay program in C

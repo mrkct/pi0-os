@@ -1,3 +1,7 @@
+// Patched by us to avoid triggering -Werror
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
+
 /* Copyright (c) 2017 Rob King
  * All rights reserved.
  *

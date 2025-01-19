@@ -107,8 +107,6 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
             const TMTPOINT *cursor_now = (const TMTPOINT *) a;
             const TMTSCREEN *screen = tmt_screen(vt);
 
-            printf("cursor move (%d, %d) -> (%d, %d)\n", view->cursor.row, view->cursor.col, cursor_now->r, cursor_now->c);
-
             /* If the cursor blink was active, and the cursor didn't move
              * because a character got drawn over it (eg: a newline), we
              * have to erase the old cursor */

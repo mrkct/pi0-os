@@ -65,6 +65,8 @@ typedef enum SyscallIdentifiers {
     SYS_Dup2 = 23,
 
     SYS_MilliSleep = 31,
+
+    SYS_WaitExit = 1000,
 } SyscallIdentifiers;
 
 typedef enum MajorDeviceNumber {
@@ -122,6 +124,11 @@ static inline void sys_kill(int pid, int sig)
 static inline int sys_waitpid(int pid, int *status, int options)
 {
     return syscall(SYS_WaitPid, (sysarg_t) pid, (sysarg_t) status, (sysarg_t) options, 0);
+}
+
+static inline int sys_waitexit(int pid)
+{
+    return syscall(SYS_WaitExit, (sysarg_t) pid, 0, 0, 0);
 }
 
 static inline int sys_mkpipe(int *writer, int *receiver)

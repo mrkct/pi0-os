@@ -48,7 +48,11 @@ static char *read_line(const char *prompt)
             fprintf(stderr, "poll() failed: %d\n", rc);
             exit(-1);
         }
-        sys_read(STDIN_FILENO, &c, 1);
+        rc = sys_read(STDIN_FILENO, &c, 1);
+        if (rc < 0) {
+            fprintf(stderr, "read() failed: %d\n", rc);
+            exit(-1);
+        }
 
         if (c == '\r')
             continue;
@@ -56,7 +60,7 @@ static char *read_line(const char *prompt)
         putchar(c);
 
         bool is_eol = c == '\n';
-        if (c < 0 || (is_eol && length == 0))
+        if (is_eol && length == 0)
             continue;
         if (is_eol && length > 0)
             break;
@@ -126,7 +130,7 @@ static int run_builtin_command(const char *command, size_t argc, const char *arg
 static int run_program(size_t argc, const char *argv[])
 {
     char * const emptyenv[] = { NULL };
-    int pid, status;
+    int pid;
     (void) argc;
 
     pid = fork();

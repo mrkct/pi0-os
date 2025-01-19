@@ -48,8 +48,9 @@ void BCM2835SystemTimer::irq_handler(InterruptFrame *frame, uint32_t channel)
     
     iowrite32(&r->cs, 0xff);
 
-    uint32_t chan = ioread32(&r->c[CHANNEL]);
-    iowrite32(&r->c[CHANNEL], chan + m_period);
+    kassert(channel == CHANNEL);
+    uint32_t chan = ioread32(&r->c[channel]);
+    iowrite32(&r->c[channel], chan + m_period);
 }
 
 int32_t BCM2835SystemTimer::shutdown()

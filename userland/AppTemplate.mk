@@ -7,6 +7,11 @@
 # APP_OBJECTS = 
 # include ../AppTemplate.mk
 
+# When building third-party software, we'll let warnings pass
+ifeq ($(DISABLE_WERROR),)
+	APP_CFLAGS += -Werror
+endif
+
 include ../Toolchain.mk 
 
 .PHONY: all clean install bsp/libbsp.a
