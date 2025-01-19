@@ -148,53 +148,55 @@ int main(int argc, char *argv[])
             view_update_clock(&view, &datetime);
         }
 
-        if (updated < 0) {
-            if (updated == -ERR_TIMEDOUT) {
-                continue;
-            } else {
-                fprintf(stderr, "sys_poll() failed: %d\n", updated);
-                exit(-1);
-            }
+        if (updated == -ERR_TIMEDOUT) {
+            view_idle_tick(&view);
         }
 
-        switch (updated) {
-            case STDIN_FDPOS: {
-                count = sys_read(fds[updated].fd, buf, sizeof(buf));
-                if (count > 0) {
-                    /* Convert '\r' to '\n\r' */
-                    for (int i = 0; i < count; i++) {
-                        if (buf[i] == '\r') {
-                            sys_write(stdin_sender, "\n\r", 2);
-                        } else {
-                            sys_write(stdin_sender, buf + i, 1);
+        if (updated < 0 && updated != -ERR_TIMEDOUT) {
+            fprintf(stderr, "sys_poll() failed: %d\n", updated);
+            exit(-1);
+        }
+
+        if (updated >= 0) {
+            switch (updated) {
+                case STDIN_FDPOS: {
+                    count = sys_read(fds[updated].fd, buf, sizeof(buf));
+                    if (count > 0) {
+                        /* Convert '\r' to '\n\r' */
+                        for (int i = 0; i < count; i++) {
+                            if (buf[i] == '\r') {
+                                sys_write(stdin_sender, "\n\r", 2);
+                            } else {
+                                sys_write(stdin_sender, buf + i, 1);
+                            }
                         }
                     }
-                }
-                break;
-            }
-
-            case STDOUT_STDERR_FDPOS: {
-                count = sys_read(fds[updated].fd, buf, sizeof(buf));
-                if (count < 0) {
-                    fprintf(stderr, "Failed to read from stdout/stderr\n");
-                    continue;
+                    break;
                 }
 
-                /* Convert '\n' to '\r\n' */
-                for (int i = 0; i < count; i++) {
-                    if (buf[i] == '\n') {
-                        view_terminal_write(&view, "\r\n", 2);
-                    } else {
-                        view_terminal_write(&view, buf + i, 1);
+                case STDOUT_STDERR_FDPOS: {
+                    count = sys_read(fds[updated].fd, buf, sizeof(buf));
+                    if (count < 0) {
+                        fprintf(stderr, "Failed to read from stdout/stderr\n");
+                        continue;
                     }
-                }
-        
-                break;
-            }
 
-            default: {
-                fprintf(stderr, "Unexpected fd from sys_select(): %d\n", updated);
-                break;
+                    /* Convert '\n' to '\r\n' */
+                    for (int i = 0; i < count; i++) {
+                        if (buf[i] == '\n') {
+                            view_terminal_write(&view, "\r\n", 2);
+                        } else {
+                            view_terminal_write(&view, buf + i, 1);
+                        }
+                    }
+
+                    break;
+                }
+
+                default: {
+                    fprintf(stderr, "Unexpected fd from sys_select(): %d\n", updated);
+                    break;
+                }
             }
         }
 

@@ -201,3 +201,17 @@ void draw_text(Display *display, Font *font, const char *text, int x, int y, int
         x += (font->header.width + font->hmargin) * scale;
     }
 }
+
+uint32_t get_opposite_color(uint32_t color)
+{
+    uint32_t a = GET_ALPHA(color);
+    uint32_t r = GET_RED(color);
+    uint32_t g = GET_GREEN(color);
+    uint32_t b = GET_BLUE(color);
+    
+    r = 255 - r;
+    g = 255 - g;
+    b = 255 - b;
+    
+    return COLOR(a, r, g, b);
+}

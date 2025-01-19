@@ -7,7 +7,13 @@
 #define PIXELFMT_ARGB8 1
 
 #ifdef PIXELFMT_ARGB8
+
 #define COLOR(a, r, g, b) ((b << 24) | (g << 16) | (r << 8) | a)
+#define GET_ALPHA(color) ((color) & 0xff)
+#define GET_RED(color) (((color) >> 8) & 0xff)
+#define GET_GREEN(color) (((color) >> 16) & 0xff)
+#define GET_BLUE(color) (((color) >> 24) & 0xff)
+
 #else
 #error "No pixel format defined"
 #endif
@@ -66,3 +72,5 @@ int load_psf_font(uint8_t const* data, size_t size, Font*);
 void draw_char(Display* window, Font* font, char c, int x, int y, int scale, uint32_t color);
 
 void draw_text(Display* window, Font* font, char const* text, int x, int y, int scale, uint32_t color);
+
+uint32_t get_opposite_color(uint32_t color);

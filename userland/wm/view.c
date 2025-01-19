@@ -52,7 +52,7 @@ static uint32_t tmtcolor_to_ours(tmt_color_t col, uint32_t default_color)
     }
 }
 
-static void draw_term_char(struct View *view, size_t x, size_t y, char c, TMTATTRS *attrs)
+static void draw_term_char(struct View *view, size_t x, size_t y, char c, const TMTATTRS *attrs)
 {
     Font *font = get_default_font();
     int scale = SCALE;
@@ -69,7 +69,6 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
 {
     /* grab a pointer to the virtual screen */
     const TMTSCREEN *s = tmt_screen(vt);
-    const TMTPOINT *c = tmt_cursor(vt);
     struct View *view = (struct View *) p;
 
     switch (m){
@@ -77,7 +76,7 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
             /* the terminal is requesting that we ring the bell/flash the
              * screen/do whatever ^G is supposed to do; a is NULL
              */
-            printf("bing!\n");
+            printf("BEEP!\n");
             break;
 
         case TMT_MSG_UPDATE:
@@ -101,9 +100,26 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
              * pointer to a string */
             printf("terminal answered %s\n", (const char *)a);
             break;
+        
+        case TMT_MSG_CURSOR:
+        case TMT_MSG_MOVED: {
+            /* the cursor position changed; a is a pointer to a TMTPOINT */
+            const TMTPOINT *cursor_now = (const TMTPOINT *) a;
+            const TMTSCREEN *screen = tmt_screen(vt);
 
-        case TMT_MSG_MOVED:
-            /* the cursor moved; a is a pointer to the cursor's TMTPOINT */
+            printf("cursor move (%d, %d) -> (%d, %d)\n", view->cursor.row, view->cursor.col, cursor_now->r, cursor_now->c);
+
+            /* If the cursor blink was active, and the cursor didn't move
+             * because a character got drawn over it (eg: a newline), we
+             * have to erase the old cursor */
+            if (view->cursor.blink_state) {
+                draw_term_char(view, view->cursor.col, view->cursor.row, ' ', &screen->lines[view->cursor.row]->chars[view->cursor.col].a);
+            }
+            view->cursor.row = cursor_now->r;
+            view->cursor.col = cursor_now->c;
+            break;
+        }
+        default:
             break;
     }
 }
@@ -135,6 +151,11 @@ void view_init(struct View *view, struct Display *display)
             .minute = 0,
             .second = 0,
         },
+        .cursor = {
+            .row = 0,
+            .col = 0,
+            .blink_state = false,
+        }
     };
 
     TMT *vt = tmt_open(nlines, ncols, tmtcb, view, NULL);
@@ -159,6 +180,9 @@ void view_terminal_write(struct View *view, char *data, size_t size)
 {
     view->dirty = true;
     tmt_write(view->vt, data, size);
+
+    /* Restart the cursor blink, it feels better if we do this */
+    view->cursor.blink_state = false;
 }
 
 void view_refresh_display(struct View *view)
@@ -167,4 +191,21 @@ void view_refresh_display(struct View *view)
         return;
     view->dirty = false;
     view->display->ops.refresh(view->display);
+}
+
+void view_idle_tick(struct View *view)
+{
+    view->dirty = true;
+    view->cursor.blink_state = !view->cursor.blink_state;
+
+    const TMTPOINT *cursor = tmt_cursor(view->vt);
+    const TMTCHAR *pos = &(tmt_screen(view->vt)->lines[cursor->r]->chars[cursor->c]);
+
+    if (view->cursor.blink_state) {
+        draw_filled_rect(view->display,
+            CHARX(cursor->c), CHARY(cursor->r), SCALE * 8, SCALE * 9,
+            get_opposite_color(tmtcolor_to_ours(pos->a.bg, COL_BLACK)));
+    } else {
+        draw_term_char(view, cursor->c, cursor->r, ' ', &pos->a);
+    }
 }
