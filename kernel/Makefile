@@ -1,6 +1,7 @@
 SOURCES_ROOT=../
 
 CXX=arm-none-eabi-g++
+AS=arm-none-eabi-as
 OBJCOPY=arm-none-eabi-objcopy
 
 CXXFLAGS=-fpic -nostdlib -lgcc -lc -lg -lgcc -lstdc++ -lm
@@ -39,7 +40,7 @@ SOURCES=\
 	kernel/drivers/timer/bcm2835_systimer.cpp \
 	kernel/drivers/device.cpp \
 	kernel/drivers/devicemanager.cpp \
-	kernel/lib/more_time.c \
+	kernel/lib/more_time.cpp \
 	kernel/locking/irqlock.cpp \
 	kernel/locking/mutex.cpp \
 	kernel/locking/spinlock.cpp \
@@ -86,13 +87,9 @@ kernel.elf: $(OBJS)
 	@echo "\033[36mCompiling $<\033[0m"
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
-%.c.o: %.c Makefile
-	@echo "\033[36mCompiling $<\033[0m"
-	$(CXX) $< -c -o $@ $(CXXFLAGS)
-
 %.S.o: %.S Makefile
 	@echo "\033[36mCompiling $<\033[0m"
-	$(CXX) $< -c -o $@ $(CXXFLAGS)
+	$(AS) $< -c -o $@
 
 clean:
 	$(RM) -f $(OBJS) $(DEPENDS)

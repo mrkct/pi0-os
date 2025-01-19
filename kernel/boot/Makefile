@@ -1,5 +1,6 @@
 SOURCES_ROOT=../
 
+AS=arm-none-eabi-as
 CXX=arm-none-eabi-g++
 OBJCOPY=arm-none-eabi-objcopy
 
@@ -45,7 +46,7 @@ boot.elf: $(OBJS) ../kernel.elf
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
 %.S.o: %.S Makefile
-	$(CXX) $< -c -o $@ $(CXXFLAGS)
+	$(AS) $< -c -o $@
 
 clean:
 	$(RM) -f $(OBJS) $(DEPENDS)
