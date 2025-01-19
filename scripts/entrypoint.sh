@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 # This script is used on the CI to build the kernel, userland and
 # create the release artifacts.
 
