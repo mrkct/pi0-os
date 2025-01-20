@@ -36,18 +36,10 @@ static char *read_line(const char *prompt)
     char c;
     char *line = malloc(8);
     size_t length = 0, allocated = 8;
-    PollFd pollfds[1];
-    pollfds[0].fd = STDIN_FILENO;
-    pollfds[0].events = F_POLLIN;
     
     printf("%s", prompt);
 
     do {
-        rc = sys_poll(pollfds, 1, -1);
-        if (rc < 0) {
-            fprintf(stderr, "poll() failed: %d\n", rc);
-            exit(-1);
-        }
         rc = sys_read(STDIN_FILENO, &c, 1);
         if (rc < 0) {
             fprintf(stderr, "read() failed: %d\n", rc);
