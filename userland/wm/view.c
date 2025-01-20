@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <libgfx/libgfx.h>
 #include "view.h"
 
@@ -106,12 +107,13 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
             /* the cursor position changed; a is a pointer to a TMTPOINT */
             const TMTPOINT *cursor_now = (const TMTPOINT *) a;
             const TMTSCREEN *screen = tmt_screen(vt);
+            const TMTCHAR *c = &screen->lines[view->cursor.row]->chars[view->cursor.col];
 
             /* If the cursor blink was active, and the cursor didn't move
              * because a character got drawn over it (eg: a newline), we
              * have to erase the old cursor */
-            if (view->cursor.blink_state) {
-                draw_term_char(view, view->cursor.col, view->cursor.row, ' ', &screen->lines[view->cursor.row]->chars[view->cursor.col].a);
+            if (view->cursor.blink_state && isspace(c->c)) {
+                draw_term_char(view, view->cursor.col, view->cursor.row, ' ', &c->a);
             }
             view->cursor.row = cursor_now->r;
             view->cursor.col = cursor_now->c;
