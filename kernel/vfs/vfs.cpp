@@ -1,5 +1,7 @@
 #include "vfs.h"
 
+#include <kernel/scheduler.h>
+
 #define LOG_ENABLED
 #define LOG_TAG "VFS"
 #include <kernel/log.h>
@@ -459,6 +461,13 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
         return -ERR_PERM;
     }
 
+    if ((custody->flags & OF_NONBLOCK) == 0) {
+        uint32_t events = 0;
+        while (vfs_poll(custody, F_POLLIN, &events) == 0 && (events & F_POLLIN) == 0) {
+            sys$yield();
+        }
+    }
+
     LOGI("vfs_read(%" PRIu32 " bytes, custody offset @ %" PRIu64 ")", size, custody->offset);
     auto *inode = custody->inode;
     ssize_t rc = inode->file_ops->read(inode, custody->offset, buffer, size);
@@ -476,6 +485,13 @@ ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
     if ((custody->flags & OF_ACCMODE) == OF_RDONLY) {
         LOGI("vfs_write: denied because custody was opened with RDONLY flag (flags: %" PRIu32 ")", custody->flags);
         return -ERR_PERM;
+    }
+
+    if ((custody->flags & OF_NONBLOCK) == 0) {
+        uint32_t events = 0;
+        while (vfs_poll(custody, F_POLLOUT, &events) == 0 && (events & F_POLLOUT) == 0) {
+            sys$yield();
+        }
     }
 
     auto *inode = custody->inode;
@@ -579,7 +595,7 @@ cleanup:
     return rc;
 }
 
-bool vfs_poll(FileCustody *custody, uint32_t events, uint32_t *out_revents)
+int32_t vfs_poll(FileCustody *custody, uint32_t events, uint32_t *out_revents)
 {
     if (custody->inode->type == InodeType::Directory)
         return true;
