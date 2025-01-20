@@ -2,7 +2,7 @@
 
 #include <kernel/timer.h>
 
-#define LOG_ENABLED
+// #define LOG_ENABLED
 #define LOG_TAG "VIRT-GPU"
 #include <kernel/log.h>
 
@@ -294,7 +294,7 @@ int32_t VirtioGPU::cmd_transfer_to_host_2d(uint32_t resource_id, virtio_gpu_rect
         .padding = VIRTIO_FB_PADDING
     };
     virtio_gpu_ctrl_hdr resp = {};
-    LOGI("Transfer to host 2D for resource %" PRIu32, resource_id);
+    LOGD("Transfer to host 2D for resource %" PRIu32, resource_id);
     rc = cmd_send_receive(&cmd, sizeof(cmd), &resp, sizeof(resp));
     if (rc != 0) {
         LOGE("Failed to send TRANSFER_TO_HOST_2D: %" PRId32, rc);
