@@ -41,6 +41,7 @@ struct Process {
     char name[64];
     AddressSpace address_space;
     FileCustody *openfiles[16];
+    char *working_directory;
     IntrusiveLinkedList<ProcessExitListener> process_exit_listeners;
 
     struct {
@@ -105,3 +106,5 @@ int sys$mmap(int fd, uintptr_t vaddr, uint32_t length, uint32_t flags);
 int sys$dup2(int oldfd, int newfd);
 
 int sys$waitexit(int pid);
+
+int sys$setcwd(const char *path);

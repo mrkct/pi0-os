@@ -42,6 +42,7 @@ static void free_process(Process *process)
         free_thread(process->threads.data[0]);
     free(process->threads.data);
     LOGD("All threads freed");
+
     for (size_t i = 0; i < array_size(process->openfiles); i++) {
         FileCustody *custody = process->openfiles[i];
         if (custody == nullptr)
@@ -51,8 +52,12 @@ static void free_process(Process *process)
         vfs_close(custody);
     }
     LOGD("All files closed, freeing address space");
+    
     vm_free(process->address_space);
     LOGD("Done, freeing the process structure");
+    
+    free(process->working_directory);
+
     kfree(process);
 
     release(lock);
@@ -310,6 +315,11 @@ static Process *alloc_process(const char *name, void (*entrypoint)(), bool privi
     new_process->exit_code = 0;
     new_process->pid = s_next_available_pid++;
     strcpy(const_cast<char*>(new_process->name), name);
+    new_process->working_directory = strdup("/");
+    if (new_process->working_directory == nullptr) {
+        LOGE("Failed to alloc memory for working directory");
+        goto cleanup;
+    }
     
     if (!vm_create_address_space(new_process->address_space).is_success()) {
         LOGE("Failed to create address space for new process %s\n", name);
@@ -462,6 +472,14 @@ int sys$fork()
         rc = -ERR_NOMEM;
         goto failed;
     }
+
+    free(forked->working_directory);
+    forked->working_directory = strdup(current_process->working_directory);
+    if (forked->working_directory == nullptr) {
+        LOGE("Failed to duplicate working directory");
+        rc = -ERR_NOMEM;
+        goto failed;
+    }
     
     for (size_t i = 0; i < array_size(current_process->openfiles); i++) {
         custody = current_process->openfiles[i];
@@ -596,7 +614,7 @@ int sys$open(const char *path, int flags, int mode)
         return -ERR_NFILE;
     }
 
-    rc = vfs_open(path, flags, &file);
+    rc = vfs_open(current_process->working_directory, path, flags, &file);
     if (rc != 0) {
         LOGE("Process %s[%d] failed to open '%s', rc=%d", current_process->name, current_process->pid, path, rc);
         return rc;
@@ -661,6 +679,9 @@ int sys$ioctl(int fd, uint32_t ioctl, void *argp)
         return -ERR_BADF;
 
     file = current_process->openfiles[fd];
+    if (file == nullptr)
+        return -ERR_BADF;
+
     return vfs_ioctl(file, ioctl, argp);
 }
 
@@ -931,4 +952,28 @@ int sys$waitexit(int pid)
     mutex_take(mutex);
     LOGI("Process %s[%d] exited", process->name, process->pid);
     return 0;
+}
+
+int sys$setcwd(const char *path)
+{
+    auto *current_process = cpu_current_process();
+    char *new_workdir = nullptr;
+    int rc;
+
+    size_t len = strnlen(path, MAX_PATH_LEN);
+    if (len == MAX_PATH_LEN) {
+        rc = -ERR_INVAL;
+        goto failed;
+    }
+
+    new_workdir = (char*) malloc(len + 1);
+    memcpy(new_workdir, path, len);
+    new_workdir[len] = '\0';
+    free(current_process->working_directory);
+    current_process->working_directory = new_workdir;
+    
+    return 0;
+
+failed:
+    return rc;
 }

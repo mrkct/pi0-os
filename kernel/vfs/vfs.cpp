@@ -48,6 +48,8 @@ static size_t canonicalized_path_strlen(const char *path)
     return len;
 }
 
+static inline bool path_is_absolute(const char *path) { return path[0] == '/'; }
+
 /**
  * Creates a canonicalized path from a string.
  * 
@@ -411,6 +413,28 @@ int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
     }
 
     LOGD("vfs_open(%s) -> %d (%s)", path, rc, strerror(rc));
+    return rc;
+}
+
+int vfs_open(const char *workdir, const char *path, uint32_t flags, FileCustody **out_custody)
+{
+    if (path_is_absolute(path))
+        return vfs_open(path, flags, out_custody);
+    
+    int rc = 0;
+    size_t workdir_len = strlen(workdir);
+    size_t path_len = strlen(path);
+    size_t len = workdir_len + path_len + 1;
+    char *cpath = (char*) malloc(len);
+    if (cpath == nullptr)
+        return -ERR_NOMEM;
+    memcpy(cpath, workdir, workdir_len);
+    memcpy(cpath + workdir_len, path, path_len);
+    cpath[len - 1] = '\0';
+
+    rc = vfs_open(cpath, flags, out_custody);
+    free(cpath);
+
     return rc;
 }
 

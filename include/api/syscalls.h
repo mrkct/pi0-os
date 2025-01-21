@@ -63,6 +63,7 @@ typedef enum SyscallIdentifiers {
     SYS_MakeDirectory = 21,
     SYS_MMap = 22,
     SYS_Dup2 = 23,
+    SYS_SetCwd = 24,
 
     SYS_MilliSleep = 31,
 
@@ -146,6 +147,11 @@ static inline int sys_dup2(int oldfd, int newfd)
     return syscall(SYS_Dup2, (sysarg_t) oldfd, (sysarg_t) newfd, 0, 0);
 }
 
+static inline int sys_setcwd(const char *path)
+{
+    return syscall(SYS_SetCwd, (sysarg_t) path, 0, 0, 0);
+}
+
 typedef struct PollFd {
     int32_t fd;
 
@@ -222,6 +228,7 @@ namespace api {
 #define OF_RDONLY       0x0000
 #define OF_WRONLY       0x0001
 #define OF_RDWR         0x0002
+#define OF_NONBLOCK     0x0004
 #define OF_APPEND       0x0008
 #define OF_CREATE       0x0200
 #define OF_DIRECTORY    0x200000

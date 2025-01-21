@@ -3,6 +3,7 @@
 #include <kernel/base.h>
 #include "fs.h"
 
+static constexpr size_t MAX_PATH_LEN = 256;
 
 struct FileCustody {
     Inode *inode;
@@ -13,6 +14,8 @@ struct FileCustody {
 int vfs_mount(const char *path, Filesystem&);
 
 int vfs_open(const char *path, uint32_t flags, FileCustody** );
+
+int vfs_open(const char *workdir, const char *path, uint32_t flags, FileCustody**);
 
 ssize_t vfs_read(FileCustody*, uint8_t *buffer, uint32_t size);
 
