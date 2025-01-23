@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <dirent.h>
 
@@ -136,6 +137,15 @@ pid_t waitpid(pid_t pid, int *wstatus, int options)
 pid_t _wait(int *wstatus)
 {
     return waitpid(-1, wstatus, 0);
+}
+
+int _gettimeofday (struct timeval *tv, void *)
+{
+    *tv = (struct timeval) {
+        .tv_sec = 1737399329,
+        .tv_usec = 0
+    };
+    return 0;
 }
 
 int mkdir(char const* pathname, mode_t mode)

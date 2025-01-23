@@ -7,7 +7,8 @@ OBJECTS = \
 	libgfx/default_font.c.o \
 	libgfx/libgfx.c.o \
 	libutil/moretime.c.o \
-	libsstring.c.o
+	libsstring.c.o \
+	libline/libline.c.o
 
 .PHONY: all clean
 

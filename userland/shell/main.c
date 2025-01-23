@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <api/syscalls.h>
+
+#include <libline/libline.h>
 #include "libsstring.h"
 
 #define MAX_ARGS 16
@@ -12,6 +14,7 @@ extern int exit_main(int argc, const char *argv[]);
 extern int echo_main(int argc, const char *argv[]);
 extern int ls_main(int argc, const char *argv[]);
 extern int cat_main(int argc, const char *argv[]);
+extern int clear_main(int argc, const char *argv[]);
 extern int cd_main(int argc, const char *argv[]);
 extern int pwd_main(int argc, const char *argv[]);
 extern int mkdir_main(int argc, const char *argv[]);
@@ -19,54 +22,16 @@ extern int rm_main(int argc, const char *argv[]);
 
 static struct { const char *name; int (*main)(int argc, const char *argv[]); } builtins[] = {
     { "cat", cat_main },
+    { "clear", clear_main },
     { "echo", echo_main },
     { "ls", ls_main },
     { "mkdir", mkdir_main },
     { "rm", rm_main },
 };
 
-static char *read_line(const char *prompt);
 static size_t tokenize(char *line);
 static size_t argv_from_tokenized_line(const char *tokenized_line,
     size_t tokens, const char *argv[], size_t max_args);
-
-static char *read_line(const char *prompt)
-{
-    int rc;
-    char c;
-    char *line = malloc(8);
-    size_t length = 0, allocated = 8;
-    
-    printf("%s", prompt);
-
-    do {
-        rc = sys_read(STDIN_FILENO, &c, 1);
-        if (rc < 0) {
-            fprintf(stderr, "read() failed: %d\n", rc);
-            exit(-1);
-        }
-
-        if (c == '\r')
-            continue;
-
-        putchar(c);
-
-        bool is_eol = c == '\n';
-        if (is_eol && length == 0)
-            continue;
-        if (is_eol && length > 0)
-            break;
-
-        if (length == allocated - 1) {
-            allocated += 8;
-            line = realloc(line, allocated);
-        }
-        line[length++] = (char) c;
-        line[length] = '\0';
-    } while (true);
-
-    return line;
-}
 
 static size_t tokenize(char *line)
 {
@@ -121,9 +86,17 @@ static int run_builtin_command(const char *command, size_t argc, const char *arg
 
 static int run_program(size_t argc, const char *argv[])
 {
+    char procpath[256];
     char * const emptyenv[] = { NULL };
     int pid;
     (void) argc;
+
+    if (argv[0][0] == '/') {
+        strncpy(procpath, argv[0], sizeof(procpath));
+    } else {
+        strncpy(procpath, "/bina/", sizeof(procpath));
+        strncat(procpath, argv[0], sizeof(procpath));
+    }
 
     pid = fork();
     if (pid < 0) {
@@ -132,7 +105,7 @@ static int run_program(size_t argc, const char *argv[])
     }
 
     if (pid == 0) {
-        execve(argv[0], (char *const *) argv, emptyenv);
+        execve(procpath, (char *const *) argv, emptyenv);
         fprintf(stderr, "execv() failed: %d\n", pid);
         exit(-1);
     } 
@@ -146,13 +119,15 @@ int main(int argc, char **argv)
     (void) argc;
     (void) argv;
 
+    static libline_t ll = { 0 };
     char *line = NULL;
     const char *command_argv[MAX_ARGS];
 
     setvbuf(stdout, NULL, _IONBF, 0);
+    line_initialize(&ll);
     
     while (1) {
-        line = read_line("$: ");
+        line = line_editor(&ll, "$ ");
         size_t tokens = tokenize(line);
         size_t command_argc = argv_from_tokenized_line(line, tokens, command_argv, MAX_ARGS);
 
