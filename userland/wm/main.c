@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <api/syscalls.h>
@@ -78,6 +79,11 @@ static int open_framebuffer_view(const char *path, struct View *view)
     return 0;
 }
 
+static void on_terminal_response(int process_fd, const char *response)
+{
+    sys_write(process_fd, response, strlen(response));
+}
+
 int main(int argc, char *argv[])
 {
     (void) argc;
@@ -113,6 +119,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "sys_mkpipe() for stdout+stderr failed\n");
         exit(-1);
     }
+
+    view_set_terminal_response_cb(&view, on_terminal_response, stdin_sender);
 
     /* Spawn the shell process */
     if (0 == sys_fork()) {

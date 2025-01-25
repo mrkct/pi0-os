@@ -99,7 +99,7 @@ static void tmtcb(tmt_msg_t m, TMT *vt, const void *a, void *p)
         case TMT_MSG_ANSWER:
             /* the terminal has a response to give to the program; a is a
              * pointer to a string */
-            printf("terminal answered %s\n", (const char *)a);
+            view->response_cb(view->response_cb_fd, (const char *)a);
             break;
         
         case TMT_MSG_CURSOR:
@@ -208,4 +208,14 @@ void view_idle_tick(struct View *view)
     } else {
         draw_term_char(view, cursor->c, cursor->r, ' ', &pos->a);
     }
+}
+
+void view_set_terminal_response_cb(
+    struct View *view,
+    TerminalResponseCallback cb,
+    int fd
+)
+{
+    view->response_cb = cb;
+    view->response_cb_fd = fd;
 }
