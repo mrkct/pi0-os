@@ -1,3 +1,6 @@
+.aider*
+.venv
+
 kernel.elf
 kernel.bin
 boot.elf
