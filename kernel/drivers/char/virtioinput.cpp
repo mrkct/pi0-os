@@ -78,10 +78,18 @@ int32_t VirtioInputDevice::device_specific_init()
 {
     int32_t rc = 0;
 
-    iowrite32(&r->input.select, VIRTIO_INPUT_CFG_ID_NAME);
-    iowrite32(&r->input.subsel, 0);
-    memcpy(m_name, (void*) r->input.u.string, sizeof(m_name));
-    m_name[r->input.size] = '\0';
+    iowrite8(&r->input.select, VIRTIO_INPUT_CFG_ID_NAME);
+    iowrite8(&r->input.subsel, 0);
+
+    uint8_t name_len = ioread8(&r->input.size);
+    if (name_len >= sizeof(m_name)) {
+        LOGW("Device name too long (%" PRIu8 "), truncating", name_len);
+        name_len = sizeof(m_name) - 1;
+    }
+    for (uint8_t i = 0; i < name_len; ++i) {
+        m_name[i] = ioread8(&r->input.u.string[i]);
+    }
+    m_name[name_len] = '\0';
     LOGI("Device name: %s", m_name);
 
     rc = virtio_util_setup_virtq(r, 0, EVENTQ_SIZE, &m_eventq);
@@ -99,7 +107,7 @@ int32_t VirtioInputDevice::device_specific_init()
 
     rc = virtio_util_setup_virtq(r, 1, STATUSQ_SIZE, &m_statusq);
     if (rc) {
-        LOGE("Failed to setup eventq statusq: %" PRId32, rc);
+        LOGE("Failed to setup statusq virtq: %" PRId32, rc);
         goto failed;
     }
 
