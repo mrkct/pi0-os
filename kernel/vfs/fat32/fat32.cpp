@@ -155,7 +155,7 @@ static void copy_entry_name(fat32::DirectoryEntry8_3& e, char* buf)
         name_length++;
 
     uint32_t extension_length = 0;
-    while (e.DIR_Name[8 + extension_length] != ' ' && extension_length < 3)
+    while (extension_length < 3 && e.DIR_Name[8 + extension_length] != ' ')
         extension_length++;
 
     memcpy(buf, e.DIR_Name, name_length);
