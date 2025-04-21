@@ -5,23 +5,73 @@
 #include <unistd.h>
 
 #include <api/syscalls.h>
-#include <libgfx/libgfx.h>
-#include <libutil/moretime.h>
+#include "flanterm/flanterm.h"
+#include "flanterm/backends/fb.h"
 
-#include "view.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
 #define STDIN_FDPOS         0
 #define STDOUT_STDERR_FDPOS 1
 
+static struct flanterm_context *ft_ctx;
+static int display_fd;
 
-static int framebuffer_refresh(Display *display)
-{
-    return sys_ioctl((int) display->opaque, FBIO_REFRESH, 0);
+
+static void terminal_callback(struct flanterm_context *ctx, void *data, uint64_t type, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
+    (void)ctx;
+    (void)arg1;
+    (void)arg2;
+    (void)arg3;
+
+    char reply[32];
+    int fd = (int) data;
+
+    switch (type) {
+        case FLANTERM_CB_POS_REPORT: {
+            sys_write(fd, reply, snprintf(reply, sizeof(reply), "\x1b[%llu;%lluR", arg2, arg1));
+            break;
+        }
+        /*
+        case FLANTERM_CB_DEC:
+            printf("TERM_CB_DEC");
+            goto values;
+        case FLANTERM_CB_MODE:
+            printf("TERM_CB_MODE");
+            goto values;
+        case FLANTERM_CB_LINUX:
+            printf("TERM_CB_LINUX");
+            values:
+                printf("(count=%llu, values={", arg1);
+                for (uint64_t i = 0; i < arg1; i++) {
+                    printf(i == 0 ? "%lu" : ", %lu", ((uint32_t*)((uint32_t) arg2 & 0xffffffff))[i]);
+                }
+                printf("}, final='%c')\n", (int)arg3);
+                break;
+        case FLANTERM_CB_BELL:
+            printf("TERM_CB_BELL()\n");
+            break;
+        case FLANTERM_CB_PRIVATE_ID: printf("TERM_CB_PRIVATE_ID()\n"); break;
+        case FLANTERM_CB_STATUS_REPORT: printf("TERM_CB_STATUS_REPORT()\n"); break;
+        
+        case FLANTERM_CB_KBD_LEDS:
+            printf("TERM_CB_KBD_LEDS(state=");
+            switch (arg1) {
+                case 0: printf("CLEAR_ALL"); break;
+                case 1: printf("SET_SCRLK"); break;
+                case 2: printf("SET_NUMLK"); break;
+                case 3: printf("SET_CAPSLK"); break;
+            }
+            printf(")\n");
+            break;
+        */
+        default:
+            // printf("Unknown callback type %lu: %lx, %lx, %lx\n", type, arg1, arg2, arg3);
+            break;
+    }
 }
 
-static int open_framebuffer_display(const char *path, Display *display)
+static int open_framebuffer_display(const char *path)
 {
     int rc = 0, fd = 0;
     FramebufferDisplayInfo fbinfo;
@@ -45,43 +95,31 @@ static int open_framebuffer_display(const char *path, Display *display)
         goto cleanup;
     }
 
-    *display = (Display) {
-        .framebuffer = f,
-        .pitch = fbinfo.pitch,
-        .width = fbinfo.width,
-        .height = fbinfo.height,
-        .opaque = (void*) fd,
-        .ops = {
-            .refresh = framebuffer_refresh,
-        }
-    };
+    ft_ctx = flanterm_fb_init(
+        NULL,
+        NULL,
+        f, fbinfo.width, fbinfo.height, fbinfo.pitch,
+        8, 16, 8, 8, 8, 0,
+        NULL,
+        NULL, NULL,
+        NULL, NULL,
+        NULL, NULL,
+        NULL, 0, 0, 1,
+        0, 0,
+        0
+    );
+    if (!ft_ctx) {
+        fprintf(stderr, "flanterm_fb_init() failed\n");
+        goto cleanup;
+    }
+    
+
+    display_fd = fd;
 
     return 0;
 
 cleanup:
     return rc;
-}
-
-static int open_framebuffer_view(const char *path, struct View *view)
-{
-    Display *display = malloc(sizeof(Display));
-    if (display == NULL) {
-        fprintf(stderr, "Failed to allocate display\n");
-        return -1;
-    }
-
-    if (open_framebuffer_display(path, display)) {
-        fprintf(stderr, "Failed to open framebuffer '%s'\n", path);
-        return -1;
-    }
-
-    view_init(view, display);
-    return 0;
-}
-
-static void on_terminal_response(int process_fd, const char *response)
-{
-    sys_write(process_fd, response, strlen(response));
 }
 
 int main(int argc, char *argv[])
@@ -93,22 +131,8 @@ int main(int argc, char *argv[])
     int count;
     PollFd fds[2];
     char buf[1024];
-    struct DateTime datetime;
-    Clock clock;
-    View view;
     int stdin_sender, stdin_receiver;
     int stdout_stderr_sender, stdout_stderr_receiver;
-
-    /* Some initialization */
-    if (0 != (rc = clock_init(&clock))) {
-        fprintf(stderr, "clock_init() failed\n");
-        exit(-1);
-    }
-    if (0 != (rc = open_framebuffer_view("/dev/framebuffer0", &view))) {
-        fprintf(stderr, "framebuffer_open() failed\n");
-        exit(-1);
-    }
-
 
     /* Create pipes for IPC between shell and wm */
     if (sys_mkpipe(&stdin_sender, &stdin_receiver) < 0) {
@@ -120,7 +144,13 @@ int main(int argc, char *argv[])
         exit(-1);
     }
 
-    view_set_terminal_response_cb(&view, on_terminal_response, stdin_sender);
+    /* Setup the display and terminal emulator */
+    if (0 != (rc = open_framebuffer_display("/dev/framebuffer0"))) {
+        fprintf(stderr, "framebuffer_open() failed\n");
+        exit(-1);
+    }
+    flanterm_set_autoflush(ft_ctx, true);
+    flanterm_set_callback(ft_ctx, terminal_callback, (void*) stdin_sender);
 
     /* Spawn the shell process */
     if (0 == sys_fork()) {
@@ -149,16 +179,7 @@ int main(int argc, char *argv[])
     fds[STDOUT_STDERR_FDPOS].events = F_POLLIN;
 
     while (true) {
-        int updated = sys_poll(fds, ARRAY_SIZE(fds), 1000);
-
-        /* Always update the clock */
-        if (clock_get_datetime(&clock, &datetime) == 0) {
-            view_update_clock(&view, &datetime);
-        }
-
-        if (updated == -ERR_TIMEDOUT) {
-            view_idle_tick(&view);
-        }
+        int updated = sys_poll(fds, ARRAY_SIZE(fds), 100000);
 
         if (updated < 0 && updated != -ERR_TIMEDOUT) {
             fprintf(stderr, "sys_poll() failed: %d\n", updated);
@@ -169,16 +190,8 @@ int main(int argc, char *argv[])
             switch (updated) {
                 case STDIN_FDPOS: {
                     count = sys_read(fds[updated].fd, buf, sizeof(buf));
-                    if (count > 0) {
-                        /* Convert '\r' to '\n\r' */
-                        for (int i = 0; i < count; i++) {
-                            if (buf[i] == '\r') {
-                                sys_write(stdin_sender, "\n\r", 2);
-                            } else {
-                                sys_write(stdin_sender, buf + i, 1);
-                            }
-                        }
-                    }
+
+                    sys_write(stdin_sender, buf, count);
                     break;
                 }
 
@@ -189,15 +202,7 @@ int main(int argc, char *argv[])
                         continue;
                     }
 
-                    /* Convert '\n' to '\r\n' */
-                    for (int i = 0; i < count; i++) {
-                        if (buf[i] == '\n') {
-                            view_terminal_write(&view, "\r\n", 2);
-                        } else {
-                            view_terminal_write(&view, buf + i, 1);
-                        }
-                    }
-
+                    flanterm_write(ft_ctx, buf, count);
                     break;
                 }
 
@@ -208,6 +213,6 @@ int main(int argc, char *argv[])
             }
         }
 
-        view_refresh_display(&view);
+        sys_ioctl(display_fd, FBIO_REFRESH, 0);
     }
 }
