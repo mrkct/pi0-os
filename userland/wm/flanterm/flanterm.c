@@ -1306,7 +1306,15 @@ unicode_error:
             }
             return;
         case '\b':
-            ctx->set_cursor_pos(ctx, x - 1, y);
+            // Handle backspace: move left, print space, move left again.
+            if (x > 0) {
+                ctx->set_cursor_pos(ctx, x - 1, y);
+                // Erase the character at the new position by printing a space.
+                // Note: raw_putchar advances the cursor, so we need to move back again.
+                ctx->raw_putchar(ctx, ' ');
+                // Move cursor back to the position of the erased character.
+                ctx->set_cursor_pos(ctx, x - 1, y);
+            }
             return;
         case '\r':
             ctx->set_cursor_pos(ctx, 0, y);
