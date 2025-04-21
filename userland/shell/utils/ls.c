@@ -16,8 +16,8 @@ int ls_main(int argc, const char *argv[])
 
     dir = opendir(argv[1]);
     if (dir == NULL) {
-        perror("opendir");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "ls: Cannot open directory '%s'\n", argv[1]);
+        return -1;
     }
 
     while ((entry = readdir(dir)) != NULL) {
