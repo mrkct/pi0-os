@@ -8,7 +8,7 @@ static constexpr uint32_t RXINTR_MASK = 1 << 4;
 static constexpr uint32_t RXFE_MASK = 1 << 4;
 
 PL011UART::PL011UART(Config const *config)
-    :   UART(), m_config(*config)
+    : UART(), m_config(*config)
 {
 }
 
@@ -74,32 +74,27 @@ int32_t PL011UART::shutdown()
     return 0;
 }
 
-int64_t PL011UART::write(const uint8_t *buffer, size_t size)
+void PL011UART::echo_raw(uint8_t ch)
 {
     if (r == nullptr)
-        return -ERR_IO;
+        return;
 
     auto lock = irq_lock();
 
     static constexpr uint32_t TRANSMIT_FIFO_FULL = 1 << 5;
-    for (size_t i = 0; i < size; i++) {
-        while (ioread32(&r->FR) & TRANSMIT_FIFO_FULL)
-            cpu_relax();
-        iowrite32(&r->DR, buffer[i]);
-    }
+    while (ioread32(&r->FR) & TRANSMIT_FIFO_FULL)
+        cpu_relax();
+    iowrite32(&r->DR, ch);
 
     release(lock);
-
-    return size;
 }
-
 
 void PL011UART::irq_handler()
 {
     if (ioread32(&r->RIS) & RXINTR_MASK) {
         while (!(ioread32(&r->FR) & RXFE_MASK)) {
             uint8_t data = ioread32(&r->DR) & 0xff;
-            on_received(&data, 1);
+            emit(data);
         }
         iowrite32(&r->ICR, RXINTR_MASK);
     }

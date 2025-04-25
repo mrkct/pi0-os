@@ -47,7 +47,7 @@ public:
     virtual int32_t shutdown() override;
 
 protected:
-    virtual int64_t write(const uint8_t *buffer, size_t size) override;    
+    virtual void echo_raw(uint8_t ch) override;  
 
 private:
     int32_t init_except_interrupt();

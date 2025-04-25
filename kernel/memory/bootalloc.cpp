@@ -1,7 +1,7 @@
 #include "bootalloc.h"
 
 
-static uint8_t s_bootalloc_storage[1024];
+static uint8_t s_bootalloc_storage[16 *_1KB];
 static uint8_t *s_bootalloc_next = s_bootalloc_storage;
 
 void *bootalloc(size_t size)

@@ -346,6 +346,10 @@ enum RealTimeClockIoctl {
     RTCIO_GET_DATETIME = 1,
 };
 
+enum TtyIoctl {
+    TTYIO_TCGETATTR = 1,
+    TTYIO_TCSETATTR = 2,
+};
 
 #ifdef __cplusplus
 }

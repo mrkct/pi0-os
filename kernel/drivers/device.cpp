@@ -179,45 +179,140 @@ int32_t Console::ioctl(uint32_t, void*)
     return -ERR_NOTSUP;
 }
 
-int64_t UART::read(uint8_t *buffer, size_t size)
+TTY::TTY(uint8_t major, uint8_t minor, const char *name):
+    CharacterDevice(major, minor, name)
 {
-    int64_t bytes_read = 0;
-
-    auto lock = irq_lock();
-
-    while (bytes_read < size && !m_rx_buffer.is_empty()) {
-        m_rx_buffer.pop(buffer[bytes_read++]);
-    }
-
-    release(lock);
-
-    return bytes_read;
+    reset_termios();
 }
 
-int32_t UART::ioctl(uint32_t, void*)
+void TTY::reset_termios()
 {
-    todo();
-    return -ERR_NOTSUP;
+    m_termios.c_iflag = ICRNL;
+    m_termios.c_oflag = ONLCR;
+    m_termios.c_cflag = 0;
+    m_termios.c_lflag = ICANON | ECHO | ECHOK;
 }
 
-int32_t UART::poll(uint32_t events, uint32_t *out_revents) const
+void TTY::emit(uint8_t ch)
 {
-    if ((events & F_POLLIN) && !m_rx_buffer.is_empty()) {
-        *out_revents |= F_POLLIN;
+    if (ch == '\r' && m_termios.c_iflag & ICRNL) {
+        ch = '\n';
+    } else if (ch == '\n' && m_termios.c_iflag & INLCR) {
+        ch = '\r';
     }
 
-    if ((events & F_POLLOUT) && can_write()) {
+    if (m_termios.c_lflag & ICANON) {
+        if (ch == 127) {
+            if (m_linebuffer_size > 0) {
+                m_linebuffer_size--;
+                echo_raw('\b');
+                echo_raw(' ');
+                echo_raw('\b');
+            }
+            return;
+        }
+
+        if (m_linebuffer_size < array_size(m_linebuffer)) {
+            m_linebuffer[m_linebuffer_size++] = ch;
+        } else {
+            // Line is full, echo a bell
+            echo_raw('\a');
+            return;
+        }
+        
+        /* End of line condition */
+        if (ch == '\n') {
+            if (m_termios.c_lflag & ECHO || m_termios.c_lflag & ECHONL)
+                echo('\n');
+
+            flush_line();
+            return;
+        }
+    } else {
+        m_input_buffer.push(ch);
+    }
+
+    if (m_termios.c_lflag & ECHO) {
+        echo(ch);
+    }
+}
+
+int64_t TTY::read(uint8_t *buffer, size_t size)
+{
+    uint8_t *start = buffer;
+    bool canon = (m_termios.c_lflag & ICANON) != 0;
+    uint8_t ch;
+
+    while ((size_t)(buffer - start) < size && m_input_buffer.pop(ch)) {
+        *buffer++ = ch;
+        if (canon && ch == '\n') {
+            kassert(m_available_lines > 0);
+            m_available_lines--;
+            break;
+        }
+    }
+
+    return buffer - start;
+}
+
+int64_t TTY::write(const uint8_t *buffer, size_t size)
+{
+    for (size_t i = 0; i < size; ++i)
+        echo(buffer[i]);
+    return size;
+}
+
+void TTY::echo(uint8_t ch)
+{
+    if ((m_termios.c_oflag & ONLCR) && ch == '\n') {
+        echo_raw('\r');
+    }
+    echo_raw(ch);
+}
+
+int32_t TTY::ioctl(uint32_t request, void* argp)
+{
+    switch (request) {
+        case api::TTYIO_TCGETATTR:
+            *(termios*) argp = m_termios;
+            return 0;
+        case api::TTYIO_TCSETATTR:
+            m_termios = *(termios*) argp;
+            return 0;
+        default:
+            return -ERR_NOTSUP;
+    }
+}
+
+int32_t TTY::poll(uint32_t events, uint32_t *out_revents) const
+{
+    bool can_read = false;
+    
+    if ((events & F_POLLIN)) {
+        if (m_termios.c_lflag & ICANON) {
+            can_read = m_available_lines > 0;
+        } else {
+            can_read = !m_input_buffer.is_empty();
+        }
+        if (can_read)
+            *out_revents |= F_POLLIN;
+    }
+
+    if ((events & F_POLLOUT) && can_echo()) {
         *out_revents |= F_POLLOUT;
     }
 
     return 0;
 }
 
-void UART::on_received(uint8_t *buffer, size_t size)
+void TTY::flush_line()
 {
-    for (size_t i = 0; i < size; i++) {
-        m_rx_buffer.push(buffer[i]);
+    for (size_t i = 0; i < m_linebuffer_size; i++) {
+        m_input_buffer.push(m_linebuffer[i]);
     }
+    m_linebuffer_size = 0;
+    m_available_lines++;
+    LOGD("TTY: Flushing line, m_available_lines=%lu, m_input_buffer.size()=%lu", m_available_lines, m_input_buffer.available());
 }
 
 int64_t GPIOController::read(uint8_t *, size_t)

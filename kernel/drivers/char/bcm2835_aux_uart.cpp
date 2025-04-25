@@ -77,32 +77,13 @@ int32_t BCM2835AuxUART::shutdown()
     return 0;
 }
 
-int64_t BCM2835AuxUART::writebyte(uint8_t c)
+void BCM2835AuxUART::echo_raw(uint8_t c)
 {
     static constexpr uint32_t TRANSMITTER_EMPTY = 1 << 5;
     while (!(ioread32(&r->mu_lsr_reg) & TRANSMITTER_EMPTY))
-	    ;
-	
+	    cpu_relax();
+
     iowrite32(&r->mu_io_reg, c);
-    return 0;
-}
-
-int64_t BCM2835AuxUART::write(const uint8_t *buffer, size_t size)
-{
-    if (r == nullptr)
-        return -ERR_IO;
-
-    int64_t rc = 0;
-    auto lock = irq_lock();
-
-    for (size_t i = 0; i < size; i++) {
-        rc = writebyte(buffer[i]);
-        if (rc != 0)
-            break;
-    }
-    release(lock);
-
-    return rc == 0 ? size : rc;
 }
 
 void BCM2835AuxUART::irq_handler()
@@ -116,6 +97,6 @@ void BCM2835AuxUART::irq_handler()
     // Check if it is a UART "Receiver holds valid byte" interrupt
     if ((irq_source >> 1 & 0b11) == 0b10) {
         uint8_t data = ioread32(&r->mu_io_reg) & 0xff;
-        on_received(&data, 1);
+        emit(data);
     }
 }

@@ -6,8 +6,10 @@
 #include <kernel/memory/vm.h>
 #include <kernel/arch/arch.h>
 #include <kernel/lib/ringbuffer.h>
+#include <kernel/locking/mutex.h>
 #include <include/api/syscalls.h>
 #include <include/api/input.h>
+#include <sys/termios.h>
 
 
 class Device
@@ -77,6 +79,7 @@ public:
         *out_revents = events & F_POLLMASK;
         return 0;
     }
+    virtual bool is_tty() const { return false; }
     virtual int32_t mmap(AddressSpace*, uintptr_t, uint32_t, uint32_t) { return -ERR_NOTSUP; }
 
 private:
@@ -160,25 +163,40 @@ protected:
     virtual int32_t set_cursor_position(size_t, size_t) { return -ERR_NOTSUP; }
 };
 
-class UART: public CharacterDevice
+class TTY: public CharacterDevice
+{
+public:
+    TTY(uint8_t major, uint8_t minor, const char *name);
+    virtual ~TTY() {}
+
+    virtual int64_t read(uint8_t* buffer, size_t size) override;
+    virtual int64_t write(const uint8_t* buffer, size_t size) override;
+    virtual int32_t ioctl(uint32_t request, void *argp) override;
+    virtual int32_t poll(uint32_t events, uint32_t *out_revents) const override;
+    virtual bool is_tty() const override { return true; }
+
+protected:
+    void reset_termios();
+    void flush_line();
+    virtual void echo_raw(uint8_t ch) = 0;
+    void echo(uint8_t ch);
+    virtual bool can_echo() const { return true; }
+    void emit(uint8_t c);
+
+    struct termios m_termios;
+    uint8_t m_linebuffer[256];
+    size_t m_linebuffer_size;
+    size_t m_available_lines { 0 };
+    RingBuffer<4096, uint8_t> m_input_buffer;
+};
+
+class UART: public TTY
 {
 private:
     static uint8_t s_next_minor;
-
 public:
-    UART(): CharacterDevice(Maj_UART, s_next_minor++, "uart")
-    {}
+    UART(): TTY(Maj_UART, s_next_minor++, "ttyS") {}
     virtual ~UART() {}
-
-    virtual int64_t read(uint8_t*, size_t) override;
-    virtual int32_t ioctl(uint32_t request, void *argp) override;
-    virtual int32_t poll(uint32_t events, uint32_t *out_revents) const override;
-
-protected:
-    virtual bool can_write() const { return true; }
-
-    void on_received(uint8_t *data, size_t size);
-    RingBuffer<64, uint8_t> m_rx_buffer;
 };
 
 class GPIOController: public CharacterDevice

@@ -5,10 +5,10 @@
 #include <sys/wait.h>
 #include <api/syscalls.h>
 
-#include <libline/libline.h>
 #include "libsstring.h"
 
 #define MAX_ARGS 16
+#define MAX_LINE_LEN 256
 
 extern int exit_main(int argc, const char *argv[]);
 extern int echo_main(int argc, const char *argv[]);
@@ -32,6 +32,21 @@ static struct { const char *name; int (*main)(int argc, const char *argv[]); } b
 static size_t tokenize(char *line);
 static size_t argv_from_tokenized_line(const char *tokenized_line,
     size_t tokens, const char *argv[], size_t max_args);
+
+static void read_line(const char *prompt, char *buf, size_t len)
+{
+    printf("%s", prompt);
+
+    int count = sys_read(STDIN_FILENO, buf, len - 1);
+    if (count < 0) {
+        fprintf(stderr, "Failed to read line: %d", count);
+        exit(-1);
+    }
+    buf[count] = '\0';
+    char *c = strrchr(buf, '\n');
+    if (c)
+        *c = '\0';
+}
 
 static size_t tokenize(char *line)
 {
@@ -119,15 +134,13 @@ int main(int argc, char **argv)
     (void) argc;
     (void) argv;
 
-    static libline_t ll = { 0 };
-    char *line = NULL;
+    char line[MAX_LINE_LEN];
     const char *command_argv[MAX_ARGS];
 
     setvbuf(stdout, NULL, _IONBF, 0);
-    line_initialize(&ll);
     
     while (1) {
-        line = line_editor(&ll, "$ ");
+        read_line("$ ", line, sizeof(line));
         size_t tokens = tokenize(line);
         size_t command_argc = argv_from_tokenized_line(line, tokens, command_argv, MAX_ARGS);
 
@@ -138,8 +151,6 @@ int main(int argc, char **argv)
                 }
             }
         }
-
-        free(line);
     }
 
     return 0;

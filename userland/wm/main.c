@@ -66,7 +66,7 @@ static void terminal_callback(struct flanterm_context *ctx, void *data, uint64_t
             break;
         */
         default:
-            // printf("Unknown callback type %lu: %lx, %lx, %lx\n", type, arg1, arg2, arg3);
+            printf("Unknown callback type %llu: %llx, %llx, %llx\n", type, arg1, arg2, arg3);
             break;
     }
 }
@@ -169,9 +169,9 @@ int main(int argc, char *argv[])
         sys_exit(-1);
     }
 
-    fds[STDIN_FDPOS].fd = sys_open("/dev/uart0", OF_RDONLY, 0);
+    fds[STDIN_FDPOS].fd = sys_open("/dev/ttyS0", OF_RDONLY, 0);
     if (fds[STDIN_FDPOS].fd < 0) {
-        fprintf(stderr, "Failed to open /dev/uart0\n");
+        fprintf(stderr, "Failed to open /dev/ttyS0\n");
         exit(-1);
     }
     fds[STDIN_FDPOS].events = F_POLLIN;
@@ -201,7 +201,6 @@ int main(int argc, char *argv[])
                         fprintf(stderr, "Failed to read from stdout/stderr\n");
                         continue;
                     }
-
                     flanterm_write(ft_ctx, buf, count);
                     break;
                 }
