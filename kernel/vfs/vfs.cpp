@@ -48,6 +48,15 @@ static size_t canonicalized_path_strlen(const char *path)
     return len;
 }
 
+static bool canonicalized_path_startswith(const char *path, const char *prefix)
+{
+    size_t pathlen = canonicalized_path_strlen(path);
+    size_t prefixlen = canonicalized_path_strlen(prefix);
+    if (pathlen < prefixlen)
+        return false;
+    return memcmp(path, prefix, prefixlen) == 0;
+}
+
 static inline bool path_is_absolute(const char *path) { return path[0] == '/'; }
 
 /**
@@ -365,10 +374,10 @@ static int traverse(const char *path, Inode **out_parent, Inode **out_inode)
 
     // NOTE: This assumes that the paths in the mountpoints are ordered by length descending
     auto *mp = s_mountpoints.find_first([&](MountPoint *mp) {
-        return startswith(cpath, mp->path);
+        return canonicalized_path_startswith(cpath, mp->path);
     });
     if (mp == nullptr) {
-        LOGW("Mo mountpoint found");
+        LOGW("No mountpoint found");
         rc = -ERR_NOENT;
     } else {
         LOGI("Found mountpoint at '%s'", log_canonicalized_path(mp->path));
@@ -459,11 +468,13 @@ int vfs_mount(const char *path, Filesystem &fs)
     LOGD("Mountpoint %s ('%s') has path skip %" PRIu32, path, log_canonicalized_path(mp->path), mp->path_skip);
 
     auto *after = s_mountpoints.find_first([&](MountPoint *mp) {
-        return strlen(mp->path) < strlen(cpath);
+        return canonicalized_path_strlen(mp->path) < canonicalized_path_strlen(cpath);
     });
     if (after) {
+        LOGD("add before '%s'", log_canonicalized_path(after->path));
         s_mountpoints.append_before(mp, after);
     } else {
+        LOGD("add to head");
         s_mountpoints.add(mp);
     }
 
@@ -471,6 +482,11 @@ int vfs_mount(const char *path, Filesystem &fs)
     rc = open_inode(root_inode);
     kassert(rc == 0); // TODO: handle this error
     icache_insert(&fs.icache, root_inode->identifier, root_inode);
+
+
+    s_mountpoints.foreach([&](MountPoint *mp) {
+        LOGD("Mountpoint '%s'", log_canonicalized_path(mp->path));
+    });
 
     return rc;
 }
