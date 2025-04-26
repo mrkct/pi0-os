@@ -183,9 +183,9 @@ protected:
     virtual bool can_echo() const { return true; }
     void emit(uint8_t c);
 
-    struct termios m_termios;
+    struct termios m_termios { };
     uint8_t m_linebuffer[256];
-    size_t m_linebuffer_size;
+    size_t m_linebuffer_size { 0 };
     size_t m_available_lines { 0 };
     RingBuffer<4096, uint8_t> m_input_buffer;
 };
@@ -197,6 +197,63 @@ private:
 public:
     UART(): TTY(Maj_UART, s_next_minor++, "ttyS") {}
     virtual ~UART() {}
+};
+
+class PtyMaster;
+
+class PtySlave: public TTY
+{
+friend class PtyMaster;
+public:
+    PtySlave(PtyMaster &master, uint8_t ptyid)
+        : TTY(Maj_PtySlave, ptyid, "pts"),
+          m_master(master)
+    {
+    }
+    virtual ~PtySlave() {}
+
+    virtual int32_t init() override { return 0; }
+    virtual int32_t shutdown() override { return 0; }
+
+    bool is_open() const { return m_open; }
+    void set_open(bool open) { m_open = open; }
+
+protected:
+    virtual void echo_raw(uint8_t ch) override;  
+
+private:
+    PtyMaster &m_master;
+    bool m_open { false };
+};
+
+class PtyMaster: public CharacterDevice
+{
+friend class PtySlave;
+public:
+    PtyMaster(uint8_t ptyid)
+        : CharacterDevice(Maj_PtyMaster, ptyid, "ptm"),
+        m_ptyid(ptyid),
+        m_slave(*this, ptyid)
+    {
+    }
+    virtual ~PtyMaster() {}
+
+    virtual int32_t init() override { return 0; }
+    virtual int32_t shutdown() override { return 0; }
+    virtual int64_t read(uint8_t*, size_t) override;
+    virtual int64_t write(const uint8_t*, size_t) override;
+    virtual int32_t ioctl(uint32_t request, void *argp) override;
+    virtual int32_t poll(uint32_t events, uint32_t *out_revents) const override;
+
+    bool is_open() const { return !m_closed; }
+    void mark_closed() { m_closed = true; }
+    PtySlave *slave() { return &m_slave; }
+
+private:
+    uint8_t m_ptyid;
+    RingBuffer<4096, uint8_t> m_buf;
+    PtySlave m_slave;
+    bool m_closed { false };
 };
 
 class GPIOController: public CharacterDevice

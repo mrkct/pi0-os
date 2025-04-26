@@ -288,7 +288,7 @@ int32_t TTY::poll(uint32_t events, uint32_t *out_revents) const
 {
     bool can_read = false;
     
-    if ((events & F_POLLIN)) {
+    if (events & F_POLLIN) {
         if (m_termios.c_lflag & ICANON) {
             can_read = m_available_lines > 0;
         } else {
@@ -313,6 +313,56 @@ void TTY::flush_line()
     m_linebuffer_size = 0;
     m_available_lines++;
     LOGD("TTY: Flushing line, m_available_lines=%lu, m_input_buffer.size()=%lu", m_available_lines, m_input_buffer.available());
+}
+
+int64_t PtyMaster::read(uint8_t *buf, size_t size)
+{
+    size_t n = 0;
+    while (n < size && m_buf.pop(*buf++))
+        n++;
+    return n;
+}
+
+int64_t PtyMaster::write(const uint8_t *buf, size_t size)
+{
+    for (size_t i = 0; i < size; i++) {
+        m_slave.emit(buf[i]);
+    }
+    return size;
+}
+
+int32_t PtyMaster::poll(uint32_t events, uint32_t *out_revents) const
+{
+    int32_t rc = 0;
+    uint32_t temp = 0;
+
+    if ((events & F_POLLIN) && !m_buf.is_empty()) {
+        *out_revents |= F_POLLIN;
+    }
+
+    if (events & F_POLLOUT) {
+        rc = m_slave.poll(F_POLLOUT, &temp);
+        if (rc != 0)
+            return rc;
+        *out_revents |= temp & F_POLLOUT;
+    }
+
+    return 0;
+}
+
+int32_t PtyMaster::ioctl(uint32_t request, void*)
+{
+    switch (request) {
+        case api::PTYIO_GETSLAVE:
+            return m_ptyid;
+        default:
+            return -ERR_NOTSUP;
+    }
+}
+
+void PtySlave::echo_raw(uint8_t ch)
+{
+    m_master.m_buf.push(ch);
 }
 
 int64_t GPIOController::read(uint8_t *, size_t)

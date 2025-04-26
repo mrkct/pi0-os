@@ -1,6 +1,6 @@
 #include "pipefs.h"
 
-#define LOG_ENABLED
+// #define LOG_ENABLED
 #define LOG_TAG "PIPEFS"
 #include <kernel/log.h>
 

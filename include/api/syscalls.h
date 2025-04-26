@@ -82,6 +82,8 @@ typedef enum MajorDeviceNumber {
     Maj_Mouse = 10,
     Maj_Input = 11,
     Maj_Framebuffer = 12,
+    Maj_PtyMaster = 13,
+    Maj_PtySlave = 14,
 } MajorDeviceNumber;
 
 #include "arm/syscall.h"
@@ -349,6 +351,10 @@ enum RealTimeClockIoctl {
 enum TtyIoctl {
     TTYIO_TCGETATTR = 1,
     TTYIO_TCSETATTR = 2,
+};
+
+enum PtyIoctl {
+    PTYIO_GETSLAVE = 1,
 };
 
 #ifdef __cplusplus

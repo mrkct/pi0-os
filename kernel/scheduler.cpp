@@ -649,7 +649,7 @@ int sys$write(int fd, const void *buf, size_t count)
     file = current_process->openfiles[fd];
     if (file == nullptr)
         return -ERR_BADF;
-    
+
     return vfs_write(file, (const uint8_t*) buf, count);
 }
 

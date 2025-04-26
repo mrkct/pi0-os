@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/termios.h>
 
 #include <api/syscalls.h>
 #include "flanterm/flanterm.h"
@@ -11,8 +12,8 @@
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
-#define STDIN_FDPOS         0
-#define STDOUT_STDERR_FDPOS 1
+#define KEYBOARD_FDPOS  0
+#define PROCESS_FDPOS   1
 
 static struct flanterm_context *ft_ctx;
 static int display_fd;
@@ -32,6 +33,8 @@ static void terminal_callback(struct flanterm_context *ctx, void *data, uint64_t
             sys_write(fd, reply, snprintf(reply, sizeof(reply), "\x1b[%llu;%lluR", arg2, arg1));
             break;
         }
+        case FLANTERM_CB_BELL:
+            break;
         /*
         case FLANTERM_CB_DEC:
             printf("TERM_CB_DEC");
@@ -122,6 +125,29 @@ cleanup:
     return rc;
 }
 
+static void open_pty(int *ptym, int *ptys)
+{
+    *ptym = sys_open("/dev/pty/ptmx", OF_RDWR, 0);
+    if (*ptym < 0) {
+        fprintf(stderr, "Failed to open /dev/pty/ptmx\n");
+        sys_exit(-1);
+    }
+
+    int slaveid = sys_ioctl(*ptym, PTYIO_GETSLAVE, NULL);
+    if (slaveid < 0) {
+        fprintf(stderr, "Failed to get slave id\n");
+        sys_exit(-1);
+    }
+
+    char buf[32];
+    snprintf(buf, sizeof(buf) - 1, "/dev/pty/pty%d", slaveid);
+    *ptys = sys_open(buf, OF_RDWR, 0);
+    if (*ptys < 0) {
+        fprintf(stderr, "Failed to open %s\n", buf);
+        sys_exit(-1);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     (void) argc;
@@ -131,18 +157,9 @@ int main(int argc, char *argv[])
     int count;
     PollFd fds[2];
     char buf[1024];
-    int stdin_sender, stdin_receiver;
-    int stdout_stderr_sender, stdout_stderr_receiver;
+    int ptym, ptys;
 
-    /* Create pipes for IPC between shell and wm */
-    if (sys_mkpipe(&stdin_sender, &stdin_receiver) < 0) {
-        fprintf(stderr, "sys_mkpipe() for stdin failed\n");
-        exit(-1);
-    }
-    if (sys_mkpipe(&stdout_stderr_sender, &stdout_stderr_receiver) < 0) {
-        fprintf(stderr, "sys_mkpipe() for stdout+stderr failed\n");
-        exit(-1);
-    }
+    open_pty(&ptym, &ptys);
 
     /* Setup the display and terminal emulator */
     if (0 != (rc = open_framebuffer_display("/dev/framebuffer0"))) {
@@ -150,17 +167,17 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     flanterm_set_autoflush(ft_ctx, true);
-    flanterm_set_callback(ft_ctx, terminal_callback, (void*) stdin_sender);
+    flanterm_set_callback(ft_ctx, terminal_callback, (void*) ptym);
 
     /* Spawn the shell process */
     if (0 == sys_fork()) {
-        sys_dup2(stdin_receiver, STDIN_FILENO);
-        sys_dup2(stdout_stderr_sender, STDOUT_FILENO);
-        sys_dup2(stdout_stderr_sender, STDERR_FILENO);
+        sys_dup2(ptys, STDIN_FILENO);
+        sys_dup2(ptys, STDOUT_FILENO);
+        sys_dup2(ptys, STDERR_FILENO);
 
-        /* Close the other ends of the pipes, we don't want to leak them*/
-        sys_close(stdin_sender);
-        sys_close(stdout_stderr_receiver);
+        /* Close to avoid leaking fds */
+        sys_close(ptym);
+        sys_close(ptys);
 
         const char *argv[] = { "/bina/shell", NULL };
         const char *envp[] = { NULL };
@@ -168,15 +185,19 @@ int main(int argc, char *argv[])
         fprintf(stderr, "execve() failed\r\n");
         sys_exit(-1);
     }
+    sys_close(ptys);
 
-    fds[STDIN_FDPOS].fd = sys_open("/dev/ttyS0", OF_RDONLY, 0);
-    if (fds[STDIN_FDPOS].fd < 0) {
+    fds[KEYBOARD_FDPOS].events = F_POLLIN;
+    fds[KEYBOARD_FDPOS].fd = sys_open("/dev/ttyS0", OF_RDONLY, 0);
+    if (fds[KEYBOARD_FDPOS].fd < 0) {
         fprintf(stderr, "Failed to open /dev/ttyS0\n");
         exit(-1);
     }
-    fds[STDIN_FDPOS].events = F_POLLIN;
-    fds[STDOUT_STDERR_FDPOS].fd = stdout_stderr_receiver;
-    fds[STDOUT_STDERR_FDPOS].events = F_POLLIN;
+    struct termios termios = {};
+    tcsetattr(fds[KEYBOARD_FDPOS].fd, 0, &termios);
+
+    fds[PROCESS_FDPOS].events = F_POLLIN;
+    fds[PROCESS_FDPOS].fd = ptym;
 
     while (true) {
         int updated = sys_poll(fds, ARRAY_SIZE(fds), 100000);
@@ -188,19 +209,19 @@ int main(int argc, char *argv[])
 
         if (updated >= 0) {
             switch (updated) {
-                case STDIN_FDPOS: {
+                case KEYBOARD_FDPOS: {
                     count = sys_read(fds[updated].fd, buf, sizeof(buf));
-
-                    sys_write(stdin_sender, buf, count);
+                    sys_write(ptym, buf, count);
                     break;
                 }
 
-                case STDOUT_STDERR_FDPOS: {
+                case PROCESS_FDPOS: {
                     count = sys_read(fds[updated].fd, buf, sizeof(buf));
                     if (count < 0) {
                         fprintf(stderr, "Failed to read from stdout/stderr\n");
                         continue;
                     }
+                    buf[count] = '\0';
                     flanterm_write(ft_ctx, buf, count);
                     break;
                 }

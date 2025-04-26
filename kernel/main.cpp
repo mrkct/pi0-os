@@ -5,6 +5,7 @@
 #include <kernel/timer.h>
 #include <kernel/vfs/devfs/devfs.h>
 #include <kernel/vfs/pipefs/pipefs.h>
+#include <kernel/vfs/ptyfs/ptyfs.h>
 #include <kernel/vfs/vfs.h>
 #include <api/syscalls.h>
 
@@ -74,6 +75,14 @@ extern "C" void kernel_main(BootParams const *boot_params)
         panic("Failed to create pipefs: %d\n", rc);
     }
     rc = vfs_mount("/pipe/", *pipefs);
+    kassert(rc == 0);
+
+    Filesystem *ptyfs;
+    rc = ptyfs_create(&ptyfs);
+    if (rc < 0) {
+        panic("Failed to create ptyfs: %d\n", rc);
+    }
+    rc = vfs_mount("/dev/pty/", *ptyfs);
     kassert(rc == 0);
 
     kprintf("Running the first process...\n");
