@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <errno.h>
 
 #include <api/syscalls.h>
 
@@ -207,5 +208,11 @@ int closedir(DIR *dirp)
 
 int ioctl (int fd, unsigned long int request, void *argp)
 {
-    return sys_ioctl(fd, request, argp);
+    int rc = sys_ioctl(fd, request, argp);
+    if (rc < 0) {
+        errno = rc;
+        return -1;
+    } else {
+        return rc;
+    }
 }

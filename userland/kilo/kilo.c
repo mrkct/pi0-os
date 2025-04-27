@@ -46,14 +46,33 @@
 #include <ctype.h>
 #include <time.h>
 #include <sys/types.h>
-
-#if 0
-#include <termios.h>
 #include <sys/ioctl.h>
-#else
-#include <libline/libline.h>
+#include <sys/time.h>
+#include <unistd.h>
+#include <stdarg.h>
+#include <fcntl.h>
+#include <signal.h>
 
-static libline_t ll = { 0 };
+/* This block includes definitions to make kilo compile on myos */
+#include <termios.h>
+
+struct winsize {
+    unsigned short int ws_row;
+    unsigned short int ws_col;
+    unsigned short int ws_xpixel;
+    unsigned short int ws_ypixel;
+};
+
+#define TIOCGWINSZ 0x9999 /* ioctl will fail, but we don't care*/
+
+// typedef void (*sighandler_t)(int);
+
+int ftruncate(int fd, off_t length)
+{
+    (void)fd;
+    (void)length;
+    return 0;
+}
 
 static ssize_t getline(char **buf, size_t *bufsiz, FILE *fp)
 {
@@ -93,15 +112,7 @@ static ssize_t getline(char **buf, size_t *bufsiz, FILE *fp)
 	}
 }
 
-#endif
-
-#include <sys/time.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <fcntl.h>
-#include <signal.h>
-
-
+/* End of block */
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -248,20 +259,14 @@ struct editorSyntax HLDB[] = {
 
 /* ======================= Low level terminal handling ====================== */
 
-#if 0
 static struct termios orig_termios; /* In order to restore at exit.*/
-#endif
 
 void disableRawMode(int fd) {
-#if 0
     /* Don't even check the return value as it's too late. */
     if (E.rawmode) {
         tcsetattr(fd,TCSAFLUSH,&orig_termios);
         E.rawmode = 0;
     }
-#else
-    (void) fd;
-#endif
 }
 
 /* Called at exit to avoid remaining in raw mode. */
@@ -271,8 +276,6 @@ void editorAtExit(void) {
 
 /* Raw mode: 1960 magic shit. */
 int enableRawMode(int fd) {
-
-#if 0
     struct termios raw;
 
     if (E.rawmode) return 0; /* Already enabled. */
@@ -303,10 +306,6 @@ int enableRawMode(int fd) {
 fatal:
     errno = ENOTTY;
     return -1;
-#else
-    (void) fd;
-    return 0;
-#endif
 }
 
 /* Read a key from the terminal put in raw mode, trying to handle
@@ -315,10 +314,7 @@ int editorReadKey(int fd) {
     int nread;
     char c, seq[3];
     while ((nread = read(fd,&c,1)) == 0);
-    if (nread == -1) {
-        fprintf(stderr, "read() failed: %d\\n", nread);
-        exit(1);
-    }
+    if (nread == -1) exit(1);
 
     while(1) {
         switch(c) {
@@ -369,7 +365,6 @@ int editorReadKey(int fd) {
  * and return it. On error -1 is returned, on success the position of the
  * cursor is stored at *rows and *cols and 0 is returned. */
 int getCursorPosition(int ifd, int ofd, int *rows, int *cols) {
-#if 0
     char buf[32];
     unsigned int i = 0;
 
@@ -388,21 +383,12 @@ int getCursorPosition(int ifd, int ofd, int *rows, int *cols) {
     if (buf[0] != ESC || buf[1] != '[') return -1;
     if (sscanf(buf+2,"%d;%d",rows,cols) != 2) return -1;
     return 0;
-#else
-    (void) ifd;
-    (void) ofd;
-    (void) rows;
-    (void) cols;
-    return -1;
-#endif
 }
 
 /* Try to get the number of columns in the current terminal. If the ioctl()
  * call fails the function will try to query the terminal itself.
  * Returns 0 on success, -1 on error. */
 int getWindowSize(int ifd, int ofd, int *rows, int *cols) {
-
-#if 0
     struct winsize ws;
 
     if (ioctl(1, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
@@ -424,25 +410,17 @@ int getWindowSize(int ifd, int ofd, int *rows, int *cols) {
         if (write(ofd,seq,strlen(seq)) == -1) {
             /* Can't recover... */
         }
+        printf("(raw) rows: %d, cols: %d\n", *rows, *cols);
         return 0;
     } else {
         *cols = ws.ws_col;
         *rows = ws.ws_row;
+        printf("(ioctl?) rows: %d, cols: %d\n", *rows, *cols);
         return 0;
     }
 
 failed:
     return -1;
-#else
-    (void) ifd;
-    (void) ofd;
-    (void) rows;
-    (void) cols;
-
-    *cols = 80;
-    *rows = 24;
-    return 0;
-#endif
 }
 
 /* ====================== Syntax highlight color scheme  ==================== */
@@ -889,13 +867,10 @@ int editorOpen(char *filename) {
 
     fp = fopen(filename,"r");
     if (!fp) {
-        fprintf(stderr, "Failed to open file %s: %s\n", filename, strerror(errno));
-        
         if (errno != ENOENT) {
             perror("Opening file");
             exit(1);
         }
-
         return 1;
     }
 
@@ -909,7 +884,6 @@ int editorOpen(char *filename) {
     }
     free(line);
     fclose(fp);
-
     E.dirty = 0;
     return 0;
 }
@@ -923,9 +897,7 @@ int editorSave(void) {
 
     /* Use truncate + a single write(2) call in order to make saving
      * a bit safer, under the limits of what we can do in a small editor. */
-#if 0
     if (ftruncate(fd,len) == -1) goto writeerr;
-#endif
     if (write(fd,buf,len) != len) goto writeerr;
 
     close(fd);
@@ -1297,7 +1269,6 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
-        fprintf(stderr, "Quitting kilo\n");
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
@@ -1352,7 +1323,7 @@ int editorFileWasModified(void) {
 void updateWindowSize(void) {
     if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
                       &E.screenrows,&E.screencols) == -1) {
-        fprintf(stderr, "Unable to query the screen for size (columns / rows)");
+        perror("Unable to query the screen for size (columns / rows)");
         exit(1);
     }
     E.screenrows -= 2; /* Get room for status bar. */
@@ -1376,21 +1347,19 @@ void initEditor(void) {
     E.filename = NULL;
     E.syntax = NULL;
     updateWindowSize();
+    signal(SIGWINCH, handleSigWinCh);
 }
 
 int main(int argc, char **argv) {
-    setvbuf(stdout, NULL, _IONBF, 0);
-
     if (argc != 2) {
         fprintf(stderr,"Usage: kilo <filename>\n");
         exit(1);
     }
 
-    line_initialize(&ll);
+    enableRawMode(STDIN_FILENO);
     initEditor();
     editorSelectSyntaxHighlight(argv[1]);
     editorOpen(argv[1]);
-    enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
     while(1) {
