@@ -183,7 +183,7 @@ protected:
     virtual bool can_echo() const { return true; }
     void emit(uint8_t c);
 
-    struct termios m_termios { };
+    struct api::termios m_termios { };
     uint8_t m_linebuffer[256];
     size_t m_linebuffer_size { 0 };
     size_t m_available_lines { 0 };

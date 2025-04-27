@@ -274,10 +274,10 @@ int32_t TTY::ioctl(uint32_t request, void* argp)
 {
     switch (request) {
         case api::TTYIO_TCGETATTR:
-            *(termios*) argp = m_termios;
+            *(api::termios*) argp = m_termios;
             return 0;
         case api::TTYIO_TCSETATTR:
-            m_termios = *(termios*) argp;
+            m_termios = *(api::termios*) argp;
             return 0;
         default:
             return -ERR_NOTSUP;

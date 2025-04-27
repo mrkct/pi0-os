@@ -30,6 +30,7 @@ struct InodeFileOps {
     uint64_t (*seek)(Inode *self, uint64_t current, int whence, int32_t offset);
     int32_t (*poll)(Inode *self, uint32_t events, uint32_t *out_revents);
     int32_t (*mmap)(Inode *self, AddressSpace *as, uintptr_t vaddr, uint32_t length, uint32_t flags);
+    int32_t (*istty)(Inode *self);
 };
 
 struct InodeDirOps {
@@ -108,6 +109,7 @@ int32_t fs_inode_ioctl_not_supported(Inode*, uint32_t, void*);
 uint64_t fs_inode_seek_not_supported(Inode*, uint64_t, int, int32_t);
 int32_t fs_file_inode_poll_always_ready(Inode *self, uint32_t events, uint32_t *out_revents);
 int32_t fs_file_inode_mmap_not_supported(Inode*, AddressSpace*, uintptr_t, uint32_t, uint32_t);
+int32_t fs_file_inode_istty_always_false(Inode*);
 int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **);
 int fs_dir_inode_mkdir_not_supported(Inode*, const char *);
 int fs_dir_inode_rmdir_not_supported(Inode*, const char *);

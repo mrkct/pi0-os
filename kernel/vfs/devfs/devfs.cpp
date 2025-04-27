@@ -32,6 +32,7 @@ static int32_t devfs_file_inode_ioctl(Inode *self, uint32_t request, void *argp)
 static uint64_t devfs_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset);
 static int32_t devfs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out_revents);
 static int32_t devfs_file_inode_mmap(Inode*, AddressSpace*, uintptr_t, uint32_t, uint32_t);
+static int32_t devfs_file_inode_istty(Inode*);
 
 static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int devfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
@@ -57,6 +58,7 @@ static struct InodeFileOps s_devfs_inode_file_ops {
     .seek = devfs_file_inode_seek,
     .poll = devfs_file_inode_poll,
     .mmap = devfs_file_inode_mmap,
+    .istty = devfs_file_inode_istty,
 };
 
 static struct InodeDirOps s_devfs_inode_dir_ops {
@@ -215,6 +217,12 @@ static int32_t devfs_file_inode_mmap(Inode *self, AddressSpace *as, uintptr_t va
     return ctx->device->mmap(as, vaddr, length, flags);
 }
 
+static int32_t devfs_file_inode_istty(Inode *self)
+{
+    DevFSInodeCtx *ctx = (DevFSInodeCtx*) self->opaque;
+    return ctx->device->is_tty();
+}
+
 static int devfs_fs_on_mount(Filesystem *self, Inode *out_root)
 {
     *out_root = (Inode) {
@@ -349,3 +357,4 @@ int devfs_create(Filesystem **out_fs)
 failed:
     return rc;
 }
+

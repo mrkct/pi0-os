@@ -41,6 +41,7 @@ static struct InodeFileOps s_pipefs_inode_file_ops {
     .seek = fs_inode_seek_not_supported,
     .poll = pipefs_file_inode_poll,
     .mmap = fs_file_inode_mmap_not_supported,
+    .istty = fs_file_inode_istty_always_false,
 };
 
 static struct InodeDirOps s_pipefs_inode_dir_ops {

@@ -103,6 +103,8 @@ int sys$poll(api::PollFd *fds, int nfds, int timeout);
 
 int sys$mmap(int fd, uintptr_t vaddr, uint32_t length, uint32_t flags);
 
+int sys$istty(int fd);
+
 int sys$dup2(int oldfd, int newfd);
 
 int sys$waitexit(int pid);

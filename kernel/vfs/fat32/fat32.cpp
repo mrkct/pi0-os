@@ -75,6 +75,7 @@ static struct InodeFileOps s_fat32_inode_file_ops {
     .seek = fat32_file_inode_seek,
     .poll = fs_file_inode_poll_always_ready,
     .mmap = fs_file_inode_mmap_not_supported,
+    .istty = fs_file_inode_istty_always_false
 };
 
 static struct InodeDirOps s_fat32_inode_dir_ops {

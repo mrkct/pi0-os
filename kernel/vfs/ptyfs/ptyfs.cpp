@@ -26,6 +26,7 @@ static int32_t ptyfs_file_inode_ioctl(Inode *self, uint32_t request, void *argp)
 static uint64_t ptyfs_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset);
 static int32_t ptyfs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out_revents);
 static int32_t ptyfs_file_inode_mmap(Inode*, AddressSpace*, uintptr_t, uint32_t, uint32_t);
+static int32_t ptyfs_file_inode_istty(Inode*);
 
 static int ptyfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int ptyfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
@@ -51,6 +52,7 @@ static struct InodeFileOps s_ptyfs_inode_file_ops {
     .seek = ptyfs_file_inode_seek,
     .poll = ptyfs_file_inode_poll,
     .mmap = ptyfs_file_inode_mmap,
+    .istty = ptyfs_file_inode_istty,
 };
 
 static struct InodeDirOps s_ptyfs_inode_dir_ops {
@@ -222,6 +224,11 @@ static int32_t ptyfs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out
 static int32_t ptyfs_file_inode_mmap(Inode *self, AddressSpace *as, uintptr_t vaddr, uint32_t length, uint32_t flags)
 {
     return get_device_by_inode(self)->mmap(as, vaddr, length, flags);
+}
+
+static int32_t ptyfs_file_inode_istty(Inode *self)
+{
+    return self->identifier == ROOT_INODE_ID ? 0 : 1;
 }
 
 static int ptyfs_fs_on_mount(Filesystem *self, Inode *out_root)

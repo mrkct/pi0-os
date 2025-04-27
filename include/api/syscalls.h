@@ -64,6 +64,7 @@ typedef enum SyscallIdentifiers {
     SYS_MMap = 22,
     SYS_Dup2 = 23,
     SYS_SetCwd = 24,
+    SYS_IsTty = 25,
 
     SYS_MilliSleep = 31,
 
@@ -318,6 +319,11 @@ static inline int sys_mkdir(const char *path, int mode)
 static inline int sys_mmap(int fd, void *addr, size_t length, uint32_t flags)
 {
     return syscall(SYS_MMap, (sysarg_t) fd, (sysarg_t) addr, (sysarg_t) length, (sysarg_t) flags);
+}
+
+static inline int sys_isatty(int fd)
+{
+    return syscall(SYS_IsTty, (sysarg_t) fd, 0, 0, 0);
 }
 
 #ifdef __cplusplus

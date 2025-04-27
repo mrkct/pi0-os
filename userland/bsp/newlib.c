@@ -65,8 +65,7 @@ int _fstat(int file, struct stat* st)
 
 int _isatty(int file)
 {
-    (void) file;
-    return file < STDERR_FILENO;
+    return sys_isatty(file);
 }
 
 off_t _lseek(int file, int ptr, int dir)
@@ -204,4 +203,9 @@ int closedir(DIR *dirp)
     free(dirp->ent);
     free(dirp);
     return 0;
+}
+
+int ioctl (int fd, unsigned long int request, void *argp)
+{
+    return sys_ioctl(fd, request, argp);
 }

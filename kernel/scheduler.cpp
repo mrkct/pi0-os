@@ -897,6 +897,18 @@ int sys$mmap(int fd, uintptr_t vaddr, uint32_t length, uint32_t flags)
     return vfs_mmap(file, &current_process->address_space, vaddr, length, flags);
 }
 
+int sys$istty(int fd)
+{
+    auto *current_process = cpu_current_process();
+    FileCustody *file = nullptr;
+
+    if (fd < 0 || (unsigned) fd >= array_size(current_process->openfiles) || current_process->openfiles[fd] == nullptr)
+        return -ERR_BADF;
+    
+    file = current_process->openfiles[fd];
+    return vfs_istty(file);
+}
+
 int sys$dup2(int fd, int new_fd)
 {
     auto *current_process = cpu_current_process();

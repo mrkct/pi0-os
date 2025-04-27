@@ -38,3 +38,5 @@ int vfs_create_pipe(FileCustody **out_sender_custody, FileCustody **out_receiver
 int32_t vfs_poll(FileCustody *custody, uint32_t events, uint32_t *out_revents);
 
 int vfs_mmap(FileCustody *custody, AddressSpace *as, uintptr_t vaddr, uint32_t length, uint32_t flags);
+
+int vfs_istty(FileCustody *custody);

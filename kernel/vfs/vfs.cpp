@@ -650,3 +650,11 @@ int vfs_mmap(FileCustody *custody, AddressSpace *as, uintptr_t vaddr, uint32_t l
 
     return custody->inode->file_ops->mmap(custody->inode, as, vaddr, length, flags);
 }
+
+int vfs_istty(FileCustody *custody)
+{
+    if (custody->inode->type != InodeType::CharacterDevice)
+        return 0;
+
+    return custody->inode->file_ops->istty(custody->inode);
+}
