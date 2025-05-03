@@ -495,6 +495,7 @@ int32_t FramebufferDevice::mmap(AddressSpace *as, uintptr_t vaddr, uint32_t leng
     for (uintptr_t offset = 0; offset < fb_length; offset += _4KB) {
         PhysicalPage *page = addr2page(fb_phys_addr + offset);
         kassert(page != nullptr);
+        page->ref_count++;
         kassert(vm_map(*as, page, vaddr + offset, PageAccessPermissions::UserFullAccess).is_success());
     }
 
