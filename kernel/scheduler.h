@@ -93,6 +93,8 @@ int sys$seek(int fd, int offset, int whence, uint64_t *out_new_offset);
 
 int sys$millisleep(int ms);
 
+int sys$getticks();
+
 int sys$getpid();
 
 int sys$create_pipe(int *write_fd, int *read_fd);

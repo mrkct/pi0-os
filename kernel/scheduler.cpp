@@ -707,6 +707,11 @@ int sys$millisleep(int ms)
     return 0;
 }
 
+int sys$getticks()
+{
+    return get_ticks_ms();
+}
+
 int sys$fstat(int fd, api::Stat *stat)
 {
     auto *current_process = cpu_current_process();

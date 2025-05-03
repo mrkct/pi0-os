@@ -67,6 +67,7 @@ typedef enum SyscallIdentifiers {
     SYS_IsTty = 25,
 
     SYS_MilliSleep = 31,
+    SYS_GetTicks = 32,
 
     SYS_WaitExit = 1000,
 } SyscallIdentifiers;
@@ -214,6 +215,11 @@ typedef struct TimeSpec {
 static inline int sys_millisleep(int millis)
 {
     return syscall(SYS_MilliSleep, (sysarg_t) millis, 0, 0, 0);
+}
+
+static inline uint32_t sys_getticks()
+{
+    return (uint32_t) syscall(SYS_GetTicks, 0, 0, 0, 0);
 }
 
 #ifdef __cplusplus

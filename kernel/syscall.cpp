@@ -76,6 +76,9 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_WaitExit:
         rc = sys$waitexit((int) arg1);
         break;
+    case SYS_GetTicks:
+        rc = sys$getticks();
+        break;
     default:
         kprintf("Unknown syscall %d\n", syscall);
         rc = -ERR_NOSYS;
