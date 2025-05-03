@@ -12,10 +12,10 @@ enum class MutexInitialState { Unlocked, Locked };
 
 void mutex_init(Mutex& mutex, MutexInitialState);
 
-void mutex_take(Mutex& mutex);
+void mutex_take(Mutex const& mutex);
 
-int mutex_take_with_timeout(Mutex& mutex, uint32_t timeout_ms);
+int mutex_take_with_timeout(Mutex const& mutex, uint32_t timeout_ms);
 
-void mutex_release(Mutex& mutex);
+void mutex_release(Mutex const& mutex);
 
-bool mutex_is_locked(Mutex& mutex);
+bool mutex_is_locked(Mutex const& mutex);

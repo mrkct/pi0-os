@@ -10,10 +10,10 @@ typedef struct {
 
 static constexpr Spinlock SPINLOCK_START = { 0 };
 
-void spinlock_take(Spinlock&);
+void spinlock_take(Spinlock const&);
 
-int spinlock_take_with_timeout(Spinlock&, uint32_t timeout_ms);
+int spinlock_take_with_timeout(Spinlock const&, uint32_t timeout_ms);
 
-bool spinlock_is_taken(Spinlock& lock);
+bool spinlock_is_taken(Spinlock const& lock);
 
-void spinlock_release(Spinlock&);
+void spinlock_release(Spinlock const&);

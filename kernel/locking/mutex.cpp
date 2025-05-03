@@ -10,7 +10,7 @@ void mutex_init(Mutex& mutex, MutexInitialState state)
         spinlock_take(mutex.lock);
 }
 
-void mutex_take(Mutex& mutex)
+void mutex_take(Mutex const& mutex)
 {
     if (scheduler_has_started()) {
         while (spinlock_is_taken(mutex.lock))
@@ -20,17 +20,17 @@ void mutex_take(Mutex& mutex)
     spinlock_take(mutex.lock);
 }
 
-int mutex_take_with_timeout(Mutex& mutex, uint32_t timeout_ms)
+int mutex_take_with_timeout(Mutex const& mutex, uint32_t timeout_ms)
 {
     return spinlock_take_with_timeout(mutex.lock, timeout_ms);
 }
 
-void mutex_release(Mutex& mutex)
+void mutex_release(Mutex const& mutex)
 {
     spinlock_release(mutex.lock);
 }
 
-bool mutex_is_locked(Mutex& mutex)
+bool mutex_is_locked(Mutex const& mutex)
 {
     return spinlock_is_taken(mutex.lock);
 }
