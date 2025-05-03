@@ -331,7 +331,7 @@ protected:
     void notify_event(api::InputEvent);
 
 private:
-    void get_next_event(api::InputEvent&);
+    bool get_next_event(api::InputEvent&);
 
     struct {
         Mutex lock;

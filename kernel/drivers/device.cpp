@@ -403,42 +403,36 @@ int32_t RealTimeClock::ioctl(uint32_t request, void *argp)
 
 int64_t InputDevice::read(uint8_t *buffer, size_t size)
 {
-    size_t elements = size / sizeof(api::InputEvent);
     api::InputEvent *out_events = (api::InputEvent*) buffer;
+    size_t i = 0;
 
-    for (size_t i = 0; i < elements; i++) {
-        get_next_event(out_events[i]);
+    for (i = 0; i < size / sizeof(api::InputEvent); i++) {
+        if (!get_next_event(out_events[i]))
+            break;
     }
 
-    return elements * sizeof(api::InputEvent);
+    return i * sizeof(api::InputEvent);
 }
 
 void InputDevice::notify_event(api::InputEvent event)
 {
     mutex_take(this->m_events.lock);
-    this->m_events.events.push(event);
+    m_events.events.push(event);
     mutex_release(this->m_events.lock);
 }
 
-void InputDevice::get_next_event(api::InputEvent& event)
+bool InputDevice::get_next_event(api::InputEvent& event)
 {
-    while (true) {
-        while (this->m_events.events.is_empty()) {
-            cpu_relax();
-        }
-        mutex_take(this->m_events.lock);
-        if (this->m_events.events.is_empty()) {
-            mutex_release(this->m_events.lock);
-            continue;
-        }
-        this->m_events.events.pop(event);
-        mutex_release(this->m_events.lock);
-        break;
-    }
+    mutex_take(m_events.lock);
+    bool res = m_events.events.pop(event);
+    mutex_release(m_events.lock);
+    return res;
 }
 
 int32_t InputDevice::poll(uint32_t events, uint32_t *out_revents) const
 {
+    mutex_take(m_events.lock);
+
     if ((events & F_POLLIN) && !m_events.events.is_empty()) {
         *out_revents |= F_POLLIN;
     }
@@ -446,6 +440,7 @@ int32_t InputDevice::poll(uint32_t events, uint32_t *out_revents) const
     if ((events & F_POLLOUT) && !m_events.events.is_full()) {
         *out_revents |= F_POLLOUT;
     }
+    mutex_release(m_events.lock);
 
     return 0;
 }
