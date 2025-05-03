@@ -237,9 +237,9 @@ namespace api {
 #define OF_RDONLY       0x0000
 #define OF_WRONLY       0x0001
 #define OF_RDWR         0x0002
-#define OF_NONBLOCK     0x0004
 #define OF_APPEND       0x0008
 #define OF_CREATE       0x0200
+#define OF_NONBLOCK     0x4000
 #define OF_DIRECTORY    0x200000
 
 typedef struct Stat 
