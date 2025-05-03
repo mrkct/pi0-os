@@ -512,7 +512,7 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
     auto *inode = custody->inode;
     ssize_t rc = inode->file_ops->read(inode, custody->offset, buffer, size);
     if (rc > 0)
-        vfs_seek(custody, SEEK_SET, rc);
+        vfs_seek(custody, SEEK_CUR, rc);
 
     return rc;
 }
@@ -537,7 +537,7 @@ ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
     auto *inode = custody->inode;
     ssize_t rc = inode->file_ops->write(inode, custody->offset, buffer, size);
     if (rc > 0)
-        vfs_seek(custody, SEEK_SET, rc);
+        vfs_seek(custody, SEEK_CUR, rc);
 
     return rc;
 }

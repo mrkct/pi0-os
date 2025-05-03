@@ -1,6 +1,6 @@
 .PHONY: all
 
-APPS := init shell wm cowsay crash kilo
+APPS := init shell wm cowsay crash kilo minihash
 DIR := /tmp/myos-disk-image-temp-storage
 
 .PHONY: all clean build-apps build-% clean-apps clean-% clean-disk-image
