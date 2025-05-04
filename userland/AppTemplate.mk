@@ -7,9 +7,10 @@
 # APP_OBJECTS = 
 # include ../AppTemplate.mk
 
-# When building third-party software, we'll let warnings pass
-ifeq ($(DISABLE_WERROR),)
-	APP_CFLAGS += -Werror
+# Warnings are enabled by default, unless explicitly disabled by the application
+# This is used for third-party software
+ifeq ($(DISABLE_WARNINGS),)
+	APP_CFLAGS += -Wall -Wextra -Werror
 endif
 
 include ../Toolchain.mk 
