@@ -5,6 +5,10 @@
 #include "armirq.h"
 #include "armv6mmu.h"
 
+#define LOG_ENABLED
+#define LOG_TAG "ARMIRQ"
+#include <kernel/log.h>
+
 
 enum class InterruptVector: int {
     Reset = 0,
@@ -86,9 +90,9 @@ static void data_abort_handler(InterruptFrame* state)
     state->lr -= 8;
 
     uintptr_t faulting_addr = read_fault_address_register();
-    auto result = vm_try_fix_page_fault(faulting_addr);
+    auto result = vm_try_fix_page_fault(state->lr, faulting_addr);
     if (result == PageFaultHandlerResult::Fixed) {
-        kprintf("[NOTE]: Data abort while accessing %p, but fixed :)\n", faulting_addr);
+        LOGI("Data abort while accessing %p, but fixed :)\n", faulting_addr);
         return;
     }
     
@@ -96,7 +100,7 @@ static void data_abort_handler(InterruptFrame* state)
         uint32_t dfsr = read_dfsr();
         uint32_t fault_status = dfsr_fault_status(dfsr);
         
-        kprintf(
+        LOGW(
             "[DATA ABORT]: Process %s crashed\n"
             "Reason: %s accessing memory address %p while executing instruction %p\n"
             FORMAT_TASK_STATE "\n",
@@ -106,9 +110,7 @@ static void data_abort_handler(InterruptFrame* state)
             state->lr,
             FORMAT_ARGS_TASK_STATE(state)
         );
-        // TODO: change_task_state(scheduler_current_task(), TaskState::Zombie);
-        // TODO: scheduler_step(state);
-        todo();
+        sys$exit(-1);
         return;
     }
 
@@ -123,20 +125,6 @@ static void data_abort_handler(InterruptFrame* state)
         faulting_addr,
         state->lr,
         FORMAT_ARGS_TASK_STATE(state));
-    /*
-    FIXME: Uncomment this once the scheduler is implemented
-    panic(
-        "[DATA ABORT]\n"
-        "Running process %s\n"
-        "Reason: %s accessing memory address %p while executing instruction %p\n"
-        FORMAT_TASK_STATE,
-        get_running_task_name(),
-        dfsr_status_to_string(fault_status),
-        faulting_addr,
-        state->lr,
-        FORMAT_ARGS_TASK_STATE(state)
-    );
-    */
 }
 
 static void prefetch_abort_handler(InterruptFrame*)

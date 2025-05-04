@@ -505,17 +505,34 @@ error:
     return rc;
 }
 
-PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr)
+PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t instruction_addr, uintptr_t fault_addr)
 {
-    uintptr_t phys_ttbr0_addr = vm_read_current_ttbr0();
-    if (phys_ttbr0_addr == page2addr(g_kernel_address_space.ttbr0_page))
-        return PageFaultHandlerResult::KernelFatal;
-
-    // We don't implement any sort of swap memory, so this is an error in the application for sure
-    if (!areas::kernel_area.contains(fault_addr))
+    // This is the user process either trying to illegally access kernel memory
+    // or the process messing up with its own memory.
+    // Either way, it's a fatal error for the process.
+    if (!areas::kernel_area.contains(instruction_addr)) {
         return PageFaultHandlerResult::ProcessFatal;
+    }
 
+    kassert(areas::kernel_area.contains(instruction_addr));
+
+    // Kernel faulted while accessing user's memory, this is a bug
+    if (!areas::kernel_area.contains(fault_addr)) {
+        return PageFaultHandlerResult::KernelFatal;
+    }
+
+    kassert(areas::kernel_area.contains(fault_addr));
+
+    // Kernel faulted while accessing kernel memory: there's a chance of recovering.
+    // 
+    // If the fault is due to a missing lvl1 table in the kernel area, but the main
+    // kernel address space has a valid entry, then it's just that the process' address
+    // space was created before the new mapping was added
+
+
+    uintptr_t phys_ttbr0_addr = vm_read_current_ttbr0();
     auto *lvl1_kernel_table = g_kernel_address_space.get_root_table_ptr();
+
     if (lvl1_kernel_table[lvl1_index(fault_addr)].raw == 0)
         return PageFaultHandlerResult::KernelFatal;
     
@@ -523,9 +540,6 @@ PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr)
     auto *lvl1_ttbr0_table = reinterpret_cast<FirstLevelEntry*>(phys2virt(phys_ttbr0_addr));
     auto& ttbr0_lvl1_entry = lvl1_ttbr0_table[lvl1_index(fault_addr)];
 
-    // If the fault is due to a missing lvl1 table in the kernel area, but the main
-    // kernel address space has a valid entry, then it's just that the process' address
-    // space was created before the new mapping was added
     if (ttbr0_lvl1_entry.raw == 0) {
         ttbr0_lvl1_entry = kernel_lvl1_entry;
         invalidate_tlb_entry(fault_addr);

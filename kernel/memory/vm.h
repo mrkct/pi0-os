@@ -97,4 +97,4 @@ enum class PageFaultHandlerResult {
     ProcessFatal,
     KernelFatal
 };
-PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t fault_addr);
+PageFaultHandlerResult vm_try_fix_page_fault(uintptr_t instruction_addr, uintptr_t fault_addr);
