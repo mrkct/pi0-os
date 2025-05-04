@@ -53,3 +53,10 @@ the symbols file for both the kernel and the bootloader.
 
 `RECORD=1 make qemu` will record the execution of QEMU.
 `REPLAY=1 make qemu-gdb` will replay the recorded execution
+
+# Acknowledgements
+
+* [Flanterm by Mintsuki](https://codeberg.org/mintsuki/flanterm) for the default terminal emulator
+* [kilo by antirez](https://github.com/antirez/kilo) for the default text editor
+* [doomgeneric by ozkl](https://github.com/ozkl/doomgeneric) for the port of DOOM
+* Linux for some headers containing declarations for ELF, VirtIO and other stuff
