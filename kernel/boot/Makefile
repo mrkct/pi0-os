@@ -9,12 +9,16 @@ CXXFLAGS+=-MMD -MP -I../../
 CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -g
 
+ASFLAGS=
+
 -include board/$(BOARD)/deps.mk
 
 ifeq ($(ARCH), ARMV6)
 	CXXFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
+	ASFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
 else
 	CXXFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
+	ASFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
 endif
 
 ifdef CONFIG_BUNDLED_DTB
@@ -46,7 +50,7 @@ boot.elf: $(OBJS) ../kernel.elf
 	$(CXX) $< -c -o $@ $(CXXFLAGS)
 
 %.S.o: %.S Makefile
-	$(AS) $< -c -o $@
+	$(CXX) $< -c -o $@ $(ASFLAGS)
 
 clean:
 	$(RM) -f $(OBJS) $(DEPENDS)

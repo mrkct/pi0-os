@@ -10,10 +10,14 @@ CXXFLAGS+=-fno-exceptions -fno-threadsafe-statics -fno-rtti -std=c++2a
 CXXFLAGS+=-Wall -Wextra -Werror -g
 CXXFLAGS+=-fsanitize=undefined
 
+ASFLAGS:=
+
 ifeq ($(ARCH), ARMV6)
 	CXXFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
+	ASFLAGS+=-mcpu=arm1176jzf-s -DCONFIG_ARMV6
 else
 	CXXFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
+	ASFLAGS+=-mcpu=cortex-a7 -DCONFIG_ARMV7
 endif
 
 ARCH_SOURCES=\
@@ -72,7 +76,7 @@ DEPENDS:= $(addprefix $(SOURCES_ROOT), $(DEPENDS))
 OBJS:=$(addsuffix .o, $(SOURCES))
 OBJS:=$(addprefix $(SOURCES_ROOT), $(OBJS))
 
-.PHONY: all clean qemu qemu-gdb 
+.PHONY: all clean bootloader
 
 all: kernel.elf bootloader 
 
@@ -91,7 +95,7 @@ kernel.elf: $(OBJS)
 
 %.S.o: %.S Makefile
 	@echo "\033[36mCompiling $<\033[0m"
-	$(AS) $< -c -o $@
+	$(CXX) $< -c -o $@ $(ASFLAGS)
 
 clean:
 	$(RM) -f $(OBJS) $(DEPENDS)
