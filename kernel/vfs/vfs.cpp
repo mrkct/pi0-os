@@ -1,8 +1,9 @@
 #include "vfs.h"
+#include "fs.h"
 
 #include <kernel/scheduler.h>
 
-#define LOG_ENABLED
+// #define LOG_ENABLED
 #define LOG_TAG "VFS"
 #include <kernel/log.h>
 
@@ -133,57 +134,6 @@ static char *canonicalize_path(const char *path)
     cpath[cpath_len + 1] = '\0';
     return cpath;
 }
-
-static Inode *icache_lookup(InodeCache *icache, InodeIdentifier identifier)
-{
-    auto *entry = icache->list.find_first([&](InodeCache::Entry *entry) {
-        return entry->identifier == identifier;
-    });
-    if (entry == nullptr) {
-        LOGD("Looking up inode %" PRIu64 " in icache ... failed", identifier);
-        return nullptr;
-    }
-
-    LOGD("Looking up inode %" PRIu64 " in icache ... found (refcount: %d)", identifier, entry->inode->refcount);
-    return entry->inode;
-}
-
-static int icache_insert(InodeCache *icache, InodeIdentifier identifier, Inode *inode)
-{
-    kassert(icache_lookup(icache, identifier) == nullptr);
-
-    auto *entry = (InodeCache::Entry*) malloc(sizeof(InodeCache::Entry));
-    if (entry == nullptr)
-        return -ERR_NOMEM;
-
-    *entry = InodeCache::Entry {
-        .prev = nullptr,
-        .next = nullptr,
-        .identifier = identifier,
-        .inode = inode
-    };
-    icache->list.add(entry);
-
-    LOGD("Inserting inode %" PRIu64 " into icache", identifier);
-    return 0;
-}
-
-#if 0
-static Inode *icache_remove(InodeCache *icache, InodeIdentifier identifier)
-{
-    auto *entry = icache->list.find_first([&](InodeCache::Entry *entry) {
-        return entry->identifier == identifier;
-    });
-    if (entry == nullptr)
-        return nullptr;
-    
-    icache->list.remove(entry);
-    Inode *inode = entry->inode;
-    free(entry);
-
-    return inode;
-}
-#endif
 
 static int open_inode(Inode *inode)
 {
@@ -388,6 +338,56 @@ static int traverse(const char *path, Inode **out_parent, Inode **out_inode)
     return rc;
 }
 
+static void inode_stat(Inode *inode, api::Stat *out_stat)
+{
+    *out_stat = (api::Stat) {
+        .st_dev = ((uint32_t) inode->devmajor << 8) | inode->devminor,
+        .st_ino = inode->identifier,
+        .st_mode = 0666,
+        .st_nlink = (uint32_t) inode->refcount,
+        .st_uid = inode->uid,
+        .st_gid = inode->gid,
+        .st_rdev = 0,
+        .st_size = inode->size,
+        .atim = inode->access_time,
+        .mtim = inode->modification_time,
+        .ctim = inode->creation_time,
+        .st_blksize = inode->blksize,
+        .st_blocks = round_up(inode->size, inode->blksize) / inode->blksize,
+    };
+
+    switch (inode->type) {
+    case InodeType::RegularFile:
+        out_stat->st_mode |= SF_IFREG;
+        break;
+    case InodeType::Directory:
+        out_stat->st_mode |= SF_IFDIR;
+        break;
+    case InodeType::Pipe:
+        out_stat->st_mode |= SF_IFIFO;
+        break;
+    case InodeType::CharacterDevice:
+        out_stat->st_mode |= SF_IFCHR;
+        break;
+    case InodeType::BlockDevice:
+        out_stat->st_mode |= SF_IFBLK;
+        break;
+    case InodeType::Socket:
+        out_stat->st_mode |= SF_IFSOCK;
+        break;
+    case InodeType::FIFO:
+        out_stat->st_mode |= SF_IFIFO;
+        break;
+    case InodeType::SymbolicLink:
+        out_stat->st_mode |= SF_IFLNK;
+        break;
+    default:
+        LOGE("Unknown inode type %d", inode->type);
+        out_stat->st_mode |= SF_IFREG;
+        break;
+    }
+}
+
 int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
 {
     int rc = 0;
@@ -578,7 +578,7 @@ int vfs_stat(const char *path, api::Stat *stat)
     rc = traverse(path, &parent, &inode);
 
     if (rc != 0)
-        rc = inode->ops->stat(inode, stat);
+        inode_stat(parent, stat);
 
     close_inode(parent);
     close_inode(inode);
@@ -587,7 +587,8 @@ int vfs_stat(const char *path, api::Stat *stat)
 
 int vfs_fstat(FileCustody *custody, api::Stat *stat)
 {
-    return custody->inode->ops->stat(custody->inode, stat);
+    inode_stat(custody->inode, stat);
+    return 0;
 }
 
 FileCustody* vfs_duplicate(FileCustody *custody)

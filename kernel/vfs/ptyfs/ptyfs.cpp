@@ -18,8 +18,6 @@ static int ptyfs_fs_on_mount(Filesystem *self, Inode *out_root);
 static int ptyfs_fs_open_inode(Filesystem*, Inode*);
 static int ptyfs_fs_close_inode(Filesystem*, Inode*);
 
-static int ptyfs_inode_stat(Inode *self, api::Stat *st);
-
 static int64_t ptyfs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 static int64_t ptyfs_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
 static int32_t ptyfs_file_inode_ioctl(Inode *self, uint32_t request, void *argp);
@@ -30,8 +28,6 @@ static int32_t ptyfs_file_inode_istty(Inode*);
 
 static int ptyfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int ptyfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
-static int ptyfs_dir_inode_mkdir(Inode *self, const char *name);
-static int ptyfs_dir_inode_rmdir(Inode *self, const char *name);
 static int ptyfs_dir_inode_unlink(Inode *self, const char *name);
 
 
@@ -42,7 +38,6 @@ static struct FilesystemOps s_ptyfs_ops {
 };
 
 static struct InodeOps s_ptyfs_inode_ops {
-    .stat = ptyfs_inode_stat,
 };
 
 static struct InodeFileOps s_ptyfs_inode_file_ops {
@@ -58,8 +53,6 @@ static struct InodeFileOps s_ptyfs_inode_file_ops {
 static struct InodeDirOps s_ptyfs_inode_dir_ops {
     .lookup = ptyfs_dir_inode_lookup,
     .create = ptyfs_dir_inode_create,
-    .mkdir = ptyfs_dir_inode_mkdir,
-    .rmdir = ptyfs_dir_inode_rmdir,
     .unlink = ptyfs_dir_inode_unlink,
 };
 
@@ -119,12 +112,16 @@ static int ptyfs_dir_inode_lookup_ptmx(Inode *self, Inode *out_inode)
         .type = InodeType::CharacterDevice,
         .identifier = get_pty_master_inode_id(pty_id),
         .filesystem = self->filesystem,
+        .devmajor = 0,
+        .devminor = 0,
         .mode = 0666,
         .uid = 0,
+        .gid = 0,
         .size = 0,
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = 1,
         .opaque = nullptr,
         .ops = &s_ptyfs_inode_ops,
         .file_ops = &s_ptyfs_inode_file_ops,
@@ -147,12 +144,16 @@ static int ptyfs_dir_inode_lookup_pty(Inode *self, int pty, Inode *out_inode)
         .type = InodeType::CharacterDevice,
         .identifier = get_pty_slave_inode_id(pty),
         .filesystem = self->filesystem,
+        .devmajor = 0,
+        .devminor = 0,
         .mode = 0666,
         .uid = 0,
+        .gid = 0,
         .size = 0,
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = 1,
         .opaque = nullptr,
         .ops = &s_ptyfs_inode_ops,
         .file_ops = &s_ptyfs_inode_file_ops,
@@ -177,16 +178,6 @@ static int ptyfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
 }
 
 static int ptyfs_dir_inode_create(Inode*, const char*, InodeType, Inode**)
-{
-    return -ERR_NOTSUP;
-}
-
-static int ptyfs_dir_inode_mkdir(Inode*, const char*)
-{
-    return -ERR_NOTSUP;
-}
-
-static int ptyfs_dir_inode_rmdir(Inode*, const char*)
 {
     return -ERR_NOTSUP;
 }
@@ -238,12 +229,16 @@ static int ptyfs_fs_on_mount(Filesystem *self, Inode *out_root)
         .type = InodeType::Directory,
         .identifier = ROOT_INODE_ID,
         .filesystem = self,
+        .devmajor = 0,
+        .devminor = 0,
         .mode = 0,
         .uid = 0,
+        .gid = 0,
         .size = 0,
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = 1,
         .opaque = nullptr,
         .ops = &s_ptyfs_inode_ops,
         .dir_ops = &s_ptyfs_inode_dir_ops,
@@ -276,28 +271,6 @@ static int ptyfs_fs_open_inode(Filesystem *fs, Inode *inode)
     return 0;
 failed:
     return rc;
-}
-
-static int ptyfs_inode_stat(Inode *self, api::Stat *st)
-{
-    *st = (api::Stat) {
-        .st_dev = 0,
-        .st_ino = self->identifier,
-        .st_mode = 0,
-        .st_nlink = 1,
-        .st_uid = self->uid,
-        .st_gid = 0,
-        .st_rdev = 0,
-        .st_size = 0,
-        .atim = self->access_time,
-        .mtim = self->modification_time,
-        .ctim = self->creation_time,
-        .st_blksize = 0,
-        .st_blocks = 0
-    };
-    st->st_mode = self->identifier == ROOT_INODE_ID ? SF_IFDIR : SF_IFCHR;
-
-    return 0;
 }
 
 static int ptyfs_fs_close_inode(Filesystem *fs, Inode *inode)

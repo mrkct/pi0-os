@@ -20,7 +20,6 @@ enum class InodeType {
 };
 
 struct InodeOps {
-    int (*stat)(Inode *self, api::Stat *st);
 };
 
 struct InodeFileOps {
@@ -36,8 +35,6 @@ struct InodeFileOps {
 struct InodeDirOps {
     int (*lookup)(Inode *self, const char *name, Inode *out_entry);
     int (*create)(Inode *self, const char *name, InodeType type, Inode **out_inode);
-    int (*mkdir)(Inode *self, const char *name);
-    int (*rmdir)(Inode *self, const char *name);
     int (*unlink)(Inode *self, const char *name);
 };
 
@@ -48,12 +45,14 @@ struct Inode {
     InodeIdentifier identifier;
     Filesystem *filesystem;
 
+    uint16_t devmajor, devminor;
     uint32_t mode;
-    uint32_t uid;
+    uint32_t uid, gid;
     uint64_t size;
     api::TimeSpec access_time;
     api::TimeSpec creation_time;
     api::TimeSpec modification_time;
+    uint64_t blksize;
 
     void *opaque;
 
@@ -98,6 +97,10 @@ struct Filesystem {
 };
 
 static inline int inode_cache_init(InodeCache *icache) { icache->list = {nullptr, nullptr}; return 0; }
+
+int icache_insert(InodeCache *icache, InodeIdentifier identifier, Inode *inode);
+
+Inode *icache_lookup(InodeCache *icache, InodeIdentifier identifier);
 
 static inline void inode_cache_free(InodeCache*) { TODO(); }
 

@@ -6,6 +6,58 @@
 #include <kernel/log.h>
 
 
+Inode *icache_lookup(InodeCache *icache, InodeIdentifier identifier)
+{
+    auto *entry = icache->list.find_first([&](InodeCache::Entry *entry) {
+        return entry->identifier == identifier;
+    });
+    if (entry == nullptr) {
+        LOGD("Looking up inode %" PRIu64 " in icache ... failed", identifier);
+        return nullptr;
+    }
+
+    LOGD("Looking up inode %" PRIu64 " in icache ... found (refcount: %d)", identifier, entry->inode->refcount);
+    return entry->inode;
+}
+
+int icache_insert(InodeCache *icache, InodeIdentifier identifier, Inode *inode)
+{
+    kassert(icache_lookup(icache, identifier) == nullptr);
+
+    auto *entry = (InodeCache::Entry*) malloc(sizeof(InodeCache::Entry));
+    if (entry == nullptr)
+        return -ERR_NOMEM;
+
+    *entry = InodeCache::Entry {
+        .prev = nullptr,
+        .next = nullptr,
+        .identifier = identifier,
+        .inode = inode
+    };
+    icache->list.add(entry);
+
+    LOGD("Inserting inode %" PRIu64 " into icache", identifier);
+    return 0;
+}
+
+#if 0
+static Inode *icache_remove(InodeCache *icache, InodeIdentifier identifier)
+{
+    auto *entry = icache->list.find_first([&](InodeCache::Entry *entry) {
+        return entry->identifier == identifier;
+    });
+    if (entry == nullptr)
+        return nullptr;
+    
+    icache->list.remove(entry);
+    Inode *inode = entry->inode;
+    free(entry);
+
+    return inode;
+}
+#endif
+
+
 uint64_t default_checked_seek(uint64_t filesize, uint64_t current, int whence, int32_t offset)
 {
     // FIXME: This doesn't handle overflow very well

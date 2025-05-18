@@ -10,25 +10,29 @@
  * except they have a slightly different name to disambiguate
  */
 typedef enum Errors {
-    ERR_PERM = 1,	    /* Not owner */
-    ERR_NOENT = 2,	    /* No such file or directory */
-    ERR_IO = 5,		    /* I/O error */
-    ERR_2BIG = 7,	    /* Arg list too long */
-    ERR_NOEXEC = 8,	    /* Exec format error */
-    ERR_BADF = 9,       /* Bad file number */
-    ERR_NOMEM =	12,	    /* Not enough space */
-    ERR_BUSY = 16,	    /* Device or resource busy */
-    ERR_NODEV = 19,	    /* No such device */
-    ERR_NOTDIR = 20,	/* Not a directory */
-    ERR_ISDIR = 21,	    /* Is a directory */
-    ERR_INVAL = 22,	    /* Invalid argument */
-    ERR_NFILE = 23,	    /* Too many open files in system */
-    ERR_ROFS = 30,	    /* Read-only file system */
-    ERR_PIPE = 32,	    /* Broken pipe */
-    ERR_NOSYS = 88,	    /* Function not implemented */
-    ERR_TIMEDOUT = 116,	/* Connection timed out */
-    ERR_ALREADY = 120,	/* Socket already connected */
-    ERR_NOTSUP = 134	/* Not supported */
+    ERR_PERM = 1,	        /* Not owner */
+    ERR_NOENT = 2,	        /* No such file or directory */
+    ERR_IO = 5,		        /* I/O error */
+    ERR_2BIG = 7,	        /* Arg list too long */
+    ERR_NOEXEC = 8,	        /* Exec format error */
+    ERR_BADF = 9,           /* Bad file number */
+    ERR_NOMEM =	12,	        /* Not enough space */
+    ERR_BUSY = 16,	        /* Device or resource busy */
+    ERR_EXIST = 17,	        /* File exists */
+    ERR_NODEV = 19,	        /* No such device */
+    ERR_NOTDIR = 20,	    /* Not a directory */
+    ERR_ISDIR = 21,	        /* Is a directory */
+    ERR_INVAL = 22,	        /* Invalid argument */
+    ERR_NFILE = 23,	        /* Too many open files in system */
+    ERR_NOSPACE = 28,	    /* No space left on device */
+    ERR_ROFS = 30,	        /* Read-only file system */
+    ERR_PIPE = 32,	        /* Broken pipe */
+    ERR_NOSYS = 88,	        /* Function not implemented */
+    ERR_NOTEMPTY = 90,	    /* Directory not empty */
+    ERR_NAMETOOLONG = 91,	/* File or path name too long */
+    ERR_TIMEDOUT = 116,	    /* Connection timed out */
+    ERR_ALREADY = 120,	    /* Socket already connected */
+    ERR_NOTSUP = 134	    /* Not supported */
 } Errors;
 
 #if __SIZEOF_POINTER__ == 4

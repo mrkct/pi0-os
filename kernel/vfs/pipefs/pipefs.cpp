@@ -16,8 +16,6 @@ static int pipefs_fs_on_mount(Filesystem *self, Inode *out_root);
 static int pipefs_fs_open_inode(Filesystem*, Inode*);
 static int pipefs_fs_close_inode(Filesystem*, Inode*);
 
-static int pipefs_inode_stat(Inode *self, api::Stat *st);
-
 static int64_t pipefs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 static int64_t pipefs_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
 static int32_t pipefs_file_inode_poll(Inode *self, uint32_t events, uint32_t *out_revents);
@@ -31,7 +29,6 @@ static struct FilesystemOps s_pipefs_ops {
 };
 
 static struct InodeOps s_pipefs_inode_ops {
-    .stat = pipefs_inode_stat,
 };
 
 static struct InodeFileOps s_pipefs_inode_file_ops {
@@ -47,8 +44,6 @@ static struct InodeFileOps s_pipefs_inode_file_ops {
 static struct InodeDirOps s_pipefs_inode_dir_ops {
     .lookup = pipefs_dir_inode_lookup,
     .create = fs_dir_inode_create_not_supported,
-    .mkdir = fs_dir_inode_mkdir_not_supported,
-    .rmdir = fs_dir_inode_rmdir_not_supported,
     .unlink = fs_dir_inode_unlink_not_supported,
 };
 
@@ -65,12 +60,16 @@ static int pipefs_dir_inode_lookup(Inode *self, const char *name, Inode *out_ino
         .type = InodeType::Pipe,
         .identifier = fs->next_pipe_id++,
         .filesystem = self->filesystem,
+        .devmajor = 0,
+        .devminor = 0,
         .mode = 0666,
         .uid = 0,
+        .gid = 0,
         .size = 0,
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = 1,
         .opaque = nullptr,
         .ops = &s_pipefs_inode_ops,
         .file_ops = &s_pipefs_inode_file_ops,
@@ -86,12 +85,16 @@ static int pipefs_fs_on_mount(Filesystem *self, Inode *out_root)
         .type = InodeType::Directory,
         .identifier = 0,
         .filesystem = self,
+        .devmajor = 0,
+        .devminor = 0,
         .mode = 0755,
         .uid = 0,
+        .gid = 0,
         .size = 0,
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = 1,
         .opaque = nullptr,
         .ops = &s_pipefs_inode_ops,
         .dir_ops = &s_pipefs_inode_dir_ops,
@@ -175,31 +178,6 @@ static int pipefs_fs_close_inode(Filesystem*, Inode *inode)
     auto *ctx = static_cast<PipeFSInodeCtx*>(inode->opaque);
     free(ctx);
     inode->opaque = nullptr;
-    return 0;
-}
-
-static int pipefs_inode_stat(Inode *self, api::Stat *st)
-{
-    st->st_dev = 0;
-    st->st_ino = self->identifier;
-    st->st_mode = SF_IFDIR | 0666;
-    st->st_nlink = 1;
-    st->st_uid = self->uid;
-    st->st_gid = self->uid;
-    st->st_rdev = 0;
-    st->st_size = self->size;
-    st->st_blksize = 4096;
-    st->st_blocks = 1;
-    st->atim = self->access_time;
-    st->mtim = self->modification_time;
-    st->ctim = self->creation_time;
-
-    if (self->identifier == 0) {
-        st->st_mode |= SF_IFDIR;
-    } else {
-        st->st_mode |= SF_IFIFO;
-    }
-    
     return 0;
 }
 

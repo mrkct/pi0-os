@@ -24,8 +24,6 @@ static int devfs_fs_on_mount(Filesystem *self, Inode *out_root);
 static int devfs_fs_open_inode(Filesystem*, Inode*);
 static int devfs_fs_close_inode(Filesystem*, Inode*);
 
-static int devfs_inode_stat(Inode *self, api::Stat *st);
-
 static int64_t devfs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 static int64_t devfs_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
 static int32_t devfs_file_inode_ioctl(Inode *self, uint32_t request, void *argp);
@@ -36,8 +34,6 @@ static int32_t devfs_file_inode_istty(Inode*);
 
 static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int devfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
-static int devfs_dir_inode_mkdir(Inode *self, const char *name);
-static int devfs_dir_inode_rmdir(Inode *self, const char *name);
 static int devfs_dir_inode_unlink(Inode *self, const char *name);
 
 
@@ -48,7 +44,6 @@ static struct FilesystemOps s_devfs_ops {
 };
 
 static struct InodeOps s_devfs_inode_ops {
-    .stat = devfs_inode_stat,
 };
 
 static struct InodeFileOps s_devfs_inode_file_ops {
@@ -64,8 +59,6 @@ static struct InodeFileOps s_devfs_inode_file_ops {
 static struct InodeDirOps s_devfs_inode_dir_ops {
     .lookup = devfs_dir_inode_lookup,
     .create = devfs_dir_inode_create,
-    .mkdir = devfs_dir_inode_mkdir,
-    .rmdir = devfs_dir_inode_rmdir,
     .unlink = devfs_dir_inode_unlink,
 };
 
@@ -133,12 +126,16 @@ static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
         .type = device_type_to_inode_type(device->device_type()),
         .identifier = device->dev_id(),
         .filesystem = self->filesystem,
+        .devmajor = 0,
+        .devminor = 0,
         .mode = 0666,
         .uid = 0,
+        .gid = 0,
         .size = get_device_size(device),
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = 512,
         .opaque = nullptr,
         .ops = &s_devfs_inode_ops,
         .file_ops = &s_devfs_inode_file_ops,
@@ -151,16 +148,6 @@ failed:
 }
 
 static int devfs_dir_inode_create(Inode*, const char*, InodeType, Inode**)
-{
-    return -ERR_NOTSUP;
-}
-
-static int devfs_dir_inode_mkdir(Inode*, const char*)
-{
-    return -ERR_NOTSUP;
-}
-
-static int devfs_dir_inode_rmdir(Inode*, const char*)
 {
     return -ERR_NOTSUP;
 }
@@ -230,12 +217,16 @@ static int devfs_fs_on_mount(Filesystem *self, Inode *out_root)
         .type = InodeType::Directory,
         .identifier = 0,
         .filesystem = self,
+        .devmajor = 0,
+        .devminor = 0,
         .mode = 0,
         .uid = 0,
+        .gid = 0,
         .size = 0,
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = 512,
         .opaque = nullptr,
         .ops = &s_devfs_inode_ops,
         .dir_ops = &s_devfs_inode_dir_ops,
@@ -285,39 +276,6 @@ static int devfs_fs_open_inode(Filesystem*, Inode *inode)
     return 0;
 failed:
     return rc;
-}
-
-static int devfs_inode_stat(Inode *self, api::Stat *st)
-{
-    DevFSInodeCtx *ctx = (DevFSInodeCtx*) self->opaque;
-
-    st->st_dev = ctx->device->dev_id();
-    st->st_ino = self->identifier;
-    switch (ctx->type) {
-    case MountableDeviceType::CharacterDevice: {
-        st->st_mode = SF_IFCHR;
-        st->st_blksize = 0;
-        st->st_blocks = 0;
-        break;
-    }
-    case MountableDeviceType::BlockDevice: {
-        BlockDevice *device = reinterpret_cast<BlockDevice *>(ctx->device);
-        st->st_mode = SF_IFBLK;
-        st->st_blksize = device->block_size();
-        st->st_blocks = round_down(device->size(), device->block_size());
-        break;
-    }
-    }
-    st->st_nlink = 1;
-    st->st_uid = self->uid;
-    st->st_gid = self->uid;
-    st->st_rdev = 0;
-    st->st_size = self->size;
-    st->atim = self->access_time;
-    st->mtim = self->modification_time;
-    st->ctim = self->creation_time;
-    
-    return 0;
 }
 
 static int devfs_fs_close_inode(Filesystem*, Inode *inode)

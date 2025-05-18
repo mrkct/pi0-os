@@ -44,8 +44,6 @@ static int fat32_fs_on_mount(Filesystem *self, Inode *out_root);
 static int fat32_fs_open_inode(Filesystem*, Inode*);
 static int fat32_fs_close_inode(Filesystem*, Inode*);
 
-static int fat32_inode_stat(Inode *self, api::Stat *st);
-
 static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 static int64_t fat32_file_inode_write(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
 static int32_t fat32_file_inode_ioctl(Inode *self, uint32_t request, void *argp);
@@ -53,8 +51,6 @@ static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence,
 
 static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int fat32_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
-static int fat32_dir_inode_mkdir(Inode *self, const char *name);
-static int fat32_dir_inode_rmdir(Inode *self, const char *name);
 static int fat32_dir_inode_unlink(Inode *self, const char *name);
 
 
@@ -65,7 +61,6 @@ static struct FilesystemOps s_fat32_ops {
 };
 
 static struct InodeOps s_fat32_inode_ops {
-    .stat = fat32_inode_stat,
 };
 
 static struct InodeFileOps s_fat32_inode_file_ops {
@@ -81,8 +76,6 @@ static struct InodeFileOps s_fat32_inode_file_ops {
 static struct InodeDirOps s_fat32_inode_dir_ops {
     .lookup = fat32_dir_inode_lookup,
     .create = fat32_dir_inode_create,
-    .mkdir = fat32_dir_inode_mkdir,
-    .rmdir = fat32_dir_inode_rmdir,
     .unlink = fat32_dir_inode_unlink,
 };
 
@@ -223,6 +216,8 @@ static api::TimeSpec fat32_datetime_to_timespec(uint16_t date, uint16_t time)
 
 static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode)
 {
+    auto *fsctx = (Fat32FilesystemCtx*) self->filesystem->opaque;
+
     LOGI("Looking up %s in inode %" PRIu64, name, self->identifier);
     return foreach_8_3_directory_entry(self, [&](auto, fat32::DirectoryEntry8_3 &fat_entry) {
 
@@ -235,10 +230,8 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
         InodeType inodetype = InodeType::RegularFile;
         uint32_t mode = 0;
         if (fat_entry.DIR_Attr & fat32::DirectoryEntry8_3::ATTR_DIRECTORY) {
-            mode |= SF_IFDIR;
             inodetype = InodeType::Directory;
         } else {
-            mode |= SF_IFREG;
             inodetype = InodeType::RegularFile;
         }
         // TODO: Figure out the mode bits
@@ -250,12 +243,16 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
             .type = inodetype,
             .identifier = cluster,
             .filesystem = self->filesystem,
+            .devmajor = fsctx->storage->major(),
+            .devminor = fsctx->storage->minor(),
             .mode = mode,
             .uid = 0,
+            .gid = 0,
             .size = fat_entry.DIR_FileSize,
             .access_time = fat32_datetime_to_timespec(fat_entry.DIR_LstAccDate, 0 /* no access time in fat32*/),
             .creation_time = fat32_datetime_to_timespec(fat_entry.DIR_CrtDate, fat_entry.DIR_CrtTime),
             .modification_time = fat32_datetime_to_timespec(fat_entry.DIR_WrtDate, fat_entry.DIR_WrtTime),
+            .blksize = fsctx->sector_size,
             .opaque = nullptr,
             .ops = &s_fat32_inode_ops,
             .file_ops = nullptr, // ignore, just to silence the compiler
@@ -272,16 +269,6 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
 }
 
 static int fat32_dir_inode_create(Inode*, const char*, InodeType, Inode**)
-{
-    return -ERR_NOTSUP;
-}
-
-static int fat32_dir_inode_mkdir(Inode*, const char*)
-{
-    return -ERR_NOTSUP;
-}
-
-static int fat32_dir_inode_rmdir(Inode*, const char*)
 {
     return -ERR_NOTSUP;
 }
@@ -356,17 +343,23 @@ static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence,
 
 static int fat32_fs_on_mount(Filesystem *self, Inode *out_root)
 {
+    auto *fsctx = (Fat32FilesystemCtx*) self->opaque;
+
     *out_root = (Inode) {
         .refcount = 0,
         .type = InodeType::Directory,
         .identifier = 2,
         .filesystem = self,
+        .devmajor = fsctx->storage->major(),
+        .devminor = fsctx->storage->minor(),
         .mode = 0,
         .uid = 0,
+        .gid = 0,
         .size = 0,
         .access_time = {},
         .creation_time = {},
         .modification_time = {},
+        .blksize = fsctx->sector_size,
         .opaque = nullptr,
         .ops = &s_fat32_inode_ops,
         .dir_ops = &s_fat32_inode_dir_ops,
@@ -378,29 +371,6 @@ static int fat32_fs_on_mount(Filesystem *self, Inode *out_root)
 static int fat32_fs_open_inode(Filesystem*, Inode *inode)
 {
     inode->opaque = nullptr;
-    return 0;
-}
-
-static int fat32_inode_stat(Inode *self, api::Stat *st)
-{
-    auto *fsctx = (Fat32FilesystemCtx*) self->filesystem->opaque;
-
-    uint16_t devno = (((uint16_t) fsctx->storage->major()) << 8) | fsctx->storage->minor();
-
-    st->st_dev = devno;
-    st->st_ino = self->identifier;
-    st->st_mode = self->type == InodeType::Directory ? SF_IFDIR : SF_IFREG;
-    st->st_nlink = 1;
-    st->st_uid = self->uid;
-    st->st_gid = self->uid;
-    st->st_rdev = 0;
-    st->st_size = self->size;
-    st->atim = self->access_time;
-    st->mtim = self->modification_time;
-    st->ctim = self->creation_time;
-    st->st_blksize = SECTOR_SIZE;
-    st->st_blocks = round_up<uint64_t>(self->size, SECTOR_SIZE) / SECTOR_SIZE;
-
     return 0;
 }
 
