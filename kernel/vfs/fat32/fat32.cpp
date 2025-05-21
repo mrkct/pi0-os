@@ -50,7 +50,7 @@ static int32_t fat32_file_inode_ioctl(Inode *self, uint32_t request, void *argp)
 static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset);
 
 static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
-static int fat32_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
+static int fat32_dir_inode_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int fat32_dir_inode_unlink(Inode *self, const char *name);
 
 
@@ -268,7 +268,7 @@ static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
     });
 }
 
-static int fat32_dir_inode_create(Inode*, const char*, InodeType, Inode**)
+static int fat32_dir_inode_create(Inode*, const char*, InodeType, Inode*)
 {
     return -ERR_NOTSUP;
 }

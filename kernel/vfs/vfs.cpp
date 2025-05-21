@@ -137,6 +137,8 @@ static char *canonicalize_path(const char *path)
 
 static int open_inode(Inode *inode)
 {
+    kassert(inode != nullptr);
+
     if (inode->refcount > 0) {
         inode->refcount++;
         LOGI("Opening inode %" PRIu64 " (increasing refcount to %d)", inode->identifier, inode->refcount);
@@ -144,6 +146,7 @@ static int open_inode(Inode *inode)
     }
 
     auto *fs = inode->filesystem;
+    kassert(fs != nullptr);
     LOGI("Opening inode %" PRIu64, inode->identifier);
     int rc = fs->ops->open_inode(fs, inode);
     if (rc != 0) {
@@ -262,7 +265,7 @@ static int traverse_in_fs(Filesystem *fs, const char *fs_relative_canonicalized_
     Inode *parent = nullptr;
     Inode *inode = icache_lookup(&fs->icache, fs->root);
     if (inode == nullptr) {
-        LOGE("root inode not found");
+        LOGE("root inode %lu not found", fs->root);
         return -ERR_NOENT;
     }
 
@@ -388,6 +391,45 @@ static void inode_stat(Inode *inode, api::Stat *out_stat)
     }
 }
 
+static int create_inode(Inode *parent, const char *name, InodeType type, Inode **out_inode)
+{
+    int rc;
+    Inode temp = {};
+
+    LOGI("Creating inode '%s' in %" PRIu64, name, parent->identifier);
+    rc = parent->dir_ops->create(parent, name, type, &temp);
+    if (rc != 0) {
+        LOGE("Failed to create inode '%s' in %" PRIu64 ": %d", name, parent->identifier, rc);
+        return rc;
+    }
+    
+    *out_inode = icache_lookup(&parent->filesystem->icache, temp.identifier);
+    kassert(*out_inode == nullptr);
+
+    *out_inode = (Inode*) malloc(sizeof(Inode));
+    if (*out_inode == nullptr)
+        return -ERR_NOMEM;
+        
+    **out_inode = temp;
+    (*out_inode)->refcount = 0;
+    rc = open_inode(*out_inode);
+    if (rc != 0) {
+        free(*out_inode);
+        *out_inode = nullptr;
+        return rc;
+    }
+    
+    rc = icache_insert(&parent->filesystem->icache, temp.identifier, *out_inode);
+    if (rc != 0) {
+        close_inode(*out_inode);
+        free(*out_inode);
+        *out_inode = nullptr;
+        return rc;
+    }
+
+    return 0;
+}
+
 int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
 {
     int rc = 0;
@@ -400,8 +442,12 @@ int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
     if (rc != 0 && parent != nullptr && (flags & OF_CREATE)) {
         kassert(parent != nullptr);
         kassert(parent->type == InodeType::Directory);
-        TODO();
-        rc = -ERR_NOTSUP;
+
+        const char *filename = strrchr(path, '/');
+        kassert(filename != nullptr);
+        filename += 1;
+
+        rc = create_inode(parent, filename, InodeType::RegularFile, &inode);
     } else if (rc == 0) {
         auto *fs = inode->filesystem;
         kassert(fs != nullptr);

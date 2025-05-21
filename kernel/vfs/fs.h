@@ -34,7 +34,7 @@ struct InodeFileOps {
 
 struct InodeDirOps {
     int (*lookup)(Inode *self, const char *name, Inode *out_entry);
-    int (*create)(Inode *self, const char *name, InodeType type, Inode **out_inode);
+    int (*create)(Inode *self, const char *name, InodeType type, Inode *out_inode);
     int (*unlink)(Inode *self, const char *name);
 };
 
@@ -113,7 +113,7 @@ uint64_t fs_inode_seek_not_supported(Inode*, uint64_t, int, int32_t);
 int32_t fs_file_inode_poll_always_ready(Inode *self, uint32_t events, uint32_t *out_revents);
 int32_t fs_file_inode_mmap_not_supported(Inode*, AddressSpace*, uintptr_t, uint32_t, uint32_t);
 int32_t fs_file_inode_istty_always_false(Inode*);
-int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **);
+int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode *);
 int fs_dir_inode_mkdir_not_supported(Inode*, const char *);
 int fs_dir_inode_rmdir_not_supported(Inode*, const char *);
 int fs_dir_inode_unlink_not_supported(Inode*, const char *);

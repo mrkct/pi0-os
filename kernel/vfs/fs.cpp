@@ -115,7 +115,7 @@ int32_t fs_file_inode_mmap_not_supported(Inode*, AddressSpace*, uintptr_t, uint3
     return -ERR_NOTSUP;
 }
 
-int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode **)
+int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode *)
 {
     return -ERR_NOTSUP;
 }

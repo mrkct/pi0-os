@@ -33,7 +33,7 @@ static int32_t devfs_file_inode_mmap(Inode*, AddressSpace*, uintptr_t, uint32_t,
 static int32_t devfs_file_inode_istty(Inode*);
 
 static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
-static int devfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
+static int devfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int devfs_dir_inode_unlink(Inode *self, const char *name);
 
 
@@ -147,7 +147,7 @@ failed:
     return rc;
 }
 
-static int devfs_dir_inode_create(Inode*, const char*, InodeType, Inode**)
+static int devfs_dir_inode_create(Inode*, const char*, InodeType, Inode*)
 {
     return -ERR_NOTSUP;
 }

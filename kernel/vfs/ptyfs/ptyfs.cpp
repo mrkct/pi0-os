@@ -27,8 +27,6 @@ static int32_t ptyfs_file_inode_mmap(Inode*, AddressSpace*, uintptr_t, uint32_t,
 static int32_t ptyfs_file_inode_istty(Inode*);
 
 static int ptyfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
-static int ptyfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode **out_inode);
-static int ptyfs_dir_inode_unlink(Inode *self, const char *name);
 
 
 static struct FilesystemOps s_ptyfs_ops {
@@ -52,8 +50,8 @@ static struct InodeFileOps s_ptyfs_inode_file_ops {
 
 static struct InodeDirOps s_ptyfs_inode_dir_ops {
     .lookup = ptyfs_dir_inode_lookup,
-    .create = ptyfs_dir_inode_create,
-    .unlink = ptyfs_dir_inode_unlink,
+    .create = fs_dir_inode_create_not_supported,
+    .unlink = fs_dir_inode_unlink_not_supported,
 };
 
 static constexpr uint64_t get_pty_master_inode_id(int pty_id) { return pty_id; }
@@ -175,16 +173,6 @@ static int ptyfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inod
     LOGD("Odd lookup for %s in ptyfs", name);
 
     return -ERR_NOENT;
-}
-
-static int ptyfs_dir_inode_create(Inode*, const char*, InodeType, Inode**)
-{
-    return -ERR_NOTSUP;
-}
-
-static int ptyfs_dir_inode_unlink(Inode*, const char*)
-{
-    return -ERR_NOTSUP;
 }
 
 static int64_t ptyfs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size)
