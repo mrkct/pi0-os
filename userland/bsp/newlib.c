@@ -12,6 +12,19 @@
 #include <api/syscalls.h>
 
 
+#define SET_ERRNO_AND_RETURN(expr)      \
+    do {                                \
+        int rc = (expr);                \
+        if (-4096 < rc && rc < 0) {     \
+            errno = -rc;                \
+            return -1;                  \
+        } else {                        \
+            errno = 0;                  \
+            return rc;                  \
+        }                               \
+    } while (0)
+
+
 void _exit(int status)
 {
     sys_exit(status);
@@ -81,12 +94,12 @@ off_t _lseek(int file, int ptr, int dir)
 
 int _link(char const* oldpath, char const* newpath)
 {
-    return sys_link(oldpath, newpath);
+    SET_ERRNO_AND_RETURN(sys_link(oldpath, newpath));
 }
 
 int _unlink(char const* pathname)
 {
-    return sys_unlink(pathname);
+    SET_ERRNO_AND_RETURN(sys_unlink(pathname));
 }
 
 void _kill(int pid, int sig)
@@ -101,42 +114,42 @@ int _getpid(void)
 
 int _open(char const* pathname, int flags, int mode)
 {
-    return sys_open(pathname, flags, mode);
+    SET_ERRNO_AND_RETURN(sys_open(pathname, flags, mode));
 }
 
 int _close(int file)
 {
-    return sys_close(file);
+    SET_ERRNO_AND_RETURN(sys_close(file));
 }
 
 int _write(int file, char* ptr, int len)
 {
-    return sys_write(file, ptr, len);
+    SET_ERRNO_AND_RETURN(sys_write(file, ptr, len));
 }
 
 int _read(int file, char* ptr, int len)
 {
-    return sys_read(file, ptr, len);
+    SET_ERRNO_AND_RETURN(sys_read(file, ptr, len));
 }
 
 pid_t _fork(void)
 {
-    return sys_fork();
+    SET_ERRNO_AND_RETURN(sys_fork());
 }
 
 int _execve(const char *pathname, char *const _Nullable argv[], char *const _Nullable envp[])
 {
-    return sys_execve(pathname, (const char * const *) argv, (const char * const *) envp);
+    SET_ERRNO_AND_RETURN(sys_execve(pathname, (const char * const *) argv, (const char * const *) envp));
 }
 
 pid_t waitpid(pid_t pid, int *wstatus, int options)
 {
-    return sys_waitpid(pid, wstatus, options);
+    SET_ERRNO_AND_RETURN(sys_waitpid(pid, wstatus, options));
 }
 
 pid_t _wait(int *wstatus)
 {
-    return waitpid(-1, wstatus, 0);
+    SET_ERRNO_AND_RETURN(waitpid(-1, wstatus, 0));
 }
 
 int _gettimeofday (struct timeval *tv, void *)
@@ -150,7 +163,7 @@ int _gettimeofday (struct timeval *tv, void *)
 
 int mkdir(char const* pathname, mode_t mode)
 {
-    return sys_mkdir(pathname, mode);
+    SET_ERRNO_AND_RETURN(sys_mkdir(pathname, mode));
 }
 
 DIR *opendir(const char *name)
@@ -208,11 +221,5 @@ int closedir(DIR *dirp)
 
 int ioctl (int fd, unsigned long int request, void *argp)
 {
-    int rc = sys_ioctl(fd, request, argp);
-    if (rc < 0) {
-        errno = rc;
-        return -1;
-    } else {
-        return rc;
-    }
+    SET_ERRNO_AND_RETURN(sys_ioctl(fd, request, argp));
 }
