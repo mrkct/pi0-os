@@ -52,6 +52,7 @@ static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence,
 static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int fat32_dir_inode_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int fat32_dir_inode_unlink(Inode *self, const char *name);
+static int64_t fat32_dir_inode_getdents(Inode*, int64_t, uint8_t *, size_t);
 
 
 static struct FilesystemOps s_fat32_ops {
@@ -61,13 +62,13 @@ static struct FilesystemOps s_fat32_ops {
 };
 
 static struct InodeOps s_fat32_inode_ops {
+    .seek = fat32_file_inode_seek,
 };
 
 static struct InodeFileOps s_fat32_inode_file_ops {
     .read = fat32_file_inode_read,
     .write = fat32_file_inode_write,
     .ioctl = fat32_file_inode_ioctl,
-    .seek = fat32_file_inode_seek,
     .poll = fs_file_inode_poll_always_ready,
     .mmap = fs_file_inode_mmap_not_supported,
     .istty = fs_file_inode_istty_always_false
@@ -77,6 +78,7 @@ static struct InodeDirOps s_fat32_inode_dir_ops {
     .lookup = fat32_dir_inode_lookup,
     .create = fat32_dir_inode_create,
     .unlink = fat32_dir_inode_unlink,
+    .getdents = fat32_dir_inode_getdents,
 };
 
 static inline constexpr uint32_t cluster_idx_to_sector(fat32::BiosParameterBlock &bpb, uint32_t cluster_idx)
@@ -276,6 +278,12 @@ static int fat32_dir_inode_create(Inode*, const char*, InodeType, Inode*)
 static int fat32_dir_inode_unlink(Inode*, const char*)
 {
     return -ERR_NOTSUP;
+}
+
+static int64_t fat32_dir_inode_getdents(Inode*, int64_t, uint8_t *, size_t)
+{
+    /* TODO: Actually implement this */
+    return 0;
 }
 
 static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size)

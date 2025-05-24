@@ -455,7 +455,7 @@ int vfs_open(const char *path, uint32_t flags, FileCustody **out_custody)
         kassert(fs->ops->open_inode != nullptr);
     }
 
-    if (rc == 0 && inode->type == InodeType::Directory)
+    if (rc == 0 && inode->type == InodeType::Directory && (flags & OF_DIRECTORY) == 0)
         rc = -ERR_ISDIR;
 
     if (rc == 0)
@@ -539,7 +539,9 @@ int vfs_mount(const char *path, Filesystem &fs)
 
 ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
 {
-    if (custody->inode->type == InodeType::Directory)
+    bool is_dir = custody->inode->type == InodeType::Directory;
+
+    if (is_dir && (custody->flags & OF_DIRECTORY) == 0)
         return -ERR_ISDIR;
     
     if ((custody->flags & OF_ACCMODE) == OF_WRONLY) {
@@ -547,7 +549,7 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
         return -ERR_PERM;
     }
 
-    if ((custody->flags & OF_NONBLOCK) == 0) {
+    if ((custody->flags & OF_NONBLOCK) == 0 && !is_dir) {
         uint32_t events = 0;
         while (vfs_poll(custody, F_POLLIN, &events) == 0 && (events & F_POLLIN) == 0) {
             sys$yield();
@@ -556,7 +558,12 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
 
     LOGI("vfs_read(%" PRIu32 " bytes, custody offset @ %" PRIu64 ")", size, custody->offset);
     auto *inode = custody->inode;
-    ssize_t rc = inode->file_ops->read(inode, custody->offset, buffer, size);
+    ssize_t rc = 0;
+    if (!is_dir) {
+        rc = inode->file_ops->read(inode, custody->offset, buffer, size);
+    } else {
+        rc = inode->dir_ops->getdents(inode, custody->offset, buffer, size);
+    }
     if (rc > 0)
         vfs_seek(custody, SEEK_CUR, rc);
 
@@ -566,7 +573,7 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
 ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
 {
     if (custody->inode->type == InodeType::Directory)
-        return -ERR_ISDIR;
+        return -ERR_INVAL;
 
     if ((custody->flags & OF_ACCMODE) == OF_RDONLY) {
         LOGI("vfs_write: denied because custody was opened with RDONLY flag (flags: %" PRIu32 ")", custody->flags);
@@ -590,11 +597,8 @@ ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
 
 ssize_t vfs_seek(FileCustody *custody, int whence, int32_t offset)
 {
-    if (custody->inode->type == InodeType::Directory)
-        return -ERR_ISDIR;
-
     auto *inode = custody->inode;
-    ssize_t new_seek = inode->file_ops->seek(inode, custody->offset, whence, offset);
+    ssize_t new_seek = inode->ops->seek(inode, custody->offset, whence, offset);
     if (new_seek < 0)
         return new_seek;
     custody->offset = new_seek;
@@ -605,6 +609,14 @@ int vfs_close(FileCustody *custody)
 {
     free_custody(custody);
     return 0;
+}
+
+int vfs_getdents(FileCustody *custody, uint8_t *buffer, uint32_t size)
+{
+    if (custody->inode->type != InodeType::Directory)
+        return -ERR_NOTDIR;
+
+    return custody->inode->dir_ops->getdents(custody->inode, custody->offset, buffer, size);
 }
 
 int vfs_ioctl(FileCustody *custody, uint32_t ioctl, void *argp)

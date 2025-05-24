@@ -29,13 +29,13 @@ static struct FilesystemOps s_pipefs_ops {
 };
 
 static struct InodeOps s_pipefs_inode_ops {
+    .seek = fs_inode_seek_not_supported,
 };
 
 static struct InodeFileOps s_pipefs_inode_file_ops {
     .read = pipefs_file_inode_read,
     .write = pipefs_file_inode_write,
     .ioctl = fs_inode_ioctl_not_supported,
-    .seek = fs_inode_seek_not_supported,
     .poll = pipefs_file_inode_poll,
     .mmap = fs_file_inode_mmap_not_supported,
     .istty = fs_file_inode_istty_always_false,
@@ -45,6 +45,7 @@ static struct InodeDirOps s_pipefs_inode_dir_ops {
     .lookup = pipefs_dir_inode_lookup,
     .create = fs_dir_inode_create_not_supported,
     .unlink = fs_dir_inode_unlink_not_supported,
+    .getdents = fs_dir_inode_getdents_not_supported,
 };
 
 static int pipefs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode)

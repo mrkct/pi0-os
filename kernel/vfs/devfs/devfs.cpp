@@ -35,6 +35,7 @@ static int32_t devfs_file_inode_istty(Inode*);
 static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int devfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int devfs_dir_inode_unlink(Inode *self, const char *name);
+static int64_t devfs_dir_inode_getdents(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 
 
 static struct FilesystemOps s_devfs_ops {
@@ -44,13 +45,13 @@ static struct FilesystemOps s_devfs_ops {
 };
 
 static struct InodeOps s_devfs_inode_ops {
+    .seek = devfs_file_inode_seek,
 };
 
 static struct InodeFileOps s_devfs_inode_file_ops {
     .read = devfs_file_inode_read,
     .write = devfs_file_inode_write,
     .ioctl = devfs_file_inode_ioctl,
-    .seek = devfs_file_inode_seek,
     .poll = devfs_file_inode_poll,
     .mmap = devfs_file_inode_mmap,
     .istty = devfs_file_inode_istty,
@@ -60,6 +61,7 @@ static struct InodeDirOps s_devfs_inode_dir_ops {
     .lookup = devfs_dir_inode_lookup,
     .create = devfs_dir_inode_create,
     .unlink = devfs_dir_inode_unlink,
+    .getdents = devfs_dir_inode_getdents,
 };
 
 static InodeType device_type_to_inode_type(Device::Type type)
@@ -155,6 +157,12 @@ static int devfs_dir_inode_create(Inode*, const char*, InodeType, Inode*)
 static int devfs_dir_inode_unlink(Inode*, const char*)
 {
     return -ERR_NOTSUP;
+}
+
+static int64_t devfs_dir_inode_getdents(Inode*, int64_t, uint8_t *, size_t)
+{
+    /* TODO: Actually implement this */
+    return 0;
 }
 
 static int64_t devfs_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size)

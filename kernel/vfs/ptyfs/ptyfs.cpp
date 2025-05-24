@@ -27,6 +27,7 @@ static int32_t ptyfs_file_inode_mmap(Inode*, AddressSpace*, uintptr_t, uint32_t,
 static int32_t ptyfs_file_inode_istty(Inode*);
 
 static int ptyfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
+static int64_t ptyfs_dir_inode_getdents(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 
 
 static struct FilesystemOps s_ptyfs_ops {
@@ -36,13 +37,13 @@ static struct FilesystemOps s_ptyfs_ops {
 };
 
 static struct InodeOps s_ptyfs_inode_ops {
+    .seek = ptyfs_file_inode_seek,
 };
 
 static struct InodeFileOps s_ptyfs_inode_file_ops {
     .read = ptyfs_file_inode_read,
     .write = ptyfs_file_inode_write,
     .ioctl = ptyfs_file_inode_ioctl,
-    .seek = ptyfs_file_inode_seek,
     .poll = ptyfs_file_inode_poll,
     .mmap = ptyfs_file_inode_mmap,
     .istty = ptyfs_file_inode_istty,
@@ -52,6 +53,7 @@ static struct InodeDirOps s_ptyfs_inode_dir_ops {
     .lookup = ptyfs_dir_inode_lookup,
     .create = fs_dir_inode_create_not_supported,
     .unlink = fs_dir_inode_unlink_not_supported,
+    .getdents = ptyfs_dir_inode_getdents,
 };
 
 static constexpr uint64_t get_pty_master_inode_id(int pty_id) { return pty_id; }
@@ -157,6 +159,12 @@ static int ptyfs_dir_inode_lookup_pty(Inode *self, int pty, Inode *out_inode)
         .file_ops = &s_ptyfs_inode_file_ops,
     };
 
+    return 0;
+}
+
+static int64_t ptyfs_dir_inode_getdents(Inode*, int64_t, uint8_t*, size_t)
+{
+    LOGW("getdents not implemented yet for PTYFS");
     return 0;
 }
 

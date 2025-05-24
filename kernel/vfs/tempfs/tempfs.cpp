@@ -1,3 +1,4 @@
+#include <sys/dirent.h>
 #include "tempfs.h"
 
 #define LOG_ENABLED
@@ -44,6 +45,7 @@ static uint64_t tempfs_file_inode_seek(Inode *self, uint64_t current, int whence
 static int tempfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int tempfs_dir_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int tempfs_dir_unlink(Inode *self, const char *name);
+static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
 
 static int tempfs_file_inode_ftruncate(Inode *self, uint64_t size);
 static uint64_t tempfs_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset);
@@ -55,13 +57,13 @@ static struct FilesystemOps s_tempfs_ops {
 };
 
 static struct InodeOps s_tempfs_inode_ops {
+    .seek = tempfs_file_inode_seek,
 };
 
 static struct InodeFileOps s_tempfs_inode_file_ops {
     .read = tempfs_file_inode_read,
     .write = tempfs_file_inode_write,
     .ioctl = fs_inode_ioctl_not_supported,
-    .seek = tempfs_file_inode_seek,
     .poll = fs_file_inode_poll_always_ready,
     .mmap = fs_file_inode_mmap_not_supported,
     .istty = fs_file_inode_istty_always_false,
@@ -71,6 +73,7 @@ static struct InodeDirOps s_tempfs_inode_dir_ops {
     .lookup = tempfs_dir_inode_lookup,
     .create = tempfs_dir_create,
     .unlink = tempfs_dir_unlink,
+    .getdents = tempfs_dir_getdents,
 };
 
 static inline TempInode* get_inode_by_id(InodeIdentifier id)
@@ -150,10 +153,11 @@ static void fill_inode(Filesystem *fs, TempInode *inode, Inode *out)
         out->size = inode->file.size;
         out->file_ops = &s_tempfs_inode_file_ops;
         break;
-    case InodeType::Directory:
+    case InodeType::Directory: {
         out->size = 0;
         out->dir_ops = &s_tempfs_inode_dir_ops;
         break;
+    }
     default:
         kassert(false);
     }
@@ -244,6 +248,8 @@ static int tempfs_dir_create(Inode *self, const char *name, InodeType type, Inod
     inode->directory.children[free_idx].name[MAX_NAME_LEN] = '\0';
     fill_inode(self->filesystem, new_inode, out_inode);
 
+    self->size += sizeof(struct dirent);
+
     return 0;
 }
 
@@ -297,6 +303,40 @@ static int tempfs_dir_unlink(Inode *self, const char *name)
     free(child);
 
     return 0;
+}
+
+static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, uint8_t *buffer, size_t size)
+{
+    int64_t bytes_read = 0;
+
+    TempInode *inode = get_inode_by_id(self->identifier);
+    size = round_down(size, sizeof(struct dirent));
+
+    for (size_t i = 0; bytes_read < size && i < array_size(inode->directory.children); i++) {
+        if (inode->directory.children[i].inode == nullptr) {
+            continue;
+        }
+
+        /* Skip entries until we reach the offset */
+        if (offset > 0) {
+            offset -= sizeof(struct dirent);
+            continue;
+        }
+
+        auto *child = &inode->directory.children[i];
+        auto *dent = reinterpret_cast<struct dirent*>(buffer + bytes_read);
+        *dent = (struct dirent) {
+            .d_ino = (uintptr_t) child->inode,
+            .d_type = static_cast<uint8_t>(child->inode->type == InodeType::Directory ? DT_DIR : DT_REG),
+            .d_name = {},
+        };
+        strncpy(dent->d_name, child->name, array_size(dent->d_name) - 1);
+        dent->d_name[array_size(dent->d_name) - 1] = '\0';
+
+        bytes_read += sizeof(struct dirent);
+    }
+
+    return bytes_read;
 }
 
 static int tempfs_fs_on_mount(Filesystem *self, Inode *out_root)
