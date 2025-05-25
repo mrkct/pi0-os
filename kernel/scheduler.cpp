@@ -994,3 +994,18 @@ int sys$setcwd(const char *path)
 failed:
     return rc;
 }
+
+int sys$getcwd(char *buf, size_t buflen)
+{
+    auto *current_process = cpu_current_process();
+    size_t len = strnlen(current_process->working_directory, MAX_PATH_LEN);
+
+    if (len >= buflen) {
+        return -ERR_2BIG;
+    }
+
+    strncpy(buf, current_process->working_directory, buflen - 1);
+    buf[buflen - 1] = '\0';
+
+    return 0;
+}

@@ -112,3 +112,5 @@ int sys$dup2(int oldfd, int newfd);
 int sys$waitexit(int pid);
 
 int sys$setcwd(const char *path);
+
+int sys$getcwd(char *buf, size_t buflen);

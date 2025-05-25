@@ -223,3 +223,19 @@ int ioctl (int fd, unsigned long int request, void *argp)
 {
     SET_ERRNO_AND_RETURN(sys_ioctl(fd, request, argp));
 }
+
+int chdir(const char *path)
+{
+    SET_ERRNO_AND_RETURN(sys_chdir(path));
+}
+
+char *getcwd(char *buf, size_t size)
+{
+    int rc = sys_getcwd(buf, size);
+    if (rc < 0) {
+        errno = -rc;
+        return NULL;
+    } else {
+        return buf;
+    }
+}

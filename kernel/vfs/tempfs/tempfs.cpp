@@ -311,7 +311,7 @@ static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, struct dirent *e
 
     TempInode *inode = get_inode_by_id(self->identifier);
 
-    for (size_t i = 0; count > 0 && i < array_size(inode->directory.children); i++, count--) {
+    for (size_t i = 0; count > 0 && i < array_size(inode->directory.children); i++) {
         if (inode->directory.children[i].inode == nullptr) {
             continue;
         }
@@ -333,6 +333,7 @@ static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, struct dirent *e
         
         entries++;
         bytes_read += sizeof(struct dirent);
+        count--;
     }
 
     return bytes_read;

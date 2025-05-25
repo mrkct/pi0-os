@@ -18,15 +18,19 @@ extern int clear_main(int argc, const char *argv[]);
 extern int cd_main(int argc, const char *argv[]);
 extern int pwd_main(int argc, const char *argv[]);
 extern int mkdir_main(int argc, const char *argv[]);
+extern int pwd_main(int argc, const char *argv[]);
 extern int rm_main(int argc, const char *argv[]);
+extern int touch_main(int argc, const char *argv[]);
 
 static struct { const char *name; int (*main)(int argc, const char *argv[]); } builtins[] = {
     { "cat", cat_main },
+    { "cd", cd_main },
     { "clear", clear_main },
     { "echo", echo_main },
     { "ls", ls_main },
     { "mkdir", mkdir_main },
     { "rm", rm_main },
+    { "touch", touch_main },
 };
 
 static size_t tokenize(char *line);
@@ -37,10 +41,9 @@ static void read_line(const char *prompt, char *buf, size_t len)
 {
     printf("%s", prompt);
 
-    int count = sys_read(STDIN_FILENO, buf, len - 1);
+    int count = read(STDIN_FILENO, buf, len - 1);
     if (count < 0) {
-        fprintf(stderr, "Failed to read line: %d", count);
-        exit(-1);
+        perror("read line");
     }
     buf[count] = '\0';
     char *c = strrchr(buf, '\n');
@@ -115,13 +118,13 @@ static int run_program(size_t argc, const char *argv[])
 
     pid = fork();
     if (pid < 0) {
-        fprintf(stderr, "fork() failed: %d\n", pid);
+        perror("fork");
         return -1;
     }
 
     if (pid == 0) {
         execve(procpath, (char *const *) argv, emptyenv);
-        fprintf(stderr, "execv() failed: %d\n", pid);
+        perror("execve");
         exit(-1);
     } 
     
@@ -140,7 +143,11 @@ int main(int argc, char **argv)
     setvbuf(stdout, NULL, _IONBF, 0);
     
     while (1) {
-        read_line("$ ", line, sizeof(line));
+        static char cwd[256];
+        getcwd(cwd, sizeof(cwd) - 4);
+        strcat(cwd, " $ ");
+
+        read_line(cwd, line, sizeof(line));
         size_t tokens = tokenize(line);
         size_t command_argc = argv_from_tokenized_line(line, tokens, command_argv, MAX_ARGS);
 

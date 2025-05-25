@@ -73,6 +73,9 @@ int dispatch_syscall(InterruptFrame *, sysarg_t syscall,
     case SYS_SetCwd:
         rc = sys$setcwd((char*) arg1);
         break;
+    case SYS_GetCwd:
+        rc = sys$getcwd((char*) arg1, (size_t) arg2);
+        break;
     case SYS_WaitExit:
         rc = sys$waitexit((int) arg1);
         break;
