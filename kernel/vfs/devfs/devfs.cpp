@@ -35,7 +35,7 @@ static int32_t devfs_file_inode_istty(Inode*);
 static int devfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int devfs_dir_inode_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int devfs_dir_inode_unlink(Inode *self, const char *name);
-static int64_t devfs_dir_inode_getdents(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
+static int64_t devfs_dir_inode_getdents(Inode *self, int64_t offset, struct dirent *entries, size_t count);
 
 
 static struct FilesystemOps s_devfs_ops {
@@ -45,12 +45,12 @@ static struct FilesystemOps s_devfs_ops {
 };
 
 static struct InodeOps s_devfs_inode_ops {
-    .seek = devfs_file_inode_seek,
 };
 
 static struct InodeFileOps s_devfs_inode_file_ops {
     .read = devfs_file_inode_read,
     .write = devfs_file_inode_write,
+    .seek = devfs_file_inode_seek,
     .ioctl = devfs_file_inode_ioctl,
     .poll = devfs_file_inode_poll,
     .mmap = devfs_file_inode_mmap,
@@ -159,7 +159,7 @@ static int devfs_dir_inode_unlink(Inode*, const char*)
     return -ERR_NOTSUP;
 }
 
-static int64_t devfs_dir_inode_getdents(Inode*, int64_t, uint8_t *, size_t)
+static int64_t devfs_dir_inode_getdents(Inode*, int64_t, struct dirent*, size_t)
 {
     /* TODO: Actually implement this */
     return 0;

@@ -20,12 +20,12 @@ enum class InodeType {
 };
 
 struct InodeOps {
-    uint64_t (*seek)(Inode *self, uint64_t current, int whence, int32_t offset);
 };
 
 struct InodeFileOps {
     int64_t (*read)(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
     int64_t (*write)(Inode *self, int64_t offset, const uint8_t *buffer, size_t size);
+    uint64_t (*seek)(Inode *self, uint64_t current, int whence, int32_t offset);
     int32_t (*ioctl)(Inode *self, uint32_t request, void *argp);
     int32_t (*poll)(Inode *self, uint32_t events, uint32_t *out_revents);
     int32_t (*mmap)(Inode *self, AddressSpace *as, uintptr_t vaddr, uint32_t length, uint32_t flags);
@@ -36,7 +36,7 @@ struct InodeDirOps {
     int (*lookup)(Inode *self, const char *name, Inode *out_entry);
     int (*create)(Inode *self, const char *name, InodeType type, Inode *out_inode);
     int (*unlink)(Inode *self, const char *name);
-    int64_t (*getdents)(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
+    int64_t (*getdents)(Inode *self, int64_t offset, struct dirent *entries, size_t count);
 };
 
 struct Inode {
@@ -118,4 +118,4 @@ int fs_dir_inode_create_not_supported(Inode*, const char*, InodeType, Inode *);
 int fs_dir_inode_mkdir_not_supported(Inode*, const char *);
 int fs_dir_inode_rmdir_not_supported(Inode*, const char *);
 int fs_dir_inode_unlink_not_supported(Inode*, const char *);
-int64_t fs_dir_inode_getdents_not_supported(Inode*, int64_t, uint8_t *, size_t);
+int64_t fs_dir_inode_getdents_not_supported(Inode*, int64_t, struct dirent*, size_t count);

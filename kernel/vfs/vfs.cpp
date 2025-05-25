@@ -1,3 +1,4 @@
+#include <dirent.h>
 #include "vfs.h"
 #include "fs.h"
 
@@ -562,7 +563,7 @@ ssize_t vfs_read(FileCustody *custody, uint8_t *buffer, uint32_t size)
     if (!is_dir) {
         rc = inode->file_ops->read(inode, custody->offset, buffer, size);
     } else {
-        rc = inode->dir_ops->getdents(inode, custody->offset, buffer, size);
+        rc = inode->dir_ops->getdents(inode, custody->offset, (struct dirent*) buffer, size / sizeof(struct dirent));
     }
     if (rc > 0)
         vfs_seek(custody, SEEK_CUR, rc);
@@ -598,7 +599,17 @@ ssize_t vfs_write(FileCustody *custody, uint8_t const *buffer, uint32_t size)
 ssize_t vfs_seek(FileCustody *custody, int whence, int32_t offset)
 {
     auto *inode = custody->inode;
-    ssize_t new_seek = inode->ops->seek(inode, custody->offset, whence, offset);
+    ssize_t new_seek = 0;
+    
+    if (custody->inode->type != InodeType::Directory) {
+        new_seek = inode->file_ops->seek(inode, custody->offset, whence, offset);
+    } else {
+        /* Seeking with directories is weird and not well defined in Unix,
+           also because dir inodes often don't have a proper 'size' in many fs.
+           This is here because it makes things work, not because it's really "right" */
+        new_seek = default_checked_seek(0x7fffffff, custody->offset, whence, offset);
+    }
+    
     if (new_seek < 0)
         return new_seek;
     custody->offset = new_seek;
@@ -609,14 +620,6 @@ int vfs_close(FileCustody *custody)
 {
     free_custody(custody);
     return 0;
-}
-
-int vfs_getdents(FileCustody *custody, uint8_t *buffer, uint32_t size)
-{
-    if (custody->inode->type != InodeType::Directory)
-        return -ERR_NOTDIR;
-
-    return custody->inode->dir_ops->getdents(custody->inode, custody->offset, buffer, size);
 }
 
 int vfs_ioctl(FileCustody *custody, uint32_t ioctl, void *argp)

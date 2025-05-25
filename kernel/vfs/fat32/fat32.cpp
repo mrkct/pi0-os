@@ -1,3 +1,4 @@
+#include <dirent.h>
 #include "fat32.h"
 #include "fat32_structures.h"
 
@@ -52,7 +53,7 @@ static uint64_t fat32_file_inode_seek(Inode *self, uint64_t current, int whence,
 static int fat32_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int fat32_dir_inode_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int fat32_dir_inode_unlink(Inode *self, const char *name);
-static int64_t fat32_dir_inode_getdents(Inode*, int64_t, uint8_t *, size_t);
+static int64_t fat32_dir_inode_getdents(Inode*, int64_t, struct dirent *entries, size_t count);
 
 
 static struct FilesystemOps s_fat32_ops {
@@ -62,12 +63,12 @@ static struct FilesystemOps s_fat32_ops {
 };
 
 static struct InodeOps s_fat32_inode_ops {
-    .seek = fat32_file_inode_seek,
 };
 
 static struct InodeFileOps s_fat32_inode_file_ops {
     .read = fat32_file_inode_read,
     .write = fat32_file_inode_write,
+    .seek = fat32_file_inode_seek,
     .ioctl = fat32_file_inode_ioctl,
     .poll = fs_file_inode_poll_always_ready,
     .mmap = fs_file_inode_mmap_not_supported,
@@ -163,17 +164,14 @@ static void copy_entry_name(fat32::DirectoryEntry8_3& e, char* buf)
 }
 
 template<typename HandleEntry>
-static int foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entry_cb)
+static int foreach_8_3_directory_entry(Fat32FilesystemCtx *fsctx, uint32_t cluster, HandleEntry handle_entry_cb)
 {
     int rc;
-    kassert(dirinode->type == InodeType::Directory);
-
-    auto *fsctx = (Fat32FilesystemCtx*) dirinode->filesystem->opaque;
 
     const uint32_t DIR_ENTRIES_IN_SECTOR = fsctx->sector_size / sizeof(fat32::DirectoryEntry);
 
     uint32_t entry_idx = 0;
-    uint32_t next_cluster_idx = dirinode->identifier;
+    uint32_t next_cluster_idx = cluster;
     while (fat32::is_valid_cluster(next_cluster_idx)) {
         uint32_t cluster_start_sector = cluster_idx_to_sector(fsctx->bpb, next_cluster_idx);
         for (uint32_t sector_idx = 0; sector_idx < fsctx->bpb.BPB_SecPerClus; sector_idx++) {
@@ -205,6 +203,14 @@ static int foreach_8_3_directory_entry(Inode *dirinode, HandleEntry handle_entry
     }
 
     return -ERR_NOENT;
+}
+
+template<typename HandleEntry>
+static int foreach_8_3_directory_entry(Inode *self, HandleEntry handle_entry_cb)
+{
+    auto *fsctx = (Fat32FilesystemCtx*) self->filesystem->opaque;
+    kassert(self->type == InodeType::Directory);
+    return foreach_8_3_directory_entry(fsctx, self->identifier, handle_entry_cb);
 }
 
 static api::TimeSpec fat32_datetime_to_timespec(uint16_t date, uint16_t time)
@@ -280,10 +286,39 @@ static int fat32_dir_inode_unlink(Inode*, const char*)
     return -ERR_NOTSUP;
 }
 
-static int64_t fat32_dir_inode_getdents(Inode*, int64_t, uint8_t *, size_t)
+static int64_t fat32_dir_inode_getdents(Inode *self, int64_t offset, struct dirent *entries, size_t count)
 {
-    /* TODO: Actually implement this */
-    return 0;
+    int64_t bytes_read = 0;
+
+    kassert(self->type == InodeType::Directory);
+
+    offset = round_down(offset, sizeof(struct dirent));
+
+    foreach_8_3_directory_entry(self, [&](auto, fat32::DirectoryEntry8_3 &fat_entry) {
+        if (count == 0)
+            return true;
+
+        if (offset > 0) {
+            offset -= sizeof(struct dirent);
+            return false;
+        }
+
+        entries->d_ino = self->identifier;
+        entries->d_type = fat_entry.DIR_Attr & fat32::DirectoryEntry8_3::ATTR_DIRECTORY ? DT_DIR : DT_REG;
+
+        char entry_name[20];
+        copy_entry_name(fat_entry, entry_name);
+        strncpy(entries->d_name, entry_name, sizeof(entries->d_name) - 1);
+        entries->d_name[sizeof(entries->d_name) - 1] = '\0';
+
+        bytes_read += sizeof(struct dirent);
+        entries++;
+        count--;
+
+        return false;
+    });
+
+    return bytes_read;
 }
 
 static int64_t fat32_file_inode_read(Inode *self, int64_t offset, uint8_t *buffer, size_t size)

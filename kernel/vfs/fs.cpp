@@ -135,7 +135,7 @@ int fs_dir_inode_unlink_not_supported(Inode*, const char *)
     return -ERR_NOTSUP;
 }
 
-int64_t fs_dir_inode_getdents_not_supported(Inode*, int64_t, uint8_t *, size_t)
+int64_t fs_dir_inode_getdents_not_supported(Inode*, int64_t, struct dirent*, size_t)
 {
     return -ERR_NOTSUP;
 }

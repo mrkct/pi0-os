@@ -45,7 +45,7 @@ static uint64_t tempfs_file_inode_seek(Inode *self, uint64_t current, int whence
 static int tempfs_dir_inode_lookup(Inode *self, const char *name, Inode *out_inode);
 static int tempfs_dir_create(Inode *self, const char *name, InodeType type, Inode *out_inode);
 static int tempfs_dir_unlink(Inode *self, const char *name);
-static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, uint8_t *buffer, size_t size);
+static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, struct dirent*, size_t count);
 
 static int tempfs_file_inode_ftruncate(Inode *self, uint64_t size);
 static uint64_t tempfs_file_inode_seek(Inode *self, uint64_t current, int whence, int32_t offset);
@@ -57,12 +57,12 @@ static struct FilesystemOps s_tempfs_ops {
 };
 
 static struct InodeOps s_tempfs_inode_ops {
-    .seek = tempfs_file_inode_seek,
 };
 
 static struct InodeFileOps s_tempfs_inode_file_ops {
     .read = tempfs_file_inode_read,
     .write = tempfs_file_inode_write,
+    .seek = tempfs_file_inode_seek,
     .ioctl = fs_inode_ioctl_not_supported,
     .poll = fs_file_inode_poll_always_ready,
     .mmap = fs_file_inode_mmap_not_supported,
@@ -305,14 +305,13 @@ static int tempfs_dir_unlink(Inode *self, const char *name)
     return 0;
 }
 
-static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, uint8_t *buffer, size_t size)
+static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, struct dirent *entries, size_t count)
 {
     int64_t bytes_read = 0;
 
     TempInode *inode = get_inode_by_id(self->identifier);
-    size = round_down(size, sizeof(struct dirent));
 
-    for (size_t i = 0; bytes_read < size && i < array_size(inode->directory.children); i++) {
+    for (size_t i = 0; count > 0 && i < array_size(inode->directory.children); i++, count--) {
         if (inode->directory.children[i].inode == nullptr) {
             continue;
         }
@@ -324,15 +323,15 @@ static int64_t tempfs_dir_getdents(Inode *self, int64_t offset, uint8_t *buffer,
         }
 
         auto *child = &inode->directory.children[i];
-        auto *dent = reinterpret_cast<struct dirent*>(buffer + bytes_read);
-        *dent = (struct dirent) {
+        *entries = (struct dirent) {
             .d_ino = (uintptr_t) child->inode,
             .d_type = static_cast<uint8_t>(child->inode->type == InodeType::Directory ? DT_DIR : DT_REG),
             .d_name = {},
         };
-        strncpy(dent->d_name, child->name, array_size(dent->d_name) - 1);
-        dent->d_name[array_size(dent->d_name) - 1] = '\0';
-
+        strncpy(entries->d_name, child->name, array_size(entries->d_name) - 1);
+        entries->d_name[array_size(entries->d_name) - 1] = '\0';
+        
+        entries++;
         bytes_read += sizeof(struct dirent);
     }
 

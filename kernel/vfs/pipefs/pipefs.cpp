@@ -29,12 +29,12 @@ static struct FilesystemOps s_pipefs_ops {
 };
 
 static struct InodeOps s_pipefs_inode_ops {
-    .seek = fs_inode_seek_not_supported,
 };
 
 static struct InodeFileOps s_pipefs_inode_file_ops {
     .read = pipefs_file_inode_read,
     .write = pipefs_file_inode_write,
+    .seek = fs_inode_seek_not_supported,
     .ioctl = fs_inode_ioctl_not_supported,
     .poll = pipefs_file_inode_poll,
     .mmap = fs_file_inode_mmap_not_supported,

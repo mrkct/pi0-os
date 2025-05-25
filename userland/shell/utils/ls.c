@@ -9,12 +9,11 @@ int ls_main(int argc, const char *argv[])
     struct DIR *dir;
     struct dirent *entry;
 
-    if (argc != 2) {
-        fprintf(stderr, "ls: Invalid number of arguments.\n");
-        return -1;
-    }
+    const char *path = ".";
+    if (argc >= 2)
+        path = argv[1];
 
-    dir = opendir(argv[1]);
+    dir = opendir(path);
     if (dir == NULL) {
         fprintf(stderr, "ls: Cannot open directory '%s'\n", argv[1]);
         return -1;
@@ -27,7 +26,11 @@ int ls_main(int argc, const char *argv[])
             continue;
         }
 
-        printf("%s\n", entry->d_name);
+        if (entry->d_type == DT_DIR) {
+            printf("\x1b[31m%s\x1b[0m\n", entry->d_name);
+        } else {
+            printf("%s\n", entry->d_name);
+        }
     }
 
     closedir(dir);
