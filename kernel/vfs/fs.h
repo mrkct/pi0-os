@@ -119,3 +119,18 @@ int fs_dir_inode_mkdir_not_supported(Inode*, const char *);
 int fs_dir_inode_rmdir_not_supported(Inode*, const char *);
 int fs_dir_inode_unlink_not_supported(Inode*, const char *);
 int64_t fs_dir_inode_getdents_not_supported(Inode*, int64_t, struct dirent*, size_t count);
+
+
+static inline bool path_is_absolute(const char *path) { return path[0] == '/'; }
+
+const char* log_canonicalized_path(const char *path);
+
+size_t canonicalized_path_strlen(const char *path);
+
+bool canonicalized_path_startswith(const char *path, const char *prefix);
+
+char *canonicalize_path(const char *path);
+
+void decanonicalize_path(char *cpath);
+
+char *pathjoin(const char *path1, const char *path2);

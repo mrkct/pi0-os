@@ -13,7 +13,7 @@
 
 #include "scheduler.h"
 
-#define LOG_ENABLED
+// #define LOG_ENABLED
 #define LOG_CTX_SWITCH 0
 #define LOG_TAG "SCHED"
 #include <kernel/log.h>
@@ -971,28 +971,58 @@ int sys$waitexit(int pid)
     return 0;
 }
 
+static int createcwd(const char *workdir, const char *userpath, char **out_path)
+{
+
+    if (*userpath == '/') {
+        size_t userlen = strnlen(userpath, MAX_PATH_LEN);
+        if (userlen >= MAX_PATH_LEN) {
+            LOGE("Working directory too long");
+            return -ERR_2BIG;
+        }
+
+        *out_path = canonicalize_path(userpath);
+        if (*out_path == nullptr) {
+            LOGE("Failed to canonicalize path '%s'", userpath);
+            return -ERR_NOMEM;
+        }
+        decanonicalize_path(*out_path);
+        return 0;
+    }
+
+    char *temp = pathjoin(workdir, userpath);
+    if (temp == nullptr) {
+        LOGE("Failed to allocate memory for path");
+        return -ERR_NOMEM;
+    }
+
+    *out_path = canonicalize_path(temp);
+    free(temp);
+    
+    if (*out_path == nullptr) {
+        LOGE("Failed to canonicalize paths '%s'/'%s'", workdir, userpath);
+        return -ERR_NOMEM;
+    }
+
+    decanonicalize_path(*out_path);
+    return 0;
+}
+
 int sys$setcwd(const char *path)
 {
     auto *current_process = cpu_current_process();
-    char *new_workdir = nullptr;
-    int rc;
 
-    size_t len = strnlen(path, MAX_PATH_LEN);
-    if (len == MAX_PATH_LEN) {
-        rc = -ERR_INVAL;
-        goto failed;
+    char *new_workdir = nullptr;
+    int rc = createcwd(current_process->working_directory, path, &new_workdir);
+    if (rc != 0) {
+        LOGE("Failed to create new working directory from '%s' and '%s', rc=%d", current_process->working_directory, path, rc);
+        return rc;
     }
 
-    new_workdir = (char*) malloc(len + 1);
-    memcpy(new_workdir, path, len);
-    new_workdir[len] = '\0';
     free(current_process->working_directory);
     current_process->working_directory = new_workdir;
-    
-    return 0;
 
-failed:
-    return rc;
+    return 0;
 }
 
 int sys$getcwd(char *buf, size_t buflen)

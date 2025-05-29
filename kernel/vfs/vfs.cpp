@@ -31,110 +31,6 @@ struct MountPoint {
 
 static IntrusiveLinkedList<MountPoint> s_mountpoints;
 
-static const char* log_canonicalized_path(const char *path)
-{
-    static char buf[256];
-    size_t i = 0;
-    for (i = 0; path[i] != '\0' || path[i+1] != '\0'; i++) {
-        buf[i] = path[i] == '\0' ? '/' : path[i];
-    }
-    buf[i] = '\0';
-    return buf;
-}
-
-static size_t canonicalized_path_strlen(const char *path)
-{
-    size_t len = 0;
-    while (path[len] != '\0' || path[len+1] != '\0')
-        len++;
-    return len;
-}
-
-static bool canonicalized_path_startswith(const char *path, const char *prefix)
-{
-    size_t pathlen = canonicalized_path_strlen(path);
-    size_t prefixlen = canonicalized_path_strlen(prefix);
-    if (pathlen < prefixlen)
-        return false;
-    return memcmp(path, prefix, prefixlen) == 0;
-}
-
-static inline bool path_is_absolute(const char *path) { return path[0] == '/'; }
-
-/**
- * Creates a canonicalized path from a string.
- * 
- * A canonicalized path is defined as a path where:
- * - There is no leading separator ('hello', not '/hello')
- * - There is no trailing separator ('hello', not 'hello/)
- * - There are no '.' or '..' components ('hello/world', not 'hello/./useless/../world')
- * 
- * The separators in the returned path are replaced with '\0'.
- * This makes it easier to iterate over the path components.
- * The end of the path is marked by an empty component
- * (meaning there are 2 '\0' at the end) 
- * 
- * This function allocates a new string and returns it.
- * It is your duty to free it.
- * 
-*/
-static char *canonicalize_path(const char *path)
-{
-    while (*path == '/')
-        path++;
-
-    size_t pathlen = strlen(path);
-    char *cpath = (char*) malloc(pathlen + 2);
-    if (cpath == NULL)
-        return NULL;
-    
-    memcpy(cpath, path, pathlen);
-    cpath[pathlen] = '\0';
-    cpath[pathlen + 1] = '\0';
-
-    // Collapse consecutive separators ('hello///world' into 'hello/world')
-    {
-        char *src = cpath;
-        char *cpath_end = cpath + pathlen + 2;
-
-        while (*src) {
-            if (*src != '/') {
-                src++;
-                continue;
-            }
-
-            // Count how many '/' there are
-            int count = 0;
-            char *temp = src;
-            while (*temp == '/') {
-                temp++;
-                count++;
-            }
-
-
-            if (count == 1) {
-                src++;
-                continue;
-            }
-
-            kassert(count > 1);
-            memmove(src + 1, temp, cpath_end - temp);
-            src++;
-        }
-    }
-
-    // TODO: Remove the '.' ('hello/./world' into 'hello/world')
-    // TODO: Handle the '..' ('hello/../world' into 'world')
-
-    size_t cpath_len = strlen(cpath);
-    for (size_t i = 0; i < cpath_len; i++) {
-        if (cpath[i] == '/')
-            cpath[i] = '\0';
-    }
-    cpath[cpath_len] = '\0';
-    cpath[cpath_len + 1] = '\0';
-    return cpath;
-}
 
 static int open_inode(Inode *inode)
 {
@@ -477,18 +373,13 @@ int vfs_open(const char *workdir, const char *path, uint32_t flags, FileCustody 
     if (path_is_absolute(path))
         return vfs_open(path, flags, out_custody);
     
-    int rc = 0;
-    size_t workdir_len = strlen(workdir);
-    size_t path_len = strlen(path);
-    size_t len = workdir_len + path_len + 1;
-    char *cpath = (char*) malloc(len);
-    if (cpath == nullptr)
+    char *cpath = pathjoin(workdir, path);
+    if (cpath == nullptr) {
+        LOGE("Failed to allocate memory for path join");
         return -ERR_NOMEM;
-    memcpy(cpath, workdir, workdir_len);
-    memcpy(cpath + workdir_len, path, path_len);
-    cpath[len - 1] = '\0';
-
-    rc = vfs_open(cpath, flags, out_custody);
+    }
+    
+    int rc = vfs_open(cpath, flags, out_custody);
     free(cpath);
 
     return rc;
@@ -509,9 +400,7 @@ int vfs_mount(const char *path, Filesystem &fs)
     
     mp->path = cpath;
     mp->fs = &fs;
-    mp->path_skip = canonicalized_path_strlen(cpath);
-    if (mp->path_skip > 0)
-        mp->path_skip += 1;
+    mp->path_skip = canonicalized_path_strlen(cpath) + 1;
     LOGD("Mountpoint %s ('%s') has path skip %" PRIu32, path, log_canonicalized_path(mp->path), mp->path_skip);
 
     auto *after = s_mountpoints.find_first([&](MountPoint *mp) {

@@ -144,3 +144,194 @@ int32_t fs_file_inode_istty_always_false(Inode*)
 {
     return 0;
 }
+
+const char* log_canonicalized_path(const char *path)
+{
+    static char buf[256];
+    size_t i = 0;
+    for (i = 0; path[i] != '\0' || path[i+1] != '\0'; i++) {
+        buf[i] = path[i] == '\0' ? '/' : path[i];
+    }
+    buf[i] = '\0';
+    return buf;
+}
+
+size_t canonicalized_path_strlen(const char *path)
+{
+    size_t len = 0;
+    while (path[len] != '\0' || path[len+1] != '\0')
+        len++;
+    return len;
+}
+
+bool canonicalized_path_startswith(const char *path, const char *prefix)
+{
+    size_t pathlen = canonicalized_path_strlen(path);
+    size_t prefixlen = canonicalized_path_strlen(prefix);
+    if (pathlen < prefixlen)
+        return false;
+    return memcmp(path, prefix, prefixlen) == 0;
+}
+
+/**
+ * Creates a canonicalized path from a string.
+ * 
+ * A canonicalized path is defined as a path where:
+ * - There is no leading separator ('hello', not '/hello')
+ * - There is no trailing separator ('hello', not 'hello/)
+ * - There are no '.' or '..' components ('hello/world', not 'hello/./useless/../world')
+ * 
+ * The separators in the returned path are replaced with '\0'.
+ * This makes it easier to iterate over the path components.
+ * The end of the path is marked by an empty component
+ * (meaning there are 2 '\0' at the end) 
+ * 
+ * This function allocates a new string and returns it.
+ * It is your duty to free it.
+ * 
+*/
+char *canonicalize_path(const char *path)
+{
+    while (*path == '/' && *(path + 1) == '/')
+        path++;
+
+    size_t pathlen = strlen(path);
+    char *cpath = (char*) malloc(pathlen + 2);
+    if (cpath == NULL)
+        return NULL;
+
+    memcpy(cpath, path, pathlen);
+    cpath[pathlen] = '\0';
+    cpath[pathlen + 1] = '\0';
+
+    /** 
+     * The code below does 3 things:
+     *  1. First, it processes '..' by turning the previous component into all '/'.
+     *     Example: 'hello/../world' becomes '////////world'.
+     *  2. Then, it transforms all '/.' into '//'.
+     *     Example: 'hello/./world.txt' becomes 'hello///world.txt'.
+     *  3. Finally, it collapses consecutive separators into a single one.
+     *     Example: 'hello///world' becomes 'hello/world'.
+     * 
+     * Last, it replaces all '/' with '\0', and adds an extra '\0' at the end
+     * to mark the end of the path.
+     */
+
+    // Handle '..'
+    {
+        char *src = cpath;
+        char *last_component_start = src;
+        char *last_component_end = src;
+        while (*src) {
+            if (*src == '/') {
+                last_component_start = last_component_end;
+                last_component_end = src;
+            }
+            if (*src != '.' || *(src + 1) != '.') {
+                src++;
+                continue;
+            }
+
+            // We found a '..', so we need to remove the previous component
+            memset(last_component_start, '/', (src + 1) - last_component_start);
+            src += 2;
+        }
+    }
+
+    // Handle '/.'
+    {
+        char *src = cpath;
+        while (*src && *(src + 1)) {
+            if (*src == '/' && *(src + 1) == '.') {
+                *(src + 1) = '/';
+            }
+            src++;
+        }
+    }
+
+    // Collapse consecutive separators ('hello///world' into 'hello/world')
+    {
+        char *src = cpath;
+        char *cpath_end = cpath + pathlen + 2;
+
+        while (*src) {
+            if (*src != '/') {
+                src++;
+                continue;
+            }
+
+            // Count how many '/' there are
+            int count = 0;
+            char *temp = src;
+            while (*temp == '/') {
+                temp++;
+                count++;
+            }
+
+
+            if (count == 1) {
+                src++;
+                continue;
+            }
+
+            kassert(count > 1);
+            memmove(src + 1, temp, cpath_end - temp);
+            src++;
+        }
+    }
+
+    size_t cpath_len = strlen(cpath);
+    for (size_t i = 0; i < cpath_len; i++) {
+        if (cpath[i] == '/')
+            cpath[i] = '\0';
+    }
+    cpath[cpath_len] = '\0';
+    cpath[cpath_len + 1] = '\0';
+
+    return cpath;
+}
+
+/**
+ * Basically adds back the '/' to a canonicalized path
+ */
+void decanonicalize_path(char *path)
+{
+    /* This is the special case of '/', which becomes 3 \0 in sequence */
+    if (*path == '\0' && *(path + 1) == '\0') {
+        *path = '/';
+        return;
+    }
+
+    char *src = path;
+    while (*src != '\0' || *(src + 1) != '\0') {
+        if (*src == '\0')
+            *src = '/';
+        src++;
+    }
+}
+
+char *pathjoin(const char *path1, const char *path2)
+{
+    size_t len1 = strnlen(path1, MAX_PATH_LEN);
+    size_t len2 = strnlen(path2, MAX_PATH_LEN);
+    if (len1 + len2 + 2 > MAX_PATH_LEN) {
+        LOGE("Path too long: '%s' + '%s'", path1, path2);
+        return nullptr;
+    }
+
+    char *result = (char*) malloc(len1 + len2 + 2);
+    if (result == nullptr) {
+        LOGE("Failed to allocate memory for pathjoin");
+        return nullptr;
+    }
+
+    memcpy(result, path1, len1);
+    if (len1 > 0 && result[len1 - 1] != '/') {
+        result[len1] = '/';
+        len1++;
+    }
+    memcpy(result + len1, path2, len2);
+    result[len1 + len2] = '\0';
+
+    return result;
+}
